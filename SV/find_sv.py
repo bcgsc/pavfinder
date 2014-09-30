@@ -18,7 +18,7 @@ from pybedtools import BedTool
 class SVFinder:
     
     name = 'PAVFinder'
-    version = '0.01'
+    version = '0.0.1'
     
     def __init__(self, bam_file, aligner, contig_fasta, genome_fasta, out_dir,
                  genome=None, index_dir=None, num_procs=0, is_transcriptome=None,
