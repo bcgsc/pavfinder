@@ -13,7 +13,7 @@ Author: Readman Chiu
 ## Find structural variants
 
 ```
-SV/find_sv.py <contigs2genome.bam> bwa_mem <contig_sequence.fa> <reference_sequence.fa> <output_directory> -b <tumor_reads2contigs.bam> --normal_bam <normal_reads2contigs.bam> --min_size <minimum event size>
+python SV/find_sv.py <contigs2genome.bam> bwa_mem <contig_sequence.fa> <reference_sequence.fa> <output_directory> -b <tumor_reads2contigs.bam> --normal_bam <normal_reads2contigs.bam> --min_size <minimum event size>
 ```
 
 More detailed documentation will come later.
