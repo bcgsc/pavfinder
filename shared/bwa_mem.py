@@ -5,53 +5,42 @@ import sys
 from intspan import intspan
 from sets import Set
 
-def find_chimera(alns, bam, max_edit_distance=10, debug=False):
-    """Extracts chimeric alignments from BWA-mem
-    If there are more than 1 primary alignment, it's a chimera
-    
-    Args:
-        alns: (list) Pysam AlignedRead objects of the same contig
-        bam: Pysam bam handle
-    Returns:
-        List of Alignment objects corresponding to a chimera, or None
-    """
+def find_chimera(alns, bam, debug=False):
     primary_alns = []
+    secondary_alns = []
     for aln in alns:
-        if aln.alen == aln.rlen:
-            break
-                
-        if not aln.is_secondary:
-            edit_distance = effective_edit_distance(aln)
-            if edit_distance is not None and float(edit_distance)/float(aln.alen) > 0.1:
-                if debug:
-                    sys.stdout.write('filter out chimeric alignments %s: edit distance %s > 0.1 of alignment len %d (%.02f)\n' % (aln.qname,
-                                                                                                                                  edit_distance,
-                                                                                                                                  aln.alen,
-                                                                                                                                  float(edit_distance)/float(aln.alen)
-                                                                                                                                  ))
-                continue
+        if aln.alen != aln.rlen and not aln.is_secondary:
             primary_alns.append(aln)
-                                
+        else:
+            secondary_alns.append(aln)
+    
     if len(primary_alns) > 1:
-        replace_haplotype(primary_alns, alns, bam)
+        replace_haplotype(primary_alns, secondary_alns, bam)
         
+    if len(primary_alns) > 1:
         aligns = [Alignment.from_alignedRead(aln, bam) for aln in primary_alns]
         
         bad_aligns = [align for align in aligns if not align.is_valid()]
-        if debug:
-            for align in bad_aligns:
-                sys.stdout.write('bad alignment %s %s %s %s %s %s' % (align.query,
-                                                                      align.qstart,
-                                                                      align.qend,
-                                                                      align.target,
-                                                                      align.tstart,
-                                                                      align.tend))
-        if not bad_aligns:
-            return aligns
+        if bad_aligns:
+            if debug:
+                for align in bad_aligns:
+                    sys.stdout.write('bad alignment %s %s %s %s %s %s' % (align.query,
+                                                                          align.qstart,
+                                                                          align.qend,
+                                                                          align.target,
+                                                                          align.tstart,
+                                                                          align.tend))
+        else:
+            valid_secondary_aligns = []
+            if secondary_alns:
+                secondary_aligns = [Alignment.from_alignedRead(aln, bam) for aln in secondary_alns]
+                valid_secondary_aligns = [align for align in secondary_aligns if align.is_valid()]
+                
+            return aligns, valid_secondary_aligns
         
-    return None
-
-def replace_haplotype(primary_alns, alns, bam):
+    return None, None
+    
+def replace_haplotype(primary_alns, secondary_alns, bam):
     """Replace primary alignments that maps to a haplotype contig with secondary alignments that don't
     
     Args:
@@ -69,15 +58,18 @@ def replace_haplotype(primary_alns, alns, bam):
             
     # make changes to primary_alns only if it contains haplotype alignments
     if remove:
-        # remove haplotype alignments
+        # move haplotype alignments to secondary
         for i in sorted(remove, reverse=True):
+            secondary_alns.append(primary_alns[i])
             del primary_alns[i]
             
-        for aln in alns:
+        # move non-haplotype secondary alignments to primary
+        for aln in secondary_alns:
             chrom = bam.getrname(aln.tid)
             # add secondary alignments that do not map to haplotypes for potential pairing
-            if aln.is_secondary and not target_non_canonical(chrom):
-                primary_alns.append(aln) 
+            if not target_non_canonical(chrom):
+                primary_alns.append(aln)
+                secondary_alns.remove(aln)
                 
 def effective_edit_distance(aln):
     """Returns edit distance without counting indels"""
