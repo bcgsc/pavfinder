@@ -275,102 +275,7 @@ class Event:
 			    return True		
 	    
 	return False
-	    
-    
-#class Event2:
-    #headers = ['event_type',
-               #'chrom1',
-               #'pos1',
-               #'gene1',
-               #'transcripts1',
-               #'exons1',
-               #'chrom2',
-               #'pos2',
-               #'gene2',
-               #'transcripts2',
-               #'exons2',
-               #'contigs',
-               #'contig_blocks',
-               #'contig_breaks',
-               #]
-    
-    #def __init__(Adjacency, event_type, 
-                 #chrom1=None, pos1=None, break1=None, gene1=None, transcripts1=[], exons1=[], 
-                 #chrom2=None, pos2=None, break2=None, gene2=None, transcripts2=[], exons2=[], 
-                 #contigs=[], contig_blocks=[], contig_breaks=[]):
-	#self.event_type = event_type
-	#self.chrom1 = chrom1
-	#self.pos1 = pos1
-	#self.gene1 = gene1
-	#self.transcripts1 = transcripts1
-	#self.exons1 = exons1
-	#self.chrom2 = chrom2
-	#self.pos2 = pos2
-	#self.gene2 = gene2
-	#self.transcripts2 = transcripts2
-	#self.exons2 = exons2
-	#self.contigs = contigs
-	#self.contig_blocks = contig_blocks
-	#self.contig_breaks = contig_breaks
-	
-    #def as_tab(self):
-	#def to_string(value):
-	    #if value is None:
-		#return '-'
-	    #elif type(value) is list or type(value) is tuple:
-		#items = []
-		#for item in value:
-		    #if item is None:
-			#items.append('-')
-		    #elif type(item) is list or type(item) is tuple:
-			#if item:
-			    #items.append(','.join(map(str, item)))
-		    #else:
-			#items.append(str(item))
-			
-		#if items:
-		    #return ';'.join(items)
-		#else:
-		    #return '-'
-	    #else:
-		#return str(value)
-	
-	
-	#cols = []
-	#for attr in self.headers:
-	    #value = getattr(self, attr)
-	    #cols.append(to_string(value))
-		
-	#return '\t'.join(cols)
-    
-    #@classmethod
-    #def output(cls, events, outdir):
-	## chimeras
-	## svs
-	#svs = [event for event in events if event.event_type == 'ins' or event.event_type == 'del']
-	#cls.output_sv(svs, '%s/sv.tsv' % outdir)
-	
-	## splicing
-	#splicing_types = ['novel_exon', 'skipped_exon']
-	#splicing = [event for event in events if event.event_type in splicing_types]
-	#cls.output_splicing(splicing, '%s/splicing.tsv' % outdir)
-	
-    #@classmethod
-    #def output_sv(cls, events, outfile):
-	#out = open(outfile, 'w')
-	#out.write('%s\n' % '\t'.join(cls.headers))
-	#for event in events:
-	    #out.write('%s\n' % event.as_tab())
-	#out.close()
-	
-    #@classmethod
-    #def output_splicing(cls, events, outfile):
-	#out = open(outfile, 'w')
-	#out.write('%s\n' % '\t'.join(cls.headers))
-	#for event in events:
-	    #out.write('%s\n' % event.as_tab())
-	#out.close()
-	
+	    	
 class Mapping:
     """Mapping per alignment"""
     def __init__(self, contig, align_blocks, transcripts=[]):
@@ -386,7 +291,6 @@ class Mapping:
 	for transcript in self.transcripts:
 	    exon_span = self.create_span(transcript.exons)
 	    olap = exon_span.intersection(align_span)
-	    #print 'olap', olap, len(olap), len(exon_span), float(len(olap)) / float(len(exon_span))
 	    self.coverages.append(float(len(olap)) / float(len(exon_span)))
 	    
     @classmethod
@@ -434,8 +338,6 @@ class Mapping:
 	              'from_edge': 0,
 	              'txt_size': 0
 	              }
-	    #print 'choice', transcript.id, transcript.gene, transcript.strand, matches, align.tstart, align.tend, matches[0][0][0], matches[-1][-1][0]
-	    
 	    # points are scored for matching exon boundaries
 	    score = 0
 	    for i in range(len(matches)):
@@ -521,11 +423,7 @@ class Mapping:
 	    mappings = list(group)
 	    contigs = ','.join([mapping.contig for mapping in mappings])
 	    transcripts = [mapping.transcripts for mapping in mappings]
-	    #print transcripts
-	    #print 'tt', Set(chain(*transcripts))
 	    align_blocks = [mapping.align_blocks for mapping in mappings]
-	    #print align_blocks
-	    #print list(chain(*align_blocks))
 	    
 	    align_blocks = None
 	    
@@ -702,21 +600,7 @@ class ExonMapper:
 	    result.append(block_matches)
 			
 	return result
-		    
-    #def extract_annot(self):
-	#self.annot = {}
-	#for feature in BedTool(self.annotations_file):
-	    #if feature[2] == 'exon':		
-		#print feature
-		#try:
-		    #self.annot[feature.attrs['transcript_id']]['exons'][int(feature.attrs['exon_number'])] = (int(feature.start) + 1, int(feature.stop))
-		#except:
-		    #self.annot[feature.attrs['transcript_id']] = {}
-		    #self.annot[feature.attrs['transcript_id']]['gene'] = feature.attrs['gene_name']
-		    #self.annot[feature.attrs['transcript_id']]['strand'] = feature.strand
-		    #self.annot[feature.attrs['transcript_id']]['exons'] = {}
-		    #self.annot[feature.attrs['transcript_id']]['exons'][int(feature.attrs['exon_number'])] = (int(feature.start) + 1, int(feature.stop))
-		    
+		    		    
     def extract_transcripts(self):
 	transcripts = {}
 	for feature in BedTool(self.annotations_file):
@@ -735,9 +619,6 @@ class ExonMapper:
 		    
 		transcript.add_exon(exon)
 		
-	#for transcript in transcripts.values():
-	    #print transcript.id, transcript.num_exons(), transcript.strand
-	    
 	return transcripts
     
     def identify_fusion(self, matches1, matches2, transcripts):
@@ -760,11 +641,8 @@ class ExonMapper:
 	    scores[transcript] = score
 	    
 	best_score = max(scores.values())
-	#print best_score, [t for t in matches1.keys() if scores[t] == best_score]
 	best_txt1 = sorted([t for t in matches1.keys() if scores[t] == best_score], 
 	                   key=lambda t: transcripts[t].length(), reverse=True)[0]
-	#print best_txt1
-	
 	
 	scores = {}
 	for transcript in matches2:
@@ -782,10 +660,8 @@ class ExonMapper:
 	    scores[transcript] = score
 	    
 	best_score = max(scores.values())
-	#print best_score, [t for t in matches2.keys() if scores[t] == best_score]
 	best_txt2 = sorted([t for t in matches2.keys() if scores[t] == best_score], 
 	                   key=lambda t: transcripts[t].length(), reverse=True)[0]
-	#print best_txt2
 	print 'fusion', best_txt1, matches1[best_txt1], best_txt2, matches2[best_txt2]
 	return (best_txt1, matches1[best_txt1]), (best_txt2, matches2[best_txt2])
     
@@ -893,9 +769,6 @@ class ExonMapper:
 	    
     def find_events(self, matches_by_transcript, align, transcripts):
 	genes = Set([transcripts[txt].gene for txt in matches_by_transcript.keys()])
-	#print 'genes', genes
-	#print align.blocks
-	#print align.query_blocks
 	num_blocks = len(align.blocks)
 	
 	events = []
@@ -967,22 +840,7 @@ class ExonMapper:
 		    adj.size = adj.breaks[1] - adj.breaks[0] - 1
 		
 		events.append(adj)
-		
-		#events.append(Event(event['event'],
-		                    #gene1 = list(genes)[0],
-		                    #transcripts1 = event['transcript'],
-		                    #gene2 = list(genes)[0],
-		                    #transcripts2 = event['transcript'],
-		                    #exons1 = event['exons'],
-		                    #contigs = align.query,
-		                    #contig_blocks = [event['blocks']],
-		                    #pos1 = event['pos'][0],
-		                    #pos2 = event['pos'][1],
-		                    #chrom1 = align.target,
-		                    #chrom2 = align.target
-		                    #)
-		              #)
-	    
+			    
 	return events
 						    		    
 	    
@@ -1069,9 +927,6 @@ class ExonMapper:
 		
 	    uniq_events = []
 	    for events in grouped.values():
-		#if len(events) == 1:
-		    #uniq_events.append(events[0])
-		#else:
 		transcripts = [e['transcript'] for e in events]
 		exons = [e['exons'] for e in events]
 		
@@ -1122,19 +977,8 @@ class ExonMapper:
 	       
 	    if match1[0] == match2[0] and\
 	       match1[1][1] == '<' and match2[1][0] == '>':
-	       #match1[1] == '=<' and match2[1] == '>=':
-		# examine gap: splice motif or not
-		#print chrom, blocks
-		#print blocks[0][1] + 1, blocks[0][1] + 2
-		#print blocks[1][0] - 2, blocks[1][0] - 1
-		#print self.ref_fasta.fetch(chrom, blocks[0][1], blocks[0][1] + 20)
-		#print self.ref_fasta.fetch(chrom, blocks[1][0] - 3, blocks[1][0] + 27)
-		#print transcript.strand
-		
 		expected_motif = 'gtag' if transcript.strand == '+' else 'ctac'
 		motif = self.ref_fasta.fetch(chrom, blocks[0][1], blocks[0][1] + 2) + self.ref_fasta.fetch(chrom, blocks[1][0] - 3, blocks[1][0] - 1)
-		#print blocks
-		#print expected_motif, motif, blocks[1][0] - blocks[0][1] - 1
 		
 		gap_size = blocks[1][0] - blocks[0][1] - 1
 		pos = (blocks[0][1], blocks[1][0])
@@ -1223,12 +1067,6 @@ class ExonMapper:
 	
 	exons = [m[0][0] for m in block_matches]
 	
-	#print block_matches[0][1][1] == '=', block_matches[0][1]
-	#print block_matches[-1][1][0] == '='
-	#print len([m for m in block_matches[1:-1] if m[1] == '==']) == len(block_matches) - 2
-	#print len([(a, b) for a, b in zip(exons, exons[1:]) if b == a + 1]) == len(block_matches) - 1
-	#print len([(a, b) for a, b in zip(exons, exons[1:]) if b == a - 1]) == len(block_matches) - 1	
-		
 	if block_matches[0][0][1][1] == '=' and\
 	   block_matches[-1][0][1][0] == '=' and\
 	   len([m for m in block_matches[1:-1] if m[0][1] == '==']) == len(block_matches) - 2 and\
@@ -1244,7 +1082,6 @@ def main(args, options):
     outdir = args[-1]
     # find events
     em = ExonMapper(*args)
-    #events = em.match_all()
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
