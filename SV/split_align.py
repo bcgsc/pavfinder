@@ -2,7 +2,7 @@ from optparse import OptionParser
 import pysam
 from intspan import intspan
 from sets import Set
-from shared import gmap, bwa_mem, bwa_mem2
+from shared import gmap, bwa_mem
 import sys
 import re
 from variant import Adjacency
@@ -28,9 +28,9 @@ def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, m
 	    primary_edit_distance = 0
 	    secondary_edit_distance = 0
 	    for align in primary_chimera:
-		primary_edit_distance += bwa_mem2.effective_edit_distance(align.sam)
+		primary_edit_distance += bwa_mem.effective_edit_distance(align.sam)
 	    for align in secondary_chimera:
-		secondary_edit_distance += bwa_mem2.effective_edit_distance(align.sam)
+		secondary_edit_distance += bwa_mem.effective_edit_distance(align.sam)
 	    if secondary_edit_distance <= primary_edit_distance:
 		return True
 	    else:
@@ -62,7 +62,7 @@ def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, m
     
     primary_aligns, secondary_aligns = {
         #'gmap': gmap.find_chimera,
-        'bwa_mem': bwa_mem2.find_chimera,
+        'bwa_mem': bwa_mem.find_chimera,
         }[aligner](alns, bam, debug=debug)
     		    
     if primary_aligns:
