@@ -246,9 +246,43 @@ class Event:
 		return '-'
 	else:
 	    return str(value)
+	
+    @classmethod
+    def is_ITD(cls, adj, contigs_fasta, outdir, min_match=10):
+	result = False
+		
+	# run BLAST of contig sequence against itself
+	contig_seq = contigs_fasta.fetch(adj.contigs[0])
+	seq_file = '%s/tmp_seq.fa' % outdir
+	out = open(seq_file, 'w')
+	out.write('>%s\n%s\n' % (adj.contigs[0], contig_seq))
+	out.close()
+	
+	blast_output = '%s/tmp_blastn.tsv' % outdir
+	cmd = 'blast -query %s -subject %s -outfmt 6 -out %s' % (seq_file, seq_file, blast_output)
+	print 'breaks', adj.contig_breaks
+	print cmd
+	try:
+	    subprocess.call(cmd, shell=True)
+	    #if os.path.exists(blast_output):
+		#blast_aligns = parse_tabular_blast(blast_output)
+		
+		## identify 'significant' stretch of duplication from BLAST result
+		## and see if it overlaps contig break position
+		#min_match = 10
+		#for align in blast_aligns:
+		    #if align.qend - align.qstart + 1 > min_match and\
+			#adj.contig_breaks[0] > align.qend:
+			    #result = True
+			
+	except:
+	    sys.stderr.write('Failed to run BLAST:%s\n' % cmd)
+	    
+	return False
+	    	
 
     @classmethod
-    def is_ITD(cls, adj, align, contigs_fasta, shift_size=20):
+    def is_ITD_old(cls, adj, align, contigs_fasta, shift_size=20):
 	if adj.novel_seq:
 	    contig_seq = contigs_fasta.fetch(adj.contigs[0])
 	    print 'itd', contig_seq, align.strand, adj.novel_seq, len(adj.novel_seq)
@@ -831,7 +865,7 @@ class ExonMapper:
 		    adj.novel_seq = novel_seq if align.strand == '+' else reverse_complement(novel_seq)
 		    print 'ens2', adj.novel_seq
 		    
-		    if Event.is_ITD(adj, align, self.contigs_fasta):
+		    if Event.is_ITD(adj, align, self.contigs_fasta, self.outdir):
 			adj.rna_event = 'ITD'
 			
 		    adj.size = len(adj.novel_seq)
