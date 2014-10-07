@@ -212,26 +212,6 @@ class ITD_Finder:
 		
 	return False
 
-class Fusion:
-    def __init__(self, gene1, gene2):
-	self.gene1 = gene1
-	self.gene2 = gene2
-	self.contigs = []
-	self.breaks = []
-	self.txt1 = None
-	self.txt2 = None
-	self.exon1 = None
-	self.exon2 = None
-	self.junctions = None
-	
-    def as_tab(self):
-	data = []
-	data.append(self.gene1)
-	data.append(self.gene2)
-	data.append(','.join(self.contigs))
-	
-	return '\t'.join(data)
-
 class Transcript:
     def __init__(self, id, gene=None, strand=None):
 	self.id = id
