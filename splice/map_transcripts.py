@@ -4,6 +4,9 @@ from pybedtools import create_interval_from_list, set_tempdir, BedTool
 import pysam
 import sys
 import re
+import subprocess
+import os
+from distutils.spawn import find_executable
 from shared import gmap
 from shared.annotate import overlap
 from shared.alignment import reverse_complement
@@ -11,6 +14,203 @@ from sets import Set
 from intspan import intspan
 from SV.split_align import call_event
 from SV.variant import Adjacency
+
+class ITD_Finder: 
+    @classmethod
+    def detect_itd(cls, adj, align, contig_seq, outdir, min_len, max_apart, min_pid, debug=False):
+	"""Determines if ins is an ITD
+	
+	Args:
+	    adj: (Adjacency) original insertion adjacency
+	    align: (Alignment) alignment
+	    contig_seq: (str) contig sequence
+	    outdir: (str) absolute path of output directory for temporarily storing blastn results if necessary
+	    min_len: (int) minimum size of duplication
+	    max_apart: (int) maximum distance apart of duplication
+	    min_pid: (float) minimum percentage of identity of the 2 copies
+	Returns:
+	    If adj is determined to be an ITD, adj attributes will be updated accordingly
+	"""
+	novel_seq = adj.novel_seq if align.strand == '+' else reverse_complement(adj.novel_seq)
+	dup = False
+	# try regex first to see if perfect copies exist
+	if len(novel_seq) >= min_len:
+	    dup = cls._search_by_regex(novel_seq, contig_seq, max_apart)
+	    if dup:
+		cls._update_attrs(adj, align, dup)
+	
+	# try BLAST if regex fails
+	if not dup:
+	    dup = cls._search_by_align(adj.contigs[0], contig_seq, outdir, sorted(adj.contig_breaks), min_len, max_apart, min_pid, debug=debug)
+	    if dup:
+		cls._update_attrs(adj, align, dup, contig_seq)
+	
+    @classmethod
+    def _update_attrs(cls, adj, align, dup, contig_seq=None):
+	"""Updates attributes of original insertion adjacency to become ITD
+	   1. rna_event -> 'ITD'
+	   2. contig_breaks -> coordinates of the breakpoint (the last coordinate of the first and first coordinate of the second copy)
+	   3. breaks -> genome coordinate of the last base of the first copy and the next position (if blast was done and <contig_seq>
+	      given
+	   4. novel_seq -> sequence of the second copy (if blast was done and <contig_seq> given
+	   
+	Args:
+	    adj: (Adjacency) original insertion adjacency object
+	    align: (Alignment) alignment obejct
+	    dup: (tuple) a tuple of 2 tuples that contain the duplication coordinates in the contig
+	    contig_seq(optional): (str) only given if break coordinates need to be modified (i.e. blastn has been done) and novel_seq
+				  needs to be reset
+	"""
+	adj.rna_event = 'ITD'
+	new_contig_breaks = (dup[0][1], dup[1][0])
+	adj.contig_breaks = new_contig_breaks
+	
+	if contig_seq is not None:
+	    # adjust genome break coordiantes based on new contig break coordinates
+	    shift = dup[1][0] - adj.contig_breaks[0]
+	    if align.strand == '+':
+		new_genome_pos = adj.breaks[0] + shift
+		new_genome_breaks = new_genome_pos - 1, new_genome_pos
+	    else:
+		new_genome_pos = adj.breaks[0] + shift * -1
+		new_genome_breaks = new_genome_pos, new_genome_pos + 1
+	    adj.breaks = new_genome_breaks
+	    
+	    # captures second copy of duplication as novel sequence
+	    dup_size = max(dup[0][1] - dup[0][0] + 1, dup[1][1] - dup[1][0] + 1)
+	    novel_seq = contig_seq[dup[1][0] - 1 : dup[1][0] - 1 + dup_size]
+	    if align.strand == '-':
+		novel_seq = reverse_complement(novel_seq)
+	    adj.novel_seq = novel_seq
+
+        
+    @classmethod
+    def _search_by_regex(cls, novel_seq, contig_seq, max_apart):
+	"""Finds if there is a duplication of the novel_seq within the contig sequence
+	by simple regex matching i.e. only perfect matches captured
+	
+	Args:
+	    novel_seq: (str) the original novel contig sequence defined in the insertion, assuming the 
+			     length is already checked to be above the threshold
+	    contig_seq: (str) the contig sequence
+	    max_apart:  (int) the maximum number of bases allowed for the event to be called a duplication
+	Returns:
+	    a tuple of 2 tuples that contain the duplication coordinates in the contig
+	"""
+	matches = re.findall(novel_seq, contig_seq)
+		
+	if len(matches) > 1:
+	    starts = []
+	    p = re.compile(novel_seq)
+	    for m in p.finditer(contig_seq):
+		starts.append(m.start())
+		
+	    if len(starts) == 2 and\
+	       starts[1] - (starts[0] + len(novel_seq)) <= max_apart:				
+		return ((starts[0] + 1, starts[0] + len(novel_seq)),
+		        (starts[1] + 1, starts[1] + len(novel_seq)))
+	    
+	return False
+    
+    @classmethod
+    def _parse_blast_tab(cls, blast_tab):
+	"""Parses a tabular BLAST output file
+	
+	Args:
+	    blast_tab: (str) full path to a tabular blastn output file (-outfmt 6 from blastn)
+			     version of blastn: ncbi-blast-2.2.29+
+	Returns:
+	    A list of dictionary where the keys are the fields and the values are the results
+	"""
+	aligns = []
+	fields = ('query', 'target', 'pid', 'alen', 'num_mismatch', 'num_gaps', 'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bit_score')
+	for line in open(blast_tab, 'r'):
+	    cols = line.rstrip('\n').split('\t')
+	    # if somehow the number of values is different from the number of fields hard-coded above, no alignments will be captured
+	    if len(cols) == len(fields):
+		aligns.append(dict(zip(fields, cols)))
+	    
+	return aligns
+	
+    @classmethod
+    def _search_by_align(cls, contig, contig_seq, outdir, contig_breaks, min_len, max_apart, min_pid, debug=False):
+	"""Checks if an insertion event is an ITD using blastn self-vs-self alignment
+	Assumes:
+	1. original contig coordiantes are the coordinates of the novel sequence
+	2. original insertion will overlap the duplication ranges
+
+	Conditions:
+	1. percentage of identity between the duplications is at least <min_pid> (mismatch and gap allowed)
+	2. the duplciations are at most <max_apart> apart
+	3. the duplication is at least <min_len> long
+	
+	Returns:
+	    a tuple of 2 tuples that contain the duplication coordinates in the contig
+	"""						
+	# run blastn of contig sequence against itself
+	# generate FASTA file of contig sequence
+	seq_file = '%s/tmp_seq.fa' % outdir
+	out = open(seq_file, 'w')
+	out.write('>%s\n%s\n' % (contig, contig_seq))
+	out.close()
+	
+	# run blastn
+	blast_output = '%s/tmp_blastn.tsv' % outdir
+	cmd = 'blastn -query %s -subject %s -outfmt 6 -out %s' % (seq_file, seq_file, blast_output)
+
+	try:
+	    subprocess.call(cmd, shell=True)
+	except:
+	    # should check whether blastn is in the PATH right off the bet
+	    sys.stderr.write('Failed to run BLAST:%s\n' % cmd)
+	    sys.exit()
+	    
+	if os.path.exists(blast_output):
+	    blast_aligns = cls._parse_blast_tab(blast_output)
+	    # clean up
+	    if not debug:
+		for ff in (seq_file, blast_output):
+		    os.remove(ff)
+		
+	    # identify 'significant' stretch of duplication from BLAST result
+	    # and see if it overlaps contig break position
+	    dups = []
+	    # for picking the 'longest' dup if there are multiple candidates
+	    dup_sizes = []
+	    for aln in blast_aligns:
+		# skip if a. it's the sequence match itself 
+		#         b. match is too short 
+		#         c. match is just a member of the 2 reciprocal matches
+		if int(aln['alen']) == len(contig_seq) or\
+		   int(aln['alen']) < min_len or\
+		   int(aln['qstart']) >= int(aln['tstart']):
+		    continue
+		span1 = (int(aln['qstart']), int(aln['qend']))
+		span2 = (int(aln['tstart']), int(aln['tend']))
+		
+		# 4 conditions for checking if it's an ITD
+		#      1. longer than minimum length (checked above)
+		#      2. percent of identity better than minumum
+		#      3. the duplications less than or equal to max_apart
+		#      4. either one the duplication ranges overlaps the original contigs breakpoint coordinate range
+		#         (contig coordinates of the novel sequence)
+		if float(aln['pid']) >= min_pid and\
+		   abs(min(span2[1], span1[1]) - max(span2[0], span1[0])) <= max_apart and\
+		   (min(contig_breaks[1], span1[1]) - max(contig_breaks[0], span1[0]) > 0 or
+		    min(contig_breaks[1], span2[1]) - max(contig_breaks[0], span2[0]) > 0):
+		    dup = [(int(aln['qstart']), int(aln['qend'])), 
+		           (int(aln['tstart']), int(aln['tend']))]
+		    dups.append(dup)
+		    dup_sizes.append(int(aln['alen']))
+		    
+	    if dups:
+		# if there are multiple candidates, pick the largest
+		index_of_largest = sorted(range(len(dups)), key=lambda idx:dup_sizes[idx], reverse=True)[0]		
+		dup = dups[index_of_largest]	
+				
+		return dup
+		
+	return False
 
 class Fusion:
     def __init__(self, gene1, gene2):
@@ -246,70 +446,7 @@ class Event:
 		return '-'
 	else:
 	    return str(value)
-	
-    @classmethod
-    def is_ITD(cls, adj, contigs_fasta, outdir, min_match=10):
-	result = False
-		
-	# run BLAST of contig sequence against itself
-	contig_seq = contigs_fasta.fetch(adj.contigs[0])
-	seq_file = '%s/tmp_seq.fa' % outdir
-	out = open(seq_file, 'w')
-	out.write('>%s\n%s\n' % (adj.contigs[0], contig_seq))
-	out.close()
-	
-	blast_output = '%s/tmp_blastn.tsv' % outdir
-	cmd = 'blast -query %s -subject %s -outfmt 6 -out %s' % (seq_file, seq_file, blast_output)
-	print 'breaks', adj.contig_breaks
-	print cmd
-	try:
-	    subprocess.call(cmd, shell=True)
-	    #if os.path.exists(blast_output):
-		#blast_aligns = parse_tabular_blast(blast_output)
-		
-		## identify 'significant' stretch of duplication from BLAST result
-		## and see if it overlaps contig break position
-		#min_match = 10
-		#for align in blast_aligns:
-		    #if align.qend - align.qstart + 1 > min_match and\
-			#adj.contig_breaks[0] > align.qend:
-			    #result = True
-			
-	except:
-	    sys.stderr.write('Failed to run BLAST:%s\n' % cmd)
-	    
-	return False
-	    	
-
-    @classmethod
-    def is_ITD_old(cls, adj, align, contigs_fasta, shift_size=20):
-	if adj.novel_seq:
-	    contig_seq = contigs_fasta.fetch(adj.contigs[0])
-	    print 'itd', contig_seq, align.strand, adj.novel_seq, len(adj.novel_seq)
-	    
-	    novel_seq = adj.novel_seq if align.strand == '+' else reverse_complement(adj.novel_seq)
-	    matches = re.findall(novel_seq, contig_seq)
-	    if len(matches) > 1:
-		return True
-	    else:
-		size_novel_seq = len(adj.novel_seq)
-		start = min(adj.contig_breaks) 
-		without_ins_seq_original = contig_seq[:start] + contig_seq[start + size_novel_seq:]
-		print align.query, 'itd xx', start, start + size_novel_seq, len(contig_seq[:start]), len(contig_seq[start + size_novel_seq:]), size_novel_seq
-		for i in range(1, shift_size + 1):
-		    without_ins_seq = contig_seq[:start - i] + contig_seq[start - i + size_novel_seq:]
-		    if without_ins_seq_original==without_ins_seq:
-			novel_seq = contig_seq[start - i: start - i + size_novel_seq]
-			if len(re.findall(novel_seq, contig_seq)) > 1:
-			    return True
-		    without_ins_seq = contig_seq[:start + i] + contig_seq[start + i + size_novel_seq:]
-		    if without_ins_seq_original==without_ins_seq:
-			novel_seq = contig_seq[start + i : start + i + size_novel_seq]
-			if len(re.findall(novel_seq, contig_seq)) > 1:
-			    return True		
-	    
-	return False
-	    	
+						    	    	
 class Mapping:
     """Mapping per alignment"""
     def __init__(self, contig, align_blocks, transcripts=[]):
@@ -491,13 +628,15 @@ class Mapping:
 	out.close()
 
 class ExonMapper:
-    def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir):
+    def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
+                 itd_min_len=None, itd_min_pid=None, itd_max_apart=None, debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
 	self.contigs_fasta = pysam.Fastafile(contigs_fasta_file)
         self.ref_fasta = pysam.Fastafile(ref_fasta_file)
 	self.annot = pysam.Tabixfile(annotation_file, parser=pysam.asGTF())
         self.aligner = aligner
         self.outdir = outdir
+	self.debug = debug
         
         self.blocks_bed = '%s/blocks.bed' % outdir
         self.overlaps_bed = '%s/blocks_olap.bed' % outdir
@@ -508,9 +647,14 @@ class ExonMapper:
 	self.mappings = []
 	self.events = []
 	
+	self.itd_conditions = {'min_len': itd_min_len,
+	                       'min_pid': itd_min_pid,
+	                       'max_apart': itd_max_apart
+	                       }
+	
 	transcripts = self.extract_transcripts()
 	self.map_contigs_to_transcripts(transcripts)
-		
+			
     def get_attrs(self, attrs_str):
 	attrs = {}
 	for field in attrs_str.split(';'):
@@ -795,10 +939,8 @@ class ExonMapper:
 	return fusion
     
     def extract_novel_seq(self, adj):
-	print 'ens', adj.contigs, adj.contig_breaks, self.contigs_fasta.fetch(adj.contigs[0])
-	start, end = adj.contig_breaks if adj.contig_breaks[0] < adj.contig_breaks[1] else adj.contig_breaks[1], adj.contig_breaks[0]
+	start, end = (adj.contig_breaks[0], adj.contig_breaks[1]) if adj.contig_breaks[0] < adj.contig_breaks[1] else (adj.contig_breaks[1], adj.contig_breaks[0])
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
-	print 'ens', start, end, novel_seq, len(novel_seq)
 	return novel_seq
 	    
     def find_events(self, matches_by_transcript, align, transcripts):
@@ -807,7 +949,6 @@ class ExonMapper:
 	
 	events = []
 		
-	print 'ttt', len(genes), genes
 	if len(genes) > 1:
 	    matches_by_block = {}
 	    genes_in_block = {}
@@ -849,8 +990,6 @@ class ExonMapper:
 	local_events = self.find_novel_junctions(matches_by_transcript, align, transcripts)
 	if local_events:
 	    for event in local_events:
-		#event_type, gene, transcript, contigs=[], contig_blocks=[], contig_breaks=[], exons=[]
-		print 'mmm', event
 		adj = Adjacency((align.target,), event['pos'], '-', contig=align.query)
 		if event['event'] in ('ins', 'del', 'dup', 'inv'):
 		    adj.rearrangement = event['event']
@@ -863,11 +1002,15 @@ class ExonMapper:
 		if adj.rearrangement == 'ins' or adj.rearrangement == 'dup':
 		    novel_seq = self.extract_novel_seq(adj)
 		    adj.novel_seq = novel_seq if align.strand == '+' else reverse_complement(novel_seq)
-		    print 'ens2', adj.novel_seq
 		    
-		    if Event.is_ITD(adj, align, self.contigs_fasta, self.outdir):
-			adj.rna_event = 'ITD'
-			
+		    if len(novel_seq) >= self.itd_conditions['min_len']:
+			ITD_Finder.detect_itd(adj, align, self.contigs_fasta.fetch(adj.contigs[0]), self.outdir, 
+			                      self.itd_conditions['min_len'],
+			                      self.itd_conditions['max_apart'],
+			                      self.itd_conditions['min_pid'],
+			                      debug=self.debug
+			                      )
+		    			
 		    adj.size = len(adj.novel_seq)
 		    
 		elif adj.rearrangement == 'del':
@@ -1114,8 +1257,19 @@ class ExonMapper:
 
 def main(args, options):
     outdir = args[-1]
+    # check executables
+    required_binaries = ('gmap', 'blastn')
+    for binary in required_binaries:
+	which = find_executable(binary)
+	if not which:
+	    sys.exit('"%s" not in PATH - abort' % binary)
+    
     # find events
-    em = ExonMapper(*args)
+    em = ExonMapper(*args, 
+                    itd_min_len=options.itd_min_len,
+                    itd_min_pid=options.itd_min_pid,
+                    itd_max_apart=options.itd_max_apart,
+                    debug=options.debug)
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
@@ -1127,8 +1281,12 @@ if __name__ == '__main__':
     parser = OptionParser(usage=usage)
     
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
-    parser.add_option("-n", "--num_procs", dest="num_procs", help="Number of processes. Default: 5", default=5, type=int)
+    parser.add_option("-n", "--num_procs", dest="num_procs", help="number of processes. Default: 5", default=5, type=int)
     parser.add_option("--junctions", dest="junctions", help="output junctions", action="store_true", default=False)
+    parser.add_option("--itd_min_len", dest="itd_min_len", help="minimum ITD length. Default: 10", default=10, type=int)
+    parser.add_option("--itd_min_pid", dest="itd_min_pid", help="minimum ITD percentage of identity. Default: 0.95", default=0.95, type=float)
+    parser.add_option("--itd_max_apart", dest="itd_max_apart", help="maximum distance apart of ITD. Default: 10", default=10, type=int)
+    parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
     if len(args) == 6:
