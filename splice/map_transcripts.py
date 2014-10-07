@@ -268,6 +268,27 @@ class Transcript:
     def txEnd(self):
 	return self.exons[-1][1]
     
+    def exon_num(self, index):
+	"""Converts exon index to exon number
+	Exon number is always starting from the transcription start site
+	i.e. for positive transcripts, the first exon is exon 1
+	     for negative transcripts, the last exon is exon 1
+	Need this method because a lot of the splicing variant code just keep
+	track of the index instead of actual exon number
+	
+	Args:
+	    index: (int) index of exon in list
+	Returns:
+	    Exon number in int
+	"""
+	assert type(index) is int, 'exon index %s not given in int' % index
+	assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: %s %s' % (self.id, self.strand)
+	assert index >= 0 and index < len(self.exons), 'exon index out of range:%s %d' % (index, len(self.exons))
+	if self.strand == '+':
+	    return index + 1
+	else:
+	    return len(self.exons) - index
+    
 class Event:
     headers = ['event_type',
                'chrom1',
@@ -996,7 +1017,11 @@ class ExonMapper:
 		adj.rna_event = event['event']
 		adj.genes = (list(genes)[0],)
 		adj.transcripts = (event['transcript'][0],)
-		adj.exons = event['exons'][0]
+		
+		# converts exon index to exon number (which takes transcript strand into account)
+		exons = event['exons'][0]
+		adj.exons = map(transcripts[event['transcript'][0]].exon_num, exons)
+		
 		adj.contig_breaks = event['contig_breaks']
 		
 		if adj.rearrangement == 'ins' or adj.rearrangement == 'dup':
@@ -1122,9 +1147,6 @@ class ExonMapper:
 		    
 	    print 'final', uniq_events
 	    return uniq_events
-	    
-	
-	
 	
     def classify_novel_junction(self, match1, match2=None, chrom=None, blocks=None, transcript=None):
 	events = []
