@@ -212,6 +212,162 @@ class ITD_Finder:
 		
 	return False
     
+class FusionFinder:
+    @classmethod
+    def find_chimera(cls, chimera_block_matches, transcripts, aligns):
+	"""Identify gene fusion between split alignments
+	
+	Args:
+	    chimera_block_matches: (list) dictionaries where 
+	                                      key=transcript name, 
+	                                      value=[match1, match2, ...] where
+						    match1 = matches of each alignment block
+							     i.e.
+							     [(exon_id, '=='), (exon_id, '==')] 
+	    transcripts: (dict) key=transcript_name value=Transcript object
+	    aligns: (list) Alignments involved in chimera
+	Returns:
+	    Adjacency with genes, transcripts, exons annotated
+	"""
+	assert len(chimera_block_matches) == len(aligns), 'number of block matches(%d) != number of aligns(%d)' % \
+	       (len(chimera_block_matches), len(aligns))
+	for (matches1_by_txt, matches2_by_txt) in zip(chimera_block_matches, chimera_block_matches[1:]):	    
+	    genes1 = Set([transcripts[txt].gene for txt in matches1_by_txt.keys()])
+	    genes2 = Set([transcripts[txt].gene for txt in matches2_by_txt.keys()])
+	    	    	    
+	    junc_matches1 = {}
+	    num_blocks = len(aligns[0].blocks)
+	    for transcript in chimera_block_matches[0].keys():
+		junc_matches1[transcript] = chimera_block_matches[0][transcript][num_blocks - 1]
+	
+	    junc_matches2 = {}
+	    for transcript in chimera_block_matches[1].keys():
+		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
+    
+	    # create adjacency first to establish L/R orientations, which is necessary to pick best transcripts
+	    fusion = call_event(aligns[0], aligns[1], no_sort=True)
+	    junc1, junc2 = cls.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
+	    if junc1 and junc2:
+		fusion.rna_event = 'fusion'
+		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
+		fusion.transcripts = (junc1[0], junc2[0])
+		fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
+		return fusion
+	    
+	return None
+
+    @classmethod
+    def find_read_through(cls, matches_by_transcript, transcripts, align):
+	def create_fusion(junc1, junc2, pos, contig_breaks):
+	    fusion = Adjacency((align.target, align.target),
+	                       pos,
+	                       '-',
+	                       orients=('L', 'R'),
+	                       contig_breaks = contig_breaks
+	                       )               
+	    fusion.rna_event = 'fusion'
+	    fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
+	    fusion.transcripts = (junc1[0], junc2[0])
+	    fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
+	
+	    return fusion
+
+	num_blocks = len(align.blocks)
+	matches_by_block = {}
+	genes_in_block = {}
+	for i in range(num_blocks):
+	    matches_by_block[i] = {}
+	    genes_in_block[i] = Set()
+	    for transcript in matches_by_transcript.keys():
+		matches_by_block[i][transcript] = matches_by_transcript[transcript][i]
+		if matches_by_transcript[transcript][i] is not None:
+		    genes_in_block[i].add(transcripts[transcript].gene)
+		    
+	junctions = zip(range(num_blocks), range(num_blocks)[1:])
+	for k in range(len(junctions)):
+	    i, j = junctions[k]
+	    if len(genes_in_block[i]) == 1 and len(genes_in_block[j]) == 1:
+		if list(genes_in_block[i])[0] != list(genes_in_block[j])[0]:
+		    junc1, junc2 = cls.identify_fusion(matches_by_block[i], matches_by_block[j], transcripts, ('L', 'R'))
+		    pos = (align.blocks[i][1], align.blocks[j][0])
+		    contig_breaks = (align.query_blocks[i][1], align.query_blocks[j][0])
+		    fusion = create_fusion(junc1, junc2, pos, contig_breaks)
+		    return fusion
+	
+	    elif len(genes_in_block[i]) > 1:
+		print 'fusion block', i, j, genes_in_block
+		
+	    elif len(genes_in_block[j]) > 1:
+		print 'fusion block', i, j
+		
+	for i in genes_in_block.keys():
+	    if len(genes_in_block[i]) == 2:
+		cls.identify_fusion_unknown_break(matches_by_block[i], transcripts, ('L', 'R'))
+		
+	return None
+		
+    @classmethod
+    def identify_fusion_unknown_break(cls, matches, transcripts):
+	all_matches = Set()
+	for txt in matches:
+	    if matches[txt] is None:
+		continue
+	    
+	    for match in matches[txt]:
+		all_matches.add((txt, match))
+		
+	left_bound_matches = [match for match in all_matches if match[1][1][0] == '=']
+	right_bound_matches = [match for match in all_matches if match[1][1][1] == '=']
+
+	print 'left', left_bound_matches
+	print 'right', right_bound_matches
+	
+	if left_bound_matches and right_bound_matches:
+	    left_bound_matches.sort(key=lambda m: transcripts[m[0]].length(), reverse=True)
+	    right_bound_matches.sort(key=lambda m: transcripts[m[0]].length(), reverse=True)
+	    
+	    print 'left', left_bound_matches
+	    print 'right', right_bound_matches
+	    
+	    print 'fusion_unknown_break', left_bound_matches[0], right_bound_matches[0]
+    
+    @classmethod
+    def identify_fusion(cls, matches1, matches2, transcripts, orients):
+	"""Given 2 block matches pick the 2 transcripts"""
+	def pick_best(matches, orient):
+	    scores = {}
+	    for transcript in matches:
+		if orient == 'L':
+		    junction_block = -1
+		    junction_edge, distant_edge = -1, 0
+		else:
+		    junction_block = 0
+		    junction_edge, distant_edge = 0, -1
+		score = 0
+		if matches[transcript] is not None:
+		    if matches[transcript][junction_block][1][junction_edge] == '=':
+			score += 100
+			
+		    # align block within exon gets more points
+		    if matches[transcript][junction_block][1][distant_edge] == '=':
+			score += 15
+		    elif matches[transcript][junction_block][1][distant_edge] == '>':
+			score += 10
+		    elif matches[transcript][junction_block][1][distant_edge] == '<':
+			score += 5
+		scores[transcript] = score
+		
+	    best_score = max(scores.values())
+	    best_txt = sorted([t for t in matches.keys() if scores[t] == best_score], 
+		               key=lambda t: transcripts[t].length(), reverse=True)[0]
+	    return best_txt
+	    	
+	best_txt1 = pick_best(matches1, orients[0])
+	best_txt2 = pick_best(matches2, orients[1])
+	
+	return (best_txt1, matches1[best_txt1]), (best_txt2, matches2[best_txt2])
+
+    
 class Transcript:
     def __init__(self, id, gene=None, strand=None):
 	self.id = id
@@ -750,7 +906,8 @@ class ExonMapper:
 	    # split aligns, try to find gene fusion
 	    if chimera and chimera_block_matches:
 		if len(chimera_block_matches) == len(aligns):
-		    fusion = self.find_chimera(chimera_block_matches, transcripts, aligns)
+		    #fusion = self.find_chimera(chimera_block_matches, transcripts, aligns)
+		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns)
 		    if fusion:
 			self.events.append(fusion)
 		
@@ -796,129 +953,7 @@ class ExonMapper:
 		transcript.add_exon(exon)
 		
 	return transcripts
-    
-    def identify_fusion(self, matches1, matches2, transcripts, orients):
-	"""Given 2 block matches pick the 2 transcripts"""
-	def pick_best(matches, orient):
-	    scores = {}
-	    for transcript in matches:
-		if orient == 'L':
-		    junction_block = -1
-		    junction_edge, distant_edge = -1, 0
-		else:
-		    junction_block = 0
-		    junction_edge, distant_edge = 0, -1
-		score = 0
-		if matches[transcript] is not None:
-		    if matches[transcript][junction_block][1][junction_edge] == '=':
-			score += 100
-			
-		    # align block within exon gets more points
-		    if matches[transcript][junction_block][1][distant_edge] == '=':
-			score += 15
-		    elif matches[transcript][junction_block][1][distant_edge] == '>':
-			score += 10
-		    elif matches[transcript][junction_block][1][distant_edge] == '<':
-			score += 5
-		scores[transcript] = score
-		
-	    best_score = max(scores.values())
-	    best_txt = sorted([t for t in matches.keys() if scores[t] == best_score], 
-		               key=lambda t: transcripts[t].length(), reverse=True)[0]
-	    return best_txt
-	    	
-	best_txt1 = pick_best(matches1, orients[0])
-	best_txt2 = pick_best(matches2, orients[1])
-	
-	return (best_txt1, matches1[best_txt1]), (best_txt2, matches2[best_txt2])
-    
-    def identify_fusion_unknown_break(self, matches, transcripts):
-	all_matches = Set()
-	for txt in matches:
-	    if matches[txt] is None:
-		continue
-	    
-	    for match in matches[txt]:
-		all_matches.add((txt, match))
-		
-	left_bound_matches = [match for match in all_matches if match[1][1][0] == '=']
-	right_bound_matches = [match for match in all_matches if match[1][1][1] == '=']
-
-	print 'left', left_bound_matches
-	print 'right', right_bound_matches
-	
-	if left_bound_matches and right_bound_matches:
-	    left_bound_matches.sort(key=lambda m: transcripts[m[0]].length(), reverse=True)
-	    right_bound_matches.sort(key=lambda m: transcripts[m[0]].length(), reverse=True)
-	    
-	    print 'left', left_bound_matches
-	    print 'right', right_bound_matches
-	    
-	    print 'fusion_unknown_break', left_bound_matches[0], right_bound_matches[0]
-	    
-    def find_chimera(self, chimera_block_matches, transcripts, aligns):
-	"""Identify gene fusion between split alignments
-	
-	Args:
-	    chimera_block_matches: (list) dictionaries where 
-	                                      key=transcript name, 
-	                                      value=[match1, match2, ...] where
-						    match1 = matches of each alignment block
-							     i.e.
-							     [(exon_id, '=='), (exon_id, '==')] 
-	    transcripts: (dict) key=transcript_name value=Transcript object
-	    aligns: (list) Alignments involved in chimera
-	Returns:
-	    Adjacency with genes, transcripts, exons annotated
-	"""
-	assert len(chimera_block_matches) == len(aligns), 'number of block matches(%d) != number of aligns(%d)' % \
-	       (len(chimera_block_matches), len(aligns))
-	for (matches1_by_txt, matches2_by_txt) in zip(chimera_block_matches, chimera_block_matches[1:]):	    
-	    genes1 = Set([transcripts[txt].gene for txt in matches1_by_txt.keys()])
-	    genes2 = Set([transcripts[txt].gene for txt in matches2_by_txt.keys()])
-	    	    	    
-	    junc_matches1 = {}
-	    num_blocks = len(aligns[0].blocks)
-	    for transcript in chimera_block_matches[0].keys():
-		junc_matches1[transcript] = chimera_block_matches[0][transcript][num_blocks - 1]
-	
-	    junc_matches2 = {}
-	    for transcript in chimera_block_matches[1].keys():
-		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
-    
-	    # create adjacency first to establish L/R orientations, which is necessary to pick best transcripts
-	    fusion = call_event(aligns[0], aligns[1], no_sort=True)
-	    junc1, junc2 = self.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
-	    if junc1 and junc2:
-		fusion.rna_event = 'fusion'
-		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
-		fusion.transcripts = (junc1[0], junc2[0])
-		fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
-		return fusion
-	    
-	return None
-    
-    def create_fusion_event(self, aligns, transcripts, junc1, junc2, pos=[], contig_breaks=None):
-	if len(aligns) == 2:
-	    fusion = call_event(aligns[0], aligns[1])
-	else:
-	    fusion = Adjacency((aligns[0].target, aligns[0].target),
-	                       pos,
-	                       '-',
-	                       orients=('L', 'R'),
-	                       contig_breaks = contig_breaks
-	                       )
-	                       
-	fusion.rna_event = 'fusion'
-	#fusion.id = 'abc'
-	fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
-	fusion.transcripts = (junc1[0], junc2[0])
-	fusion.exons = (junc1[1][0][0] + 1, junc2[1][0][0] + 1)
-		
-	exon1, exon2 = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
-	
-	return fusion
-    
+        
     def extract_novel_seq(self, adj):
 	start, end = (adj.contig_breaks[0], adj.contig_breaks[1]) if adj.contig_breaks[0] < adj.contig_breaks[1] else (adj.contig_breaks[1], adj.contig_breaks[0])
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
@@ -931,38 +966,10 @@ class ExonMapper:
 	events = []
 		
 	if len(genes) > 1:
-	    matches_by_block = {}
-	    genes_in_block = {}
-	    for i in range(num_blocks):
-		matches_by_block[i] = {}
-		genes_in_block[i] = Set()
-		for transcript in matches_by_transcript.keys():
-		    matches_by_block[i][transcript] = matches_by_transcript[transcript][i]
-		    if matches_by_transcript[transcript][i] is not None:
-			genes_in_block[i].add(transcripts[transcript].gene)
-			
-			
-	    junctions = zip(range(num_blocks), range(num_blocks)[1:])
-	    for k in range(len(junctions)):
-		i, j = junctions[k]
-		if len(genes_in_block[i]) == 1 and len(genes_in_block[j]) == 1:
-		    if list(genes_in_block[i])[0] != list(genes_in_block[j])[0]:
-			junc1, junc2 = self.identify_fusion(matches_by_block[i], matches_by_block[j], transcripts, ('L', 'R'))
-			pos = (align.blocks[i][1], align.blocks[j][0])
-			contig_breaks = (align.query_blocks[i][1], align.query_blocks[j][0])
-			event = self.create_fusion_event((align,), transcripts, junc1, junc2, pos=pos, contig_breaks=contig_breaks)
-			events.append(event)
-	    
-		elif len(genes_in_block[i]) > 1:
-		    print 'fusion block', i, j, genes_in_block
-		    
-		elif len(genes_in_block[j]) > 1:
-		    print 'fusion block', i, j
-		    
-	    for i in genes_in_block.keys():
-		if len(genes_in_block[i]) == 2:
-		    self.identify_fusion_unknown_break(matches_by_block[i], transcripts, ('L', 'R'))
-	    		
+	    fusion = FusionFinder.find_read_through(matches_by_transcript, transcripts, align)
+	    if fusion is not None:
+		events.append(fusion)
+	    	    		
 	local_events = self.find_novel_junctions(matches_by_transcript, align, transcripts)
 	if local_events:
 	    for event in local_events:
@@ -1229,8 +1236,6 @@ class ExonMapper:
 	    return True
 		
 	return False
-
-
 
 def main(args, options):
     outdir = args[-1]
