@@ -252,6 +252,9 @@ class FusionFinder:
 		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
 		fusion.transcripts = (junc1[0], junc2[0])
 		fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
+		fusion.exon_bound = junc1[2], junc2[2]
+		fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
+		cls.is_ptd(fusion)
 		return fusion
 	    
 	return None
@@ -296,7 +299,10 @@ class FusionFinder:
 	    fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
 	    fusion.transcripts = (junc1[0], junc2[0])
 	    fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
-	
+	    fusion.exon_bound = junc1[2], junc2[2]
+	    fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
+	    cls.is_ptd(fusion)
+	    
 	    return fusion
 	
 	num_blocks = len(align.blocks)
@@ -361,7 +367,7 @@ class FusionFinder:
     @classmethod
     def identify_fusion(cls, matches1, matches2, transcripts, orients):
 	"""Given 2 block matches pick the 2 transcripts"""
-	def pick_best(matches, orient):
+	def pick_best(matches, orient, exon_bound_score=1000):
 	    scores = {}
 	    for transcript in matches:
 		if orient == 'L':
@@ -373,7 +379,7 @@ class FusionFinder:
 		score = 0
 		if matches[transcript] is not None:
 		    if matches[transcript][junction_block][1][junction_edge] == '=':
-			score += 100
+			score += exon_bound_score
 			
 		    # align block within exon gets more points
 		    if matches[transcript][junction_block][1][distant_edge] == '=':
@@ -387,14 +393,21 @@ class FusionFinder:
 	    best_score = max(scores.values())
 	    best_txt = sorted([t for t in matches.keys() if scores[t] == best_score], 
 		               key=lambda t: transcripts[t].length(), reverse=True)[0]
-	    return best_txt
+	    return best_txt, best_score > exon_bound_score
 	    	
-	best_txt1 = pick_best(matches1, orients[0])
-	best_txt2 = pick_best(matches2, orients[1])
+	best_txt1, exon_bound1 = pick_best(matches1, orients[0])
+	best_txt2, exon_bound2 = pick_best(matches2, orients[1])
 	
-	return (best_txt1, matches1[best_txt1]), (best_txt2, matches2[best_txt2])
+	return (best_txt1, matches1[best_txt1], exon_bound1), (best_txt2, matches2[best_txt2], exon_bound2)
 
-    
+    @classmethod
+    def is_ptd(cls, fusion):
+	"""Define PTD"""
+	if fusion.genes[0] == fusion.genes[1] and\
+	   fusion.exon_bound[0] and\
+	   fusion.exon_bound[1]:
+	    fusion.rna_event = 'PTD'
+	
 class Transcript:
     def __init__(self, id, gene=None, strand=None):
 	self.id = id
@@ -456,90 +469,109 @@ class Event:
     headers = ['event_type',
                'chrom1',
                'pos1',
+               'orient1',
                'gene1',
-               'transcripts1',
-               'exons1',
+               'transcript1',
+               'exon1',
                'chrom2',
                'pos2',
+               'orient2',
                'gene2',
-               'transcripts2',
-               'exons2',
+               'transcript2',
+               'exon2',
+               'size',
                'contigs',
-               'contig_blocks',
                'contig_breaks',
                ]
     
     @classmethod
     def output(cls, events, outdir):
-	# chimeras
-	# svs
-	#svs = [event for event in events if event.event_type == 'ins' or event.event_type == 'del']
-	#cls.output_sv(svs, '%s/sv.tsv' % outdir)
-	
-	# splicing
-	splicing_types = ['novel_exon', 'skipped_exon']
-	splicing = [event for event in events if event.rna_event in splicing_types]
-	cls.output_splicing(splicing, '%s/splicing.tsv' % outdir)
-	
-	# fusions
-	fusions = [event for event in events if event.rna_event == 'fusion']
-	cls.output_fusion(fusions, '%s/fusions.tsv' % outdir)
-	
-	# indels
-	print len(events)
-	if events:
-	    events[0].id = '123'
-	    print 'abcd', events, events[0], events[0].rearrangement, events[0].breaks, events[0].chroms, events[0].genes, events[0].transcripts
-	indels = [event for event in events if event.rearrangement in ('ins', 'del')]
-	cls.output_indels(indels, '%s/indels.tsv' % outdir)
-	
-    @classmethod
-    def output_sv(cls, events, outfile):
-	out = open(outfile, 'w')
+	out_file = '%s/events.tsv' % outdir
+	out = open(out_file, 'w')
 	out.write('%s\n' % '\t'.join(cls.headers))
 	for event in events:
-	    out.write('%s\n' % event.as_tab())
+	    print 'gg', event.rna_event
+	    if event.rna_event:
+		out_line = {
+		    'fusion': cls.from_fusion,
+		    'ITD': cls.from_indel,
+		    'PTD': cls.from_fusion,
+		    }[event.rna_event](event)
+		if out_line:
+		    out.write('%s\n' % out_line)
 	out.close()
 	
-    @classmethod
-    def output_indels(cls, events, outfile):
-	def as_indel(event):
-	    data = []
-	    data.append(event.rna_event)
-	    data.append(event.chroms[0])
-	    data.append(event.breaks[0])
-	    data.append(event.breaks[1])
-	    data.append(event.size)
-	    data.append(event.genes[0])
-	    data.append(event.transcripts[0])
-	    if event.exons:
-		data.append(','.join(map(str, event.exons)))
-	    else:
-		data.append('-')
-	    data.append(','.join(event.contigs))
-	    data.append(cls.to_string(event.contig_breaks))
-	    if event.novel_seq:
-		data.append(event.novel_seq)
+    #@classmethod
+    #def output_old(cls, events, outdir):
+	## chimeras
+	## svs
+	##svs = [event for event in events if event.event_type == 'ins' or event.event_type == 'del']
+	##cls.output_sv(svs, '%s/sv.tsv' % outdir)
+	
+	## splicing
+	#splicing_types = ['novel_exon', 'skipped_exon']
+	#splicing = [event for event in events if event.rna_event in splicing_types]
+	#cls.output_splicing(splicing, '%s/splicing.tsv' % outdir)
+	
+	## fusions
+	#fusions = [event for event in events if event.rna_event == 'fusion']
+	#cls.output_fusion(fusions, '%s/fusions.tsv' % outdir)
+	
+	## indels
+	#print len(events)
+	#if events:
+	    #events[0].id = '123'
+	    #print 'abcd', events, events[0], events[0].rearrangement, events[0].breaks, events[0].chroms, events[0].genes, events[0].transcripts
+	#indels = [event for event in events if event.rearrangement in ('ins', 'del')]
+	#cls.output_indels(indels, '%s/indels.tsv' % outdir)
+	
+    #@classmethod
+    #def output_sv(cls, events, outfile):
+	#out = open(outfile, 'w')
+	#out.write('%s\n' % '\t'.join(cls.headers))
+	#for event in events:
+	    #out.write('%s\n' % event.as_tab())
+	#out.close()
+	
+    #@classmethod
+    #def output_indels(cls, events, outfile):
+	#def as_indel(event):
+	    #data = []
+	    #data.append(event.rna_event)
+	    #data.append(event.chroms[0])
+	    #data.append(event.breaks[0])
+	    #data.append(event.breaks[1])
+	    #data.append(event.size)
+	    #data.append(event.genes[0])
+	    #data.append(event.transcripts[0])
+	    #if event.exons:
+		#data.append(','.join(map(str, event.exons)))
+	    #else:
+		#data.append('-')
+	    #data.append(','.join(event.contigs))
+	    #data.append(cls.to_string(event.contig_breaks))
+	    #if event.novel_seq:
+		#data.append(event.novel_seq)
 		
-	    return '\t'.join(map(str, data))
+	    #return '\t'.join(map(str, data))
 	
-	headers = ['event',
-	           'chrom',
-	           'pos1',
-	           'pos2',
-	           'size',
-	           'gene',
-	           'transcript',
-	           'exon',
-	           'contigs',
-	           'contig_breaks',
-	           'novel_sequence',
-	           ]
-	out = open(outfile, 'w')
-	out.write('%s\n' % '\t'.join(headers))
-	for event in events:
-	    out.write('%s\n' % as_indel(event))
-	out.close()
+	#headers = ['event',
+	           #'chrom',
+	           #'pos1',
+	           #'pos2',
+	           #'size',
+	           #'gene',
+	           #'transcript',
+	           #'exon',
+	           #'contigs',
+	           #'contig_breaks',
+	           #'novel_sequence',
+	           #]
+	#out = open(outfile, 'w')
+	#out.write('%s\n' % '\t'.join(headers))
+	#for event in events:
+	    #out.write('%s\n' % as_indel(event))
+	#out.close()
 	
 	
     @classmethod
@@ -577,38 +609,57 @@ class Event:
 	out.close()
 	
     @classmethod
-    def as_fusion(cls, event):
-	data = []
+    def from_fusion(cls, event):
+	data = [event.rna_event]
 	for values in zip(event.chroms, event.breaks, event.orients, event.genes, event.transcripts, event.exons):
-	    print 'abc', values
 	    data.extend(values)
-	
+	    
+	# size not applicable to fusion
+	data.append('-')
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
 	
 	return '\t'.join(map(str, data))
-	    
+    
     @classmethod
-    def output_fusion(cls, events, outfile):
-	headers = ['chrom1',
-	           'break1',
-	           'gene1',
-	           'transcript1',
-	           'exon1',
-	           'chrom2',
-	           'break2',
-	           'gene2',
-	           'transcript2',
-	           'exon2',
-	           'contigs',
-	           'contig_blocks',
-	           'contig_breaks',
-	           ]
-	out = open(outfile, 'w')
-	out.write('%s\n' % '\t'.join(headers))
-	for event in events:
-	    out.write('%s\n' % cls.as_fusion(event))
-	out.close()
+    def from_indel(cls, event):
+	chroms = (event.chroms[0], event.chroms[0])
+	orients = ('L', 'R')
+	genes = (event.genes[0], event.genes[0])
+	transcripts = (event.transcripts[0], event.transcripts[0])
+	exons = (event.exons[0], event.exons[0])
+	
+	data = [event.rna_event]
+	for values in zip(chroms, event.breaks, orients, genes, transcripts, exons):
+	    data.extend(values)
+	
+	data.append(event.size)
+	data.append(','.join(event.contigs))
+	data.append(cls.to_string(event.contig_breaks))
+	return '\t'.join(map(str, data))
+
+	    
+    #@classmethod
+    #def output_fusion(cls, events, outfile):
+	#headers = ['chrom1',
+	           #'break1',
+	           #'gene1',
+	           #'transcript1',
+	           #'exon1',
+	           #'chrom2',
+	           #'break2',
+	           #'gene2',
+	           #'transcript2',
+	           #'exon2',
+	           #'contigs',
+	           #'contig_blocks',
+	           #'contig_breaks',
+	           #]
+	#out = open(outfile, 'w')
+	#out.write('%s\n' % '\t'.join(headers))
+	#for event in events:
+	    #out.write('%s\n' % cls.as_fusion(event))
+	#out.close()
 	
     @classmethod
     def to_string(cls, value):
