@@ -480,6 +480,7 @@ class Event:
                'transcript2',
                'exon2',
                'size',
+               'novel_sequence',
                'contigs',
                'contig_breaks',
                ]
@@ -496,6 +497,8 @@ class Event:
 		    'fusion': cls.from_fusion,
 		    'ITD': cls.from_indel,
 		    'PTD': cls.from_fusion,
+		    'ins': cls.from_indel,
+		    'del': cls.from_indel,
 		    }[event.rna_event](event)
 		if out_line:
 		    out.write('%s\n' % out_line)
@@ -616,6 +619,7 @@ class Event:
 	    
 	# size not applicable to fusion
 	data.append('-')
+	data.append(event.novel_seq)
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
 	
@@ -634,6 +638,7 @@ class Event:
 	    data.extend(values)
 	
 	data.append(event.size)
+	data.append(event.novel_seq)
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
 	return '\t'.join(map(str, data))
