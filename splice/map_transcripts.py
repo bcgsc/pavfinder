@@ -258,7 +258,34 @@ class FusionFinder:
 
     @classmethod
     def find_read_through(cls, matches_by_transcript, transcripts, align):
+	"""Identify read-through fusion
+	
+	Assume single alignment is spanning 2 genes
+	
+	Args:
+	    matches_by_transcript: (list) dictionaries where 
+	                                      key=transcript name, 
+	                                      value=[match1, match2, ...] where
+						    match1 = matches of each alignment block
+							     i.e.
+							     [(exon_id, '=='), (exon_id, '==')] 
+							     or None if no_match
+	    transcripts: (dict) key=transcript_name value=Transcript object
+	    align: (Alignment) alignment spanning >1 gene
+	Returns:
+	    Adjacency with genes, transcripts, exons annotated
+	"""
 	def create_fusion(junc1, junc2, pos, contig_breaks):
+	    """Creates Adjacency object capturing read-through
+	    
+	    Args:
+	        junc1: (tuple) transcript_id, 'match' list [(exon_id, '==')]
+		junc2: (tuple) transcript_id, 'match' list [(exon_id, '==')]
+		pos: (tuple) genome coordinates of fusion
+		contig_breaks: (tuple) contig coordinates of breaks
+	    Returns:
+		Adjacency with genes, transcripts, exons annotated
+	    """
 	    fusion = Adjacency((align.target, align.target),
 	                       pos,
 	                       '-',
@@ -271,7 +298,7 @@ class FusionFinder:
 	    fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
 	
 	    return fusion
-
+	
 	num_blocks = len(align.blocks)
 	matches_by_block = {}
 	genes_in_block = {}
