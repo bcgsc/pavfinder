@@ -525,7 +525,7 @@ def find_adjs(aligns, aligner, contig_seq, dubious=None, debug=False):
 		
     return adjs
 
-def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', contig_seq=None, debug=False):
+def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', contig_seq=None, no_sort=False, debug=False):
     """Curates adj based on info given by primary_aligns alignments
     
     Args:
@@ -559,11 +559,12 @@ def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', co
 	orients[1] = 'L' if max(align1.tstart, align1.tend) == breaks[1] else 'R'
 	contig_breaks = [align2.qend, align1.qstart]
 	
-    if (aligns[0].target != aligns[1].target and compare_chr(aligns[0].target, aligns[1].target) > 0) or\
-       (aligns[0].target == aligns[1].target and breaks[0] > breaks[1]):
-	aligns.reverse()
-	breaks.reverse()
-	orients.reverse()
+    if not no_sort:
+	if (aligns[0].target != aligns[1].target and compare_chr(aligns[0].target, aligns[1].target) > 0) or\
+	   (aligns[0].target == aligns[1].target and breaks[0] > breaks[1]):
+	    aligns.reverse()
+	    breaks.reverse()
+	    orients.reverse()
 	
     rearrangement = None
     if aligns[0].target != aligns[1].target:
