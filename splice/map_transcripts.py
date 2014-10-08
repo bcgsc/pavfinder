@@ -744,15 +744,11 @@ class ExonMapper:
 			print 'exon', contig, align.target, align.tstart, align.tend#, within_exon[0].gene_id, within_exon[0].start, within_exon[0].end
 		    
 		    elif within_intron:
-			#print 'aa', within_intron
 			print 'intron', contig, align.target, align.tstart, align.tend#, within_intron[0].gene_id, within_intron[0].start, within_intron[0].end
 		
-		#if chimera:
-		    #chimera_block_matches.append(all_block_matches)
-		
+	    # split aligns, try to find gene fusion
 	    if chimera and chimera_block_matches:
 		if len(chimera_block_matches) == len(aligns):
-		    print 'chimera', chimera_block_matches
 		    fusion = self.find_chimera(chimera_block_matches, transcripts, aligns)
 		    if fusion:
 			self.events.append(fusion)
@@ -802,7 +798,6 @@ class ExonMapper:
     
     def identify_fusion(self, matches1, matches2, transcripts):
 	"""Given 2 block matches pick the 2 transcripts"""
-	print 'iii', matches1, matches2
 	scores = {}
 	for transcript in matches1:
 	    score = 0
@@ -841,7 +836,7 @@ class ExonMapper:
 	best_score = max(scores.values())
 	best_txt2 = sorted([t for t in matches2.keys() if scores[t] == best_score], 
 	                   key=lambda t: transcripts[t].length(), reverse=True)[0]
-	print 'fusion', best_txt1, matches1[best_txt1], best_txt2, matches2[best_txt2]
+	
 	return (best_txt1, matches1[best_txt1]), (best_txt2, matches2[best_txt2])
     
     def identify_fusion_unknown_break(self, matches, transcripts):
@@ -868,54 +863,45 @@ class ExonMapper:
 	    
 	    print 'fusion_unknown_break', left_bound_matches[0], right_bound_matches[0]
 	    
-    def find_chimera(self, chimera_block_matches, transcripts, aligns):	
+    def find_chimera(self, chimera_block_matches, transcripts, aligns):
+	"""Identify gene fusion between split alignments
+	
+	Args:
+	    chimera_block_matches: (list) dictionaries where 
+	                                      key=transcript name, 
+	                                      value=[match1, match2, ...] where
+						    match1 = matches of each alignment block
+							     i.e.
+							     [(exon_id, '=='), (exon_id, '==')] 
+	    transcripts: (dict) key=transcript_name value=Transcript object
+	    aligns: (list) Alignments involved in chimera
+	Returns:
+	    Adjacency with genes, transcripts, exons annotated
+	"""
 	assert len(chimera_block_matches) == len(aligns), 'number of block matches(%d) != number of aligns(%d)' % \
 	       (len(chimera_block_matches), len(aligns))
-	for (matches1_by_txt, matches2_by_txt) in zip(chimera_block_matches, chimera_block_matches[1:]):
-	    print 'a', matches1_by_txt
-	    print 'b', matches2_by_txt
-	    
+	for (matches1_by_txt, matches2_by_txt) in zip(chimera_block_matches, chimera_block_matches[1:]):	    
 	    genes1 = Set([transcripts[txt].gene for txt in matches1_by_txt.keys()])
 	    genes2 = Set([transcripts[txt].gene for txt in matches2_by_txt.keys()])
-	    	    
-	    print genes1, genes2
-	    # gene fusion
-	    print 'g1', genes1
-	    print 'g2', genes2
-	    
+	    	    	    
 	    junc_matches1 = {}
 	    num_blocks = len(aligns[0].blocks)
 	    for transcript in chimera_block_matches[0].keys():
-		#print 'ggg', transcript, chimera_block_matches[0][transcript]
 		junc_matches1[transcript] = chimera_block_matches[0][transcript][num_blocks - 1]
 	
 	    junc_matches2 = {}
 	    for transcript in chimera_block_matches[1].keys():
 		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
     
-	    print 'j1', junc_matches1
-	    print 'j2', junc_matches2
-    
-	    #print 'contig', aligns[0].query
 	    junc1, junc2 = self.identify_fusion(junc_matches1, junc_matches2, transcripts)
-	    print 'fusion-chimera', aligns[0].query, transcripts[junc1[0]].gene, transcripts[junc2[0]].gene
 	    
 	    if junc1 and junc2:
 		fusion = call_event(aligns[0], aligns[1])
 		fusion.rna_event = 'fusion'
-		#print 'ggg', event.event_type, event.chroms, event.breaks, event.rearrangement, event.contig_breaks, event.orients
-		#print 'kkk0', adj.chroms, adj.breaks, adj.rearrangement, adj.contig_breaks, adj.orients
-		print 'kkk', junc1, junc2, transcripts[junc1[0]], transcripts[junc2[0]], fusion.breaks, fusion.contig_breaks
-		print 'kkk1', transcripts[junc1[0]].gene, junc1[0], junc1[1][0][0], transcripts[junc1[0]].strand, aligns[0].target, aligns[0].qstart, aligns[0].qend, aligns[0].strand
-		print 'kkk2', transcripts[junc2[0]].gene, junc2[0], junc2[1][0][0], transcripts[junc2[0]].strand, aligns[1].target, aligns[1].qstart, aligns[1].qend, aligns[1].strand
-
-		fusion.id = 'abc'
 		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
 		fusion.transcripts = (junc1[0], junc2[0])
-		fusion.exons = (junc1[1][0][0] + 1, junc2[1][0][0] + 1)
-		
-		print 'kkko', fusion.as_tab()
-		
+		fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
+			
 		return fusion
 	    
 	return None
@@ -937,6 +923,8 @@ class ExonMapper:
 	fusion.transcripts = (junc1[0], junc2[0])
 	fusion.exons = (junc1[1][0][0] + 1, junc2[1][0][0] + 1)
 		
+	exon1, exon2 = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
+	
 	return fusion
     
     def extract_novel_seq(self, adj):
