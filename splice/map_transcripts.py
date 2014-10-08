@@ -211,7 +211,7 @@ class ITD_Finder:
 		return dup
 		
 	return False
-
+    
 class Transcript:
     def __init__(self, id, gene=None, strand=None):
 	self.id = id
@@ -797,46 +797,38 @@ class ExonMapper:
 		
 	return transcripts
     
-    def identify_fusion(self, matches1, matches2, transcripts):
+    def identify_fusion(self, matches1, matches2, transcripts, orients):
 	"""Given 2 block matches pick the 2 transcripts"""
-	scores = {}
-	for transcript in matches1:
-	    score = 0
-	    if matches1[transcript] is not None:
-		if matches1[transcript][0][1][1] == '=':
-		    score += 100
-		    
-		# align block within exon gets more points
-		if matches1[transcript][0][1][0] == '=':
-		    score += 15
-		elif matches1[transcript][0][1][0] == '>':
-		    score += 10
-		elif matches1[transcript][0][1][0] == '<':
-		    score += 5
-	    scores[transcript] = score
-	    
-	best_score = max(scores.values())
-	best_txt1 = sorted([t for t in matches1.keys() if scores[t] == best_score], 
-	                   key=lambda t: transcripts[t].length(), reverse=True)[0]
-	
-	scores = {}
-	for transcript in matches2:
-	    score = 0
-	    if matches2[transcript] is not None:
-		if matches2[transcript][0][1][1] == '=':
-		    score += 100
-		    
-		if matches2[transcript][0][1][0] == '=':
-		    score += 15
-		elif matches2[transcript][0][1][0] == '>':
-		    score += 10
-		elif matches2[transcript][0][1][0] == '<':
-		    score += 5
-	    scores[transcript] = score
-	    
-	best_score = max(scores.values())
-	best_txt2 = sorted([t for t in matches2.keys() if scores[t] == best_score], 
-	                   key=lambda t: transcripts[t].length(), reverse=True)[0]
+	def pick_best(matches, orient):
+	    scores = {}
+	    for transcript in matches:
+		if orient == 'L':
+		    junction_block = -1
+		    junction_edge, distant_edge = -1, 0
+		else:
+		    junction_block = 0
+		    junction_edge, distant_edge = 0, -1
+		score = 0
+		if matches[transcript] is not None:
+		    if matches[transcript][junction_block][1][junction_edge] == '=':
+			score += 100
+			
+		    # align block within exon gets more points
+		    if matches[transcript][junction_block][1][distant_edge] == '=':
+			score += 15
+		    elif matches[transcript][junction_block][1][distant_edge] == '>':
+			score += 10
+		    elif matches[transcript][junction_block][1][distant_edge] == '<':
+			score += 5
+		scores[transcript] = score
+		
+	    best_score = max(scores.values())
+	    best_txt = sorted([t for t in matches.keys() if scores[t] == best_score], 
+		               key=lambda t: transcripts[t].length(), reverse=True)[0]
+	    return best_txt
+	    	
+	best_txt1 = pick_best(matches1, orients[0])
+	best_txt2 = pick_best(matches2, orients[1])
 	
 	return (best_txt1, matches1[best_txt1]), (best_txt2, matches2[best_txt2])
     
@@ -894,15 +886,14 @@ class ExonMapper:
 	    for transcript in chimera_block_matches[1].keys():
 		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
     
-	    junc1, junc2 = self.identify_fusion(junc_matches1, junc_matches2, transcripts)
-	    
+	    # create adjacency first to establish L/R orientations, which is necessary to pick best transcripts
+	    fusion = call_event(aligns[0], aligns[1], no_sort=True)
+	    junc1, junc2 = self.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
 	    if junc1 and junc2:
-		fusion = call_event(aligns[0], aligns[1])
 		fusion.rna_event = 'fusion'
 		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
 		fusion.transcripts = (junc1[0], junc2[0])
 		fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
-			
 		return fusion
 	    
 	return None
@@ -952,15 +943,11 @@ class ExonMapper:
 			
 			
 	    junctions = zip(range(num_blocks), range(num_blocks)[1:])
-	    print 'tttk', junctions
 	    for k in range(len(junctions)):
 		i, j = junctions[k]
-		print 'fff', i, j, junctions[k], genes_in_block[i], genes_in_block[j]
 		if len(genes_in_block[i]) == 1 and len(genes_in_block[j]) == 1:
 		    if list(genes_in_block[i])[0] != list(genes_in_block[j])[0]:
-			print 'fusion splice', i, j		    
-			junc1, junc2 = self.identify_fusion(matches_by_block[i], matches_by_block[j], transcripts)
-			print 'fusion-genes', align.query, transcripts[junc1[0]].gene, transcripts[junc2[0]].gene
+			junc1, junc2 = self.identify_fusion(matches_by_block[i], matches_by_block[j], transcripts, ('L', 'R'))
 			pos = (align.blocks[i][1], align.blocks[j][0])
 			contig_breaks = (align.query_blocks[i][1], align.query_blocks[j][0])
 			event = self.create_fusion_event((align,), transcripts, junc1, junc2, pos=pos, contig_breaks=contig_breaks)
@@ -974,8 +961,7 @@ class ExonMapper:
 		    
 	    for i in genes_in_block.keys():
 		if len(genes_in_block[i]) == 2:
-		    print 'fusion block', i, matches_by_block[i]
-		    self.identify_fusion_unknown_break(matches_by_block[i], transcripts)
+		    self.identify_fusion_unknown_break(matches_by_block[i], transcripts, ('L', 'R'))
 	    		
 	local_events = self.find_novel_junctions(matches_by_transcript, align, transcripts)
 	if local_events:
