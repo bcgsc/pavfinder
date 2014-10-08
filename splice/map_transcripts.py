@@ -304,8 +304,9 @@ class Event:
 	
 	# indels
 	print len(events)
-	events[0].id = '123'
-	print 'abcd', events, events[0], events[0].rearrangement, events[0].breaks, events[0].chroms, events[0].genes, events[0].transcripts
+	if events:
+	    events[0].id = '123'
+	    print 'abcd', events, events[0], events[0].rearrangement, events[0].breaks, events[0].chroms, events[0].genes, events[0].transcripts
 	indels = [event for event in events if event.rearrangement in ('ins', 'del')]
 	cls.output_indels(indels, '%s/indels.tsv' % outdir)
 	
@@ -918,7 +919,7 @@ class ExonMapper:
 	                       )
 	                       
 	fusion.rna_event = 'fusion'
-	fusion.id = 'abc'
+	#fusion.id = 'abc'
 	fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
 	fusion.transcripts = (junc1[0], junc2[0])
 	fusion.exons = (junc1[1][0][0] + 1, junc2[1][0][0] + 1)
