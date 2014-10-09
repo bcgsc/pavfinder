@@ -495,122 +495,17 @@ class Event:
 	    if event.rna_event:
 		out_line = {
 		    'fusion': cls.from_fusion,
-		    'ITD': cls.from_indel,
+		    'ITD': cls.from_single_locus,
 		    'PTD': cls.from_fusion,
-		    'ins': cls.from_indel,
-		    'del': cls.from_indel,
+		    'ins': cls.from_single_locus,
+		    'del': cls.from_single_locus,
+		    'skipped_exon': cls.from_single_locus,
+		    'novel_exon': cls.from_single_locus,
 		    }[event.rna_event](event)
 		if out_line:
 		    out.write('%s\n' % out_line)
 	out.close()
-	
-    #@classmethod
-    #def output_old(cls, events, outdir):
-	## chimeras
-	## svs
-	##svs = [event for event in events if event.event_type == 'ins' or event.event_type == 'del']
-	##cls.output_sv(svs, '%s/sv.tsv' % outdir)
-	
-	## splicing
-	#splicing_types = ['novel_exon', 'skipped_exon']
-	#splicing = [event for event in events if event.rna_event in splicing_types]
-	#cls.output_splicing(splicing, '%s/splicing.tsv' % outdir)
-	
-	## fusions
-	#fusions = [event for event in events if event.rna_event == 'fusion']
-	#cls.output_fusion(fusions, '%s/fusions.tsv' % outdir)
-	
-	## indels
-	#print len(events)
-	#if events:
-	    #events[0].id = '123'
-	    #print 'abcd', events, events[0], events[0].rearrangement, events[0].breaks, events[0].chroms, events[0].genes, events[0].transcripts
-	#indels = [event for event in events if event.rearrangement in ('ins', 'del')]
-	#cls.output_indels(indels, '%s/indels.tsv' % outdir)
-	
-    #@classmethod
-    #def output_sv(cls, events, outfile):
-	#out = open(outfile, 'w')
-	#out.write('%s\n' % '\t'.join(cls.headers))
-	#for event in events:
-	    #out.write('%s\n' % event.as_tab())
-	#out.close()
-	
-    #@classmethod
-    #def output_indels(cls, events, outfile):
-	#def as_indel(event):
-	    #data = []
-	    #data.append(event.rna_event)
-	    #data.append(event.chroms[0])
-	    #data.append(event.breaks[0])
-	    #data.append(event.breaks[1])
-	    #data.append(event.size)
-	    #data.append(event.genes[0])
-	    #data.append(event.transcripts[0])
-	    #if event.exons:
-		#data.append(','.join(map(str, event.exons)))
-	    #else:
-		#data.append('-')
-	    #data.append(','.join(event.contigs))
-	    #data.append(cls.to_string(event.contig_breaks))
-	    #if event.novel_seq:
-		#data.append(event.novel_seq)
-		
-	    #return '\t'.join(map(str, data))
-	
-	#headers = ['event',
-	           #'chrom',
-	           #'pos1',
-	           #'pos2',
-	           #'size',
-	           #'gene',
-	           #'transcript',
-	           #'exon',
-	           #'contigs',
-	           #'contig_breaks',
-	           #'novel_sequence',
-	           #]
-	#out = open(outfile, 'w')
-	#out.write('%s\n' % '\t'.join(headers))
-	#for event in events:
-	    #out.write('%s\n' % as_indel(event))
-	#out.close()
-	
-	
-    @classmethod
-    def output_splicing(cls, events, outfile):
-	def as_splice_variant(event):
-	    data = []
-	    data.append(event.rna_event)
-	    data.append(event.chroms[0])
-	    data.append(','.join(map(str, event.breaks)))
-	    data.append(event.genes[0])
-	    data.append(event.transcripts[0])
-	    if event.exons:
-		data.append(','.join(map(str, event.exons)))
-	    else:
-		data.append('-')
-	    data.append(','.join(event.contigs))
-	    data.append(cls.to_string(event.contig_breaks))
-	    
-	    return '\t'.join(map(str, data))
-	    
-	headers = ['event',
-	           'chrom',
-	           'coords',
-	           'gene',
-	           'transcript',
-	           'exon',
-	           'contigs',
-	           'contig_breaks',
-	           ]
-	out = open(outfile, 'w')
-	out.write('%s\n' % '\t'.join(headers))
-	for event in events:
-	    print 'lll', event.rna_event, event.breaks, event.exons, event.contigs, event.contig_breaks, event.genes, event.transcripts
-	    out.write('%s\n' % as_splice_variant(event))
-	out.close()
-	
+				
     @classmethod
     def from_fusion(cls, event):
 	data = [event.rna_event]
@@ -619,52 +514,42 @@ class Event:
 	    
 	# size not applicable to fusion
 	data.append('-')
-	data.append(event.novel_seq)
+	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
+	    data.append(event.novel_seq)
+	else:
+	    data.append('-')    
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
 	
 	return '\t'.join(map(str, data))
     
     @classmethod
-    def from_indel(cls, event):
+    def from_single_locus(cls, event):
 	chroms = (event.chroms[0], event.chroms[0])
 	orients = ('L', 'R')
 	genes = (event.genes[0], event.genes[0])
 	transcripts = (event.transcripts[0], event.transcripts[0])
-	exons = (event.exons[0], event.exons[0])
+	if event.exons:
+	    exons = (event.exons[0], event.exons[0])
+	# novel exons
+	else:
+	    exons = ('-', '-')
 	
 	data = [event.rna_event]
 	for values in zip(chroms, event.breaks, orients, genes, transcripts, exons):
 	    data.extend(values)
 	
-	data.append(event.size)
-	data.append(event.novel_seq)
+	if hasattr(event, 'size') and event.size is not None:
+	    data.append(event.size)
+	else:
+	    data.append('-')
+	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
+	    data.append(event.novel_seq)
+	else:
+	    data.append('-')    
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
 	return '\t'.join(map(str, data))
-
-	    
-    #@classmethod
-    #def output_fusion(cls, events, outfile):
-	#headers = ['chrom1',
-	           #'break1',
-	           #'gene1',
-	           #'transcript1',
-	           #'exon1',
-	           #'chrom2',
-	           #'break2',
-	           #'gene2',
-	           #'transcript2',
-	           #'exon2',
-	           #'contigs',
-	           #'contig_blocks',
-	           #'contig_breaks',
-	           #]
-	#out = open(outfile, 'w')
-	#out.write('%s\n' % '\t'.join(headers))
-	#for event in events:
-	    #out.write('%s\n' % cls.as_fusion(event))
-	#out.close()
 	
     @classmethod
     def to_string(cls, value):
@@ -1062,6 +947,7 @@ class ExonMapper:
 		adj.rna_event = event['event']
 		adj.genes = (list(genes)[0],)
 		adj.transcripts = (event['transcript'][0],)
+		adj.size = event['size']
 		
 		# converts exon index to exon number (which takes transcript strand into account)
 		exons = event['exons'][0]
@@ -1187,6 +1073,7 @@ class ExonMapper:
 	                            'exons': exons,
 	                            'pos': events[0]['pos'],
 	                            'contig_breaks': contig_breaks,
+		                    'size': events[0]['size'],
 	                            }
 	                           )
 		    
@@ -1250,8 +1137,14 @@ class ExonMapper:
 	    if match2[0] == match1[0] + 1 and\
 	       match1[1][1] == '=' and\
 	       match2[1][0] == '=': 
-		pos = ('%s-%s' % (blocks[0][1], blocks[1][0]), '%s-%s' % (blocks[-2][1], blocks[-1][0]))
-		events.append({'event': 'novel_exon', 'exons': [], 'pos':pos})
+		#pos = ('%s-%s' % (blocks[0][1], blocks[1][0]), '%s-%s' % (blocks[-2][1], blocks[-1][0]))
+		pos = (blocks[1][0], blocks[-2][1])
+		size = blocks[-2][1] - blocks[1][0] + 1
+		events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size})
+		
+	for event in events:
+	    if not event.has_key('size'):
+		event['size'] = None
 	
 	return events
 		    
