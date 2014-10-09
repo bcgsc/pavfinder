@@ -571,7 +571,6 @@ class NovelSpliceFinder:
 		else:
 		    donor_start = blocks[1][0] - 2
 		    acceptor_start = blocks[0][1] + 1
-		print 'ii', chrom, donor_start, acceptor_start, transcript.strand
 		
 		gap_size = blocks[1][0] - blocks[0][1] - 1
 		pos = (blocks[0][1], blocks[1][0])
@@ -644,6 +643,19 @@ class NovelSpliceFinder:
     
     @classmethod
     def check_splice_motif(cls, chrom, donor_start, acceptor_start, strand, ref_fasta):
+	"""Check if the 4-base splice motif of a novel junction is canonical (gtag)
+	
+	Right now only considers 'gtag' as canonical
+	
+	Args:
+	    chrom: (str) chromosome
+	    donor_start: (int) genomic position of first(smallest) base of donor site (1-based)
+	    acceptor_start: (int) genomic position of first(smallest) base of acceptor site (1-based)
+	    strand: (str) transcript strand '+' or '-'
+	    ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence
+	Returns:
+	    True if it's canonical, False otherwise
+	"""
 	canonical_motifs = Set()
 	canonical_motifs.add('gtag')
 	
@@ -669,8 +681,6 @@ class NovelSpliceFinder:
 	
 	return False
 
-
-	
 class Transcript:
     def __init__(self, id, gene=None, strand=None):
 	self.id = id
