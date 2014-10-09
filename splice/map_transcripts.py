@@ -542,7 +542,8 @@ class NovelSpliceFinder:
 		if match1[0][1] == '=>' and\
 		   match1[-1][1] == '<=' and\
 		   len([(a, b) for a, b in zip(exons, exons[1:]) if b == a + 1]) == len(match1) - 1:
-		    events.append({'event': 'retained_intron', 'exons': exons, 'pos':pos})
+		    size = transcript.exons[exons[1]][0] - transcript.exons[exons[0]][1] - 1 
+		    events.append({'event': 'retained_intron', 'exons': exons, 'pos':pos, 'size':size})
 		    
 	elif match1 is None and match2 is not None:
 	    if match2[0] == 0 and match2[1] == '<=':
@@ -766,6 +767,7 @@ class Event:
 		    'novel_donor': cls.from_single_locus,
 		    'novel_acceptor': cls.from_single_locus,
 		    'novel_intron': cls.from_single_locus,
+		    'retained_intron': cls.from_single_locus,
 		    }[event.rna_event](event)
 		if out_line:
 		    out.write('%s\n' % out_line)
