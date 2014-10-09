@@ -674,6 +674,14 @@ class NovelSpliceFinder:
     
     @classmethod
     def is_junction_annotated(cls, match1, match2):
+	"""Checks if junction is in gene model
+	
+	Args:
+	    match1: (tuple) exon_index, 2-char match result e.g. '==', '>=', etc
+	    match2: (tuple) exon_index, 2-char match result e.g. '==', '>=', etc
+	Returns:
+	    True or False
+	"""
 	if match2[0] == match1[0] + 1 and\
 	   match1[1][1] == '=' and\
 	   match2[1][0] == '=':
