@@ -442,12 +442,12 @@ class NovelSpliceFinder:
 		    # special case where the first 2 blocks is the utr and there's an insertion separating the 2 blocks
 		    if i == 0:
 			events = cls.classify_novel_junction(matches[i], 
-			                                      matches[j][0], 
-			                                      chrom=align.target, 
-			                                      blocks=align.blocks[i:j+1], 
-			                                      transcript=transcripts[transcript],
-			                                      ref_fasta=ref_fasta
-			                                      )
+			                                     matches[j][0], 
+			                                     align.target, 
+			                                     align.blocks[i:j+1], 
+			                                     transcripts[transcript],
+			                                     ref_fasta
+			                                     )
 			for e in events:
 			    e['blocks'] = (i, j)
 			    e['transcript'] = transcript
@@ -457,11 +457,12 @@ class NovelSpliceFinder:
 		# for retained intron, not a 'junction'
 		if matches[i] is not None and len(matches[i]) > 1:
 		    events = cls.classify_novel_junction(matches[i], 
-		                                          chrom=align.target, 
-		                                          blocks=align.blocks[i], 
-		                                          transcript=transcripts[transcript],
-		                                          ref_fasta=ref_fasta
-		                                          )
+		                                         None,
+		                                         align.target, 
+		                                         align.blocks[i], 
+		                                         transcripts[transcript],
+		                                         ref_fasta
+		                                         )
 		    if events:
 			for e in events:
 			    e['blocks'] = (i, j)
@@ -482,12 +483,12 @@ class NovelSpliceFinder:
 		if matches[i] is not None and matches[j] is not None:
 		    # matches (i and j) are the flanking matches, blocks are the middle "novel" blocks
 		    events = cls.classify_novel_junction(matches[i][-1], 
-		                                          matches[j][0], 
-		                                          chrom=align.target, 
-		                                          blocks=align.blocks[i:j+1], 
-		                                          transcript=transcripts[transcript],
-		                                          ref_fasta=ref_fasta
-		                                          )
+		                                         matches[j][0], 
+		                                         align.target, 
+		                                         align.blocks[i:j+1], 
+		                                         transcripts[transcript],
+		                                         ref_fasta
+		                                         )
 		    print 'event', i, j, align.blocks[i:j+1], transcript, events
 		    if events:
 			for e in events:
@@ -528,13 +529,26 @@ class NovelSpliceFinder:
 	    return uniq_events
 	
     @classmethod
-    def classify_novel_junction(cls, match1, match2=None, chrom=None, blocks=None, transcript=None, ref_fasta=None):
+    def classify_novel_junction(cls, match1, match2, chrom, blocks, transcript, ref_fasta, min_intron_size=20):
+	"""Classify given junction into different splicing events or indel
+	
+	Args:
+	    match1: (tuple or list) single tuple: exon_index, 2-char match result e.g. '==', '>=', etc
+				    list of 2 tuples for retained_intron (special case)
+	    match2: (tuple) exon_index, 2-char match result e.g. '==', '>=', etc
+	    chrom: (str) chromosome, for checking splice motif
+	    blocks: (list) list of list (block coordinates)
+	    transcript: (Transcript) object of transcript, for getting exon coordinates
+	    ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence, for checking splice motif
+	Returns:
+	    List of event (dictionary storing type of event, exon indices, genomic coordinates and size)
+	"""
 	events = []
+	# set default values for 'pos'
 	if type(blocks[0]) is int:
 	    pos = (blocks[0], blocks[1])
 	else:
 	    pos = (blocks[0][1], blocks[1][0])
-	print 'blocks', match1, match2, chrom, transcript, blocks, pos, transcript.strand
 	
 	if match2 is None:
 	    if len(match1) == 2:
@@ -544,9 +558,11 @@ class NovelSpliceFinder:
 		   len([(a, b) for a, b in zip(exons, exons[1:]) if b == a + 1]) == len(match1) - 1:
 		    size = transcript.exons[exons[1]][0] - transcript.exons[exons[0]][1] - 1 
 		    events.append({'event': 'retained_intron', 'exons': exons, 'pos':pos, 'size':size})
-		    
+		  
+	# ever used??
 	elif match1 is None and match2 is not None:
 	    if match2[0] == 0 and match2[1] == '<=':
+		print 'special ins', match1, match2, pos
 		events.append({'event': 'ins', 'exons': match2[0], 'pos':pos})
 		
 	else:
@@ -558,13 +574,9 @@ class NovelSpliceFinder:
 		    exon = transcript.exons[e]
 		    size += exon[1] - exon[0] + 1
 		events.append({'event': 'skipped_exon', 'exons': range(match1[0] + 1, match2[0]), 'pos':pos, 'size':size})
-		print 'se', events[-1], range(match1[0] + 1, match2[0]), transcript.exons[match1[0] + 1], transcript.exons[match2[0] - 1]
 	       
 	    if match1[0] == match2[0] and\
-	       match1[1][1] == '<' and match2[1][0] == '>':
-		expected_motif = 'gtag' if transcript.strand == '+' else 'ctac'
-		#motif = ref_fasta.fetch(chrom, blocks[0][1], blocks[0][1] + 2) + self.ref_fasta.fetch(chrom, blocks[1][0] - 3, blocks[1][0] - 1)
-		
+	       match1[1][1] == '<' and match2[1][0] == '>':		
 		if transcript.strand == '+':
 		    donor_start = blocks[0][1] + 1
 		    acceptor_start = blocks[1][0] - 2
@@ -574,7 +586,6 @@ class NovelSpliceFinder:
 		
 		gap_size = blocks[1][0] - blocks[0][1] - 1
 		pos = (blocks[0][1], blocks[1][0])
-		min_intron_size = 20
 		event = None
 		if gap_size > 0:
 		    if gap_size > min_intron_size and\
@@ -635,6 +646,7 @@ class NovelSpliceFinder:
 		if cls.check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
 		    events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size})
 		
+	# set size to None for event that doesn't have size i.e. 'ins'
 	for event in events:
 	    if not event.has_key('size'):
 		event['size'] = None
