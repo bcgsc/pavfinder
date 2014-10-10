@@ -806,7 +806,6 @@ class Event:
 	out = open(out_file, 'w')
 	out.write('%s\n' % '\t'.join(cls.headers))
 	for event in events:
-	    print 'gg', event.rna_event
 	    if event.rna_event:
 		out_line = {
 		    'fusion': cls.from_fusion,
@@ -1376,15 +1375,25 @@ class ExonMapper:
 	return events
 		            
     def extract_aligns(self, alns):
-	chimeric_aligns = {
-	    'gmap': gmap.find_chimera,
-	    }[self.aligner](alns, self.bam)
-	if chimeric_aligns:
-	    return chimeric_aligns
-	else:
-	    return [{
-	        'gmap': gmap.find_single_unique,
-	        }[self.aligner](alns, self.bam)]
+	"""Generates Alignments objects of chimeric and single alignments
+
+	Args:
+	    alns: (list) Pysam.AlignedRead
+	Returns:
+	    List of Alignments that are either chimeras or single alignments
+	"""
+	try:
+	    chimeric_aligns = {
+		'gmap': gmap.find_chimera,
+		}[self.aligner](alns, self.bam)
+	    if chimeric_aligns:
+		return chimeric_aligns
+	    else:
+		return [{
+		    'gmap': gmap.find_single_unique,
+		    }[self.aligner](alns, self.bam)]
+	except:
+	    sys.exit("can't convert \"%s\" alignments - abort" % self.aligner)
         
     def match_exon(self, block, exon):
 	"""Match an alignment block to an exon
@@ -1415,6 +1424,24 @@ class ExonMapper:
         return result
     
     def is_full_match(self, block_matches):
+	"""Determines if a contig fully covers a transcript
+
+	A 'full' match is when every exon boundary matches, except the terminal boundaries
+	
+	Args:
+	    block_matches: List of list of tuples, where
+			   each item of the top-level list corresponds to each contig block
+			   each item of the second-level list corresponds to each exon match
+			   each exon-match tuple contains exon_index, 2-character matching string
+			   e.g. [ [ (0, '>='), (1, '<=') ], [ (2, '==') ], [ (3, '=<') ], [ (3, '>=') ] ]
+			   this says that the alignment has 4 blocks,
+			   first block matches to exon 0 and 1, find a retained-intron,
+			   second block matches perfectly to exon 2
+			   third and fourth blocks matching to exon 3, possible a deletion or novel_intron
+
+	Returns:
+	    True if full, False if partial
+	"""
 	if None in block_matches:
 	    return False
 	
