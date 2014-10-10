@@ -35,18 +35,18 @@ class ITD_Finder:
 	dup = False
 	# try regex first to see if perfect copies exist
 	if len(novel_seq) >= min_len:
-	    dup = cls._search_by_regex(novel_seq, contig_seq, max_apart)
+	    dup = cls.search_by_regex(novel_seq, contig_seq, max_apart)
 	    if dup:
-		cls._update_attrs(adj, align, dup)
+		cls.update_attrs(adj, align, dup)
 	
 	# try BLAST if regex fails
 	if not dup:
-	    dup = cls._search_by_align(adj.contigs[0], contig_seq, outdir, sorted(adj.contig_breaks), min_len, max_apart, min_pid, debug=debug)
+	    dup = cls.search_by_align(adj.contigs[0], contig_seq, outdir, sorted(adj.contig_breaks), min_len, max_apart, min_pid, debug=debug)
 	    if dup:
-		cls._update_attrs(adj, align, dup, contig_seq)
+		cls.update_attrs(adj, align, dup, contig_seq)
 	
     @classmethod
-    def _update_attrs(cls, adj, align, dup, contig_seq=None):
+    def update_attrs(cls, adj, align, dup, contig_seq=None):
 	"""Updates attributes of original insertion adjacency to become ITD
 	   1. rna_event -> 'ITD'
 	   2. contig_breaks -> coordinates of the breakpoint (the last coordinate of the first and first coordinate of the second copy)
@@ -85,7 +85,7 @@ class ITD_Finder:
 
         
     @classmethod
-    def _search_by_regex(cls, novel_seq, contig_seq, max_apart):
+    def search_by_regex(cls, novel_seq, contig_seq, max_apart):
 	"""Finds if there is a duplication of the novel_seq within the contig sequence
 	by simple regex matching i.e. only perfect matches captured
 	
@@ -113,7 +113,7 @@ class ITD_Finder:
 	return False
     
     @classmethod
-    def _parse_blast_tab(cls, blast_tab):
+    def parse_blast_tab(cls, blast_tab):
 	"""Parses a tabular BLAST output file
 	
 	Args:
@@ -133,7 +133,7 @@ class ITD_Finder:
 	return aligns
 	
     @classmethod
-    def _search_by_align(cls, contig, contig_seq, outdir, contig_breaks, min_len, max_apart, min_pid, debug=False):
+    def search_by_align(cls, contig, contig_seq, outdir, contig_breaks, min_len, max_apart, min_pid, debug=False):
 	"""Checks if an insertion event is an ITD using blastn self-vs-self alignment
 	Assumes:
 	1. original contig coordiantes are the coordinates of the novel sequence
@@ -166,7 +166,7 @@ class ITD_Finder:
 	    sys.exit()
 	    
 	if os.path.exists(blast_output):
-	    blast_aligns = cls._parse_blast_tab(blast_output)
+	    blast_aligns = cls.parse_blast_tab(blast_output)
 	    # clean up
 	    if not debug:
 		for ff in (seq_file, blast_output):
@@ -410,7 +410,22 @@ class FusionFinder:
 	    
 class NovelSpliceFinder:    
     @classmethod
-    def find_novel_junctions(cls, block_matches, align, transcripts, ref_fasta):	
+    def find_novel_junctions(cls, block_matches, align, transcripts, ref_fasta):
+	"""Find novel junctions within a single gene/transcript
+	
+	Args:
+	    block_matches: (list) dictionaries where 
+	                                      key=transcript name, 
+	                                      value=[match1, match2, ...] where
+						    match1 = matches of each alignment block
+							     i.e.
+							     [(exon_id, '=='), (exon_id, '==')] 
+	    align: (Alignment) alignment object
+	    transcripts: (dictionary) key=transcript_id value=Transcript object
+	    ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence, for checking splice motif
+	Returns:
+	    List of event (dictionary storing type of event, exon indices, genomic coordinates and size)
+	"""
 	# find annotated junctions
 	annotated = Set()
 	for transcript in block_matches.keys():
@@ -433,7 +448,6 @@ class NovelSpliceFinder:
 		
 	all_events = []
 	for transcript in block_matches.keys():
-	    print 'tt', transcripts[transcript].id, transcripts[transcript].exons
 	    matches = block_matches[transcript]
 	    for i in range(len(matches) - 1):
 		j = i + 1
@@ -489,7 +503,6 @@ class NovelSpliceFinder:
 		                                         transcripts[transcript],
 		                                         ref_fasta
 		                                         )
-		    print 'event', i, j, align.blocks[i:j+1], transcript, events
 		    if events:
 			for e in events:
 			    e['blocks'] = range(i + 1, j)
@@ -498,6 +511,7 @@ class NovelSpliceFinder:
 			all_events.extend(events)
 		
 	if all_events:
+	    # group events
 	    grouped = {}
 	    for event in all_events:
 		key = str(event['blocks']) + event['event']
@@ -525,7 +539,6 @@ class NovelSpliceFinder:
 	                            }
 	                           )
 		    
-	    print 'final', uniq_events
 	    return uniq_events
 	
     @classmethod
