@@ -772,6 +772,7 @@ class Transcript:
 	    return len(self.exons) - index
     
 class Event:
+    # headers of tab-delimited output
     headers = ['event_type',
                'chrom1',
                'pos1',
@@ -793,6 +794,14 @@ class Event:
     
     @classmethod
     def output(cls, events, outdir):
+	"""Output events
+
+	Args:
+	    events: (list) Adjacency
+	    outdir: (str) absolute path of output directory
+	Returns:
+	    events will be output in file outdir/events.tsv
+	"""
 	out_file = '%s/events.tsv' % outdir
 	out = open(out_file, 'w')
 	out.write('%s\n' % '\t'.join(cls.headers))
@@ -818,6 +827,13 @@ class Event:
 				
     @classmethod
     def from_fusion(cls, event):
+	"""Generates output line for a fusion/PTD event
+	
+	Args:
+	    event: (Adjacency) fusion or PTD event (coming from split alignment)
+	Returns:
+	    Tab-delimited line
+	"""
 	data = [event.rna_event]
 	for values in zip(event.chroms, event.breaks, event.orients, event.genes, event.transcripts, event.exons):
 	    data.extend(values)
@@ -835,6 +851,13 @@ class Event:
     
     @classmethod
     def from_single_locus(cls, event):
+	"""Generates output line for an event from a single alignment
+	
+	Args:
+	    event: (Adjacency) indel, ITD, splicing event (coming from single alignment)
+	Returns:
+	    Tab-delimited line
+	"""
 	chroms = (event.chroms[0], event.chroms[0])
 	orients = ('L', 'R')
 	genes = (event.genes[0], event.genes[0])
@@ -866,6 +889,19 @@ class Event:
 	
     @classmethod
     def to_string(cls, value):
+	"""Convert value of data types other than string usually used
+	in Adjacency attributes to string for print
+	
+	Args:
+	    value: can be
+	           1. None
+		   2. simple list/tuple
+		   3. list/tuple of list/tuple
+	Returns:
+	    string representation of value
+	    ';' used to separate items in top-level list/tuple
+	    ',' used to separate items in second-level list/tuple
+	"""
 	if value is None:
 	    return '-'
 	elif type(value) is list or type(value) is tuple:
