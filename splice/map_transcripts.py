@@ -1122,24 +1122,17 @@ class ExonMapper:
 	self.mappings = []
 	self.events = []
 	
+	# initialize ITD conditions
 	self.itd_conditions = {'min_len': itd_min_len,
 	                       'min_pid': itd_min_pid,
 	                       'max_apart': itd_max_apart
 	                       }
-	
+					
+    def map_contigs_to_transcripts(self):
+	"""Maps contig alignments to transcripts, discovering variants at the same time"""
+	# extract all transcripts info in dictionary
 	transcripts = self.extract_transcripts()
-	self.map_contigs_to_transcripts(transcripts)
-			
-    def get_attrs(self, attrs_str):
-	attrs = {}
-	for field in attrs_str.split(';'):
-	    cols = field.rstrip(' ').lstrip(' ').split(' ')
-	    if len(cols) == 2:
-		attrs[cols[0]] = cols[1].strip('"')
-	    
-	return attrs
 	
-    def map_contigs_to_transcripts(self, transcripts):
 	aligns = []
 	for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
             alns = list(group)
@@ -1147,32 +1140,34 @@ class ExonMapper:
 	    
 	    aligns = self.extract_aligns(alns)
 	    if aligns is None:
-		print 'no valid alignment', contig
+		sys.stdout.write('no valid alignment: %s\n' % contig)
 		continue
 	    
 	    chimera = True if len(aligns) > 1 else False
 	    chimera_block_matches = []
-	    	    
 	    for align in aligns:
 		if align is None:
-		    print 'bad alignment', contig
+		    sys.stdout.write('bad alignment' % contig)
 		    continue
 		
-		if '_' in align.target:
-		    print 'bad target', contig, align.target
+		if re.search('[._Mm]', align.target):
+		    sys.stdout.write('skip target:%s %s\n' % (contig, align.target))
 		    continue
 		
-		print 'bbb', align.query, align.blocks, align.query_blocks
+		if self.debug:
+		    sys.stdout.write('contig:%s genome_blocks:%s contig_blocks:%s\n' % (align.query, 
+		                                                                        align.blocks, 
+		                                                                        align.query_blocks
+		                                                                        ))
 		
 		# entire contig align within single exon or intron
 		within_intron = []
 		within_exon = []
 		
 		transcripts_mapped = Set()
-		if re.search('[._]', align.target):
-		    continue
-		
-		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):			
+		# each gtf record corresponds to a feature
+		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
+		    # contigs within single intron or exon
 		    if not chimera and align.tstart >= gtf.start and align.tend <= gtf.end:
 			match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
 			
@@ -1181,9 +1176,9 @@ class ExonMapper:
 			    
 			elif gtf.feature == 'exon':
 			    within_exon.append((gtf, match))
-			       
+			  
+		    # collect all the transcripts that have exon overlapping alignment
 		    else:
-			attrs = self.get_attrs(gtf.attributes)
 			if gtf.feature == 'exon':
 			    transcripts_mapped.add(gtf.transcript_id)
 			    		
@@ -1193,49 +1188,75 @@ class ExonMapper:
 		    # Transcript objects that are fully matched
 		    full_matched_transcripts = []
 		    for txt in transcripts_mapped:
-			#print 'gene', contig, len(align.blocks), transcripts[txt].id, transcripts[txt].gene, transcripts[txt].strand, transcripts[txt].num_exons()			
 			block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
 			all_block_matches[txt] = block_matches
 			
 			if not chimera and self.is_full_match(block_matches):
-			    print 'full', contig
 			    full_matched_transcripts.append(transcripts[txt])
 			mappings.append((transcripts[txt], block_matches))
 			    
 		    if not full_matched_transcripts:			
 			events = self.find_events(all_block_matches, align, transcripts)
-			if not events:
-			    print 'partial_no_events', contig
-			else:
-			    print 'events', align.query, events
+			if events:
 			    self.events.extend(events)
+			elif self.debug:
+			    sys.stdout.write('%s - partial but no events\n' % align.query)		    
 			    			    
 		    if chimera:
 			chimera_block_matches.append(all_block_matches)
 		    
 		elif not chimera:
 		    if within_exon:
-			print 'exon', contig, align.target, align.tstart, align.tend#, within_exon[0].gene_id, within_exon[0].start, within_exon[0].end
+			sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s %s %s" % (contig, 
+			                                                                             align.target, 
+			                                                                             align.tstart, 
+			                                                                             align.tend, 
+			                                                                             within_exon[0].gene_id, 
+			                                                                             within_exon[0].start, 
+			                                                                             within_exon[0].end
+			                                                                             ))
 		    
 		    elif within_intron:
-			print 'intron', contig, align.target, align.tstart, align.tend#, within_intron[0].gene_id, within_intron[0].start, within_intron[0].end
+			sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s %s %s" % (contig, 
+			                                                                               align.target, 
+			                                                                               align.tstart, 
+			                                                                               align.tend, 
+			                                                                               within_intron[0].gene_id, 
+			                                                                               within_intron[0].start, 
+			                                                                               within_intron[0].end
+			                                                                               ))
 		
 	    # split aligns, try to find gene fusion
 	    if chimera and chimera_block_matches:
 		if len(chimera_block_matches) == len(aligns):
-		    #fusion = self.find_chimera(chimera_block_matches, transcripts, aligns)
 		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns)
 		    if fusion:
 			self.events.append(fusion)
 		
-	   
 	    # pick best matches
 	    if len(mappings) > 1:
 		best_mapping = Mapping.pick_best(mappings, align, debug=True)
 		self.mappings.append(best_mapping)
-		
-	
+			
     def map_exons(self, blocks, exons):
+	"""Maps alignment blocks to exons
+	
+	Crucial in mapping contigs to transcripts
+	
+	Args:
+	    blocks: (List) of 2-member list (start and end of alignment block)
+	    exons: (List) of 2-member list (start and end of exon)
+	Returns:
+	    List of list of tuples, where
+	         each item of the top-level list corresponds to each contig block
+		 each item of the second-level list corresponds to each exon match
+		 each exon-match tuple contains exon_index, 2-character matching string
+		 e.g. [ [ (0, '>='), (1, '<=') ], [ (2, '==') ], [ (3, '=<') ], [ (3, '>=') ] ]
+		 this says that the alignment has 4 blocks,
+		 first block matches to exon 0 and 1, find a retained-intron,
+		 second block matches perfectly to exon 2
+		 third and fourth blocks matching to exon 3, possible a deletion or novel_intron
+	"""
 	result = []
 	for b in range(len(blocks)):
 	    block_matches = []
@@ -1248,10 +1269,18 @@ class ExonMapper:
 	    if not block_matches:
 		block_matches = None
 	    result.append(block_matches)
-			
+		
 	return result
 		    		    
     def extract_transcripts(self):
+	"""Extracts all exon info into transcript objects
+	
+	Requires annotation file passed to object
+	Uses PyBedTool for parsing
+	
+	Returns:
+	    List of Transcripts with exon info, strand
+	"""
 	transcripts = {}
 	for feature in BedTool(self.annotations_file):
 	    if feature[2] == 'exon':
@@ -1272,21 +1301,42 @@ class ExonMapper:
 	return transcripts
         
     def extract_novel_seq(self, adj):
+	"""Extracts novel sequence in adjacency, should be a method of Adjacency"""
 	start, end = (adj.contig_breaks[0], adj.contig_breaks[1]) if adj.contig_breaks[0] < adj.contig_breaks[1] else (adj.contig_breaks[1], adj.contig_breaks[0])
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
 	return novel_seq
 	    
     def find_events(self, matches_by_transcript, align, transcripts):
-	genes = Set([transcripts[txt].gene for txt in matches_by_transcript.keys()])
-	num_blocks = len(align.blocks)
+	"""Find events from single alignment
 	
+	Wrapper for finding events within a single alignment
+	Maybe a read-through fusion, calls FusionFinder.find_read_through()
+	Maybe splicing or indels, call NovelSpliceFinder.find_novel_junctions()
+	Will take results in dictionary and convert them to Adjacencies
+	
+	Args:
+	    matches_by_transcript: (list) dictionaries where 
+	                                      key=transcript name, 
+	                                      value=[match1, match2, ...] where
+						    match1 = matches of each alignment block
+							     i.e.
+							     [(exon_id, '=='), (exon_id, '==')] 
+							     or None if no_match
+	    align: (Alignment) alignment object
+	    transcripts: (dictionary) key=transcript_id value: Transcript
+	Returns:
+	    List of Adjacencies
+	"""
 	events = []
-		
+	
+	# for detecting whether there is a read-through fusion
+	genes = Set([transcripts[txt].gene for txt in matches_by_transcript.keys()])		
 	if len(genes) > 1:
 	    fusion = FusionFinder.find_read_through(matches_by_transcript, transcripts, align)
 	    if fusion is not None:
 		events.append(fusion)
-	    	    		
+	    	    	
+	# events within a gene
 	local_events = NovelSpliceFinder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta)
 	if local_events:
 	    for event in local_events:
@@ -1337,6 +1387,17 @@ class ExonMapper:
 	        }[self.aligner](alns, self.bam)]
         
     def match_exon(self, block, exon):
+	"""Match an alignment block to an exon
+	
+	Args:
+	    block: (Tuple/List) start and end of an alignment block
+	    exon: (Tuple/List) start and end of an exon
+	Returns:
+	    2 character string, each character the result of each coordinate
+	    '=': block coordinate = exon coordinate
+	    '<': block coordinate < exon coordinate
+	    '>': block coordinate > exon coordinate
+	"""
         assert len(block) == 2 and len(block) == len(exon), 'unmatched number of block(%d) and exon(%d)' % (len(block), len(exon))
         assert type(block[0]) is int and type(block[1]) is int and type(exon[0]) is int and type(exon[1]) is int,\
         'type of block and exon must be int'
@@ -1352,7 +1413,6 @@ class ExonMapper:
 		    result += '<'
         
         return result
-    
     
     def is_full_match(self, block_matches):
 	if None in block_matches:
@@ -1395,6 +1455,8 @@ def main(args, options):
                     itd_min_pid=options.itd_min_pid,
                     itd_max_apart=options.itd_max_apart,
                     debug=options.debug)
+    em.map_contigs_to_transcripts()
+
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
