@@ -251,6 +251,9 @@ class FusionFinder:
 		fusion.rna_event = 'fusion'
 		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
 		fusion.transcripts = (junc1[0], junc2[0])
+		#if junc1[1] is None or junc2[1] is None:
+		    #print 'check', junc1[0], junc2[0], transcripts[junc1[0]], transcripts[junc2[0]], junc1, junc2
+		    #return None
 		fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
 		fusion.exon_bound = junc1[2], junc2[2]
 		fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
@@ -335,7 +338,7 @@ class FusionFinder:
 		
 	for i in genes_in_block.keys():
 	    if len(genes_in_block[i]) == 2:
-		cls.identify_fusion_unknown_break(matches_by_block[i], transcripts, ('L', 'R'))
+		cls.identify_fusion_unknown_break(matches_by_block[i], transcripts)
 		
 	return None
 		
@@ -449,6 +452,8 @@ class NovelSpliceFinder:
 	all_events = []
 	for transcript in block_matches.keys():
 	    matches = block_matches[transcript]
+	    #print 'mmm', matches
+	    #print 'eee', transcript, transcripts[transcript].exons
 	    for i in range(len(matches) - 1):
 		j = i + 1
 			
@@ -465,6 +470,7 @@ class NovelSpliceFinder:
 			for e in events:
 			    e['blocks'] = (i, j)
 			    e['transcript'] = transcript
+			    e['contig_breaks'] = (align.query_blocks[i][1], align.query_blocks[j][0])
 			all_events.extend(events)
 		    continue
 		
@@ -572,11 +578,28 @@ class NovelSpliceFinder:
 		    size = transcript.exons[exons[1]][0] - transcript.exons[exons[0]][1] - 1 
 		    events.append({'event': 'retained_intron', 'exons': exons, 'pos':pos, 'size':size})
 		  
-	# ever used??
+	# genomic deletion or novel_intron
 	elif match1 is None and match2 is not None:
 	    if match2[0] == 0 and match2[1] == '<=':
-		print 'special ins', match1, match2, pos
-		events.append({'event': 'ins', 'exons': match2[0], 'pos':pos})
+		if transcript.strand == '+':
+		    donor_start = blocks[0][1] + 1
+		    acceptor_start = blocks[1][0] - 2
+		else:
+		    donor_start = blocks[1][0] - 2
+		    acceptor_start = blocks[0][1] + 1
+		print 'special check', match1, match2, pos
+		gap_size = blocks[1][0] - blocks[0][1] - 1
+		pos = (blocks[0][1], blocks[1][0])
+		event = None
+		if gap_size > 0:
+		    if gap_size > min_intron_size and\
+		       cls.check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
+			print 'aaa', transcript.id
+			event = 'novel_intron'
+		    else:
+			event = 'del'
+		if event is not None:
+		    events.append({'event': event, 'exons': [match2[0]], 'pos':pos, 'size':gap_size})
 		
 	else:
 	    if match2[0] > match1[0] + 1 and\
@@ -603,6 +626,7 @@ class NovelSpliceFinder:
 		if gap_size > 0:
 		    if gap_size > min_intron_size and\
 		       cls.check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
+			print 'bbb'
 			event = 'novel_intron'
 		    else:
 			event = 'del'
@@ -928,9 +952,13 @@ class Mapping:
 	self.transcripts = transcripts
 	self.genes = list(Set([txt.gene for txt in self.transcripts]))
 	self.align_blocks = align_blocks
+	# coverage for each transcript in self.transcripts
 	self.coverages = []
 	
     def overlap(self):
+	"""Overlaps alignment spans with exon-spans of each matching transcripts
+	Upates self.coverages
+	"""
 	align_span = self.create_span(self.align_blocks)
 	
 	for transcript in self.transcripts:
@@ -940,6 +968,9 @@ class Mapping:
 	    
     @classmethod
     def create_span(cls, blocks):
+	"""Creates intspan for each block
+	Used by self.overlap()
+	"""
 	span = None
 	for block in blocks:
 	    try:
@@ -958,6 +989,7 @@ class Mapping:
 	                  ])
 	    
     def as_tab(self):
+	"""Generates tab-delimited line for each mapping"""
 	data = []
 	data.append(self.contig)
 	if self.transcripts:
@@ -975,10 +1007,12 @@ class Mapping:
 	return '\t'.join(map(str, data))
 	
     @classmethod
-    def pick_best(self, mappings, align, debug=False):	
+    def pick_best(self, mappings, align, debug=False):
+	"""Selects best mapping among transcripts"""
 	scores = {}
 	metrics = {}
 	for transcript, matches in mappings:
+	    print 'ggg', transcript.id, matches
 	    metric = {'score': 0,
 	              'from_edge': 0,
 	              'txt_size': 0
@@ -1002,9 +1036,9 @@ class Mapping:
 			score += 2
 			
 		if matches[i][0][1][1] == '=':
-		    score += 1
+		    score += 4
 		if matches[i][-1][1][1] == '=':
-		    score += 1		
+		    score += 4	
 			
 	    # points are deducted for events
 	    penalty = 0
@@ -1062,7 +1096,7 @@ class Mapping:
 	    	
     @classmethod
     def group(cls, all_mappings):
-	"""Group by gene"""
+	"""Group mappings by gene"""
 	gene_mappings = []
 	for gene, group in groupby(all_mappings, lambda m: m.genes[0]):
 	    mappings = list(group)
@@ -1076,25 +1110,20 @@ class Mapping:
 		try:
 		    align_blocks = align_blocks.union(cls.create_span(mapping.align_blocks))
 		except:
-		    align_blocks = cls.create_span(mapping.align_blocks)
-	    #print align_blocks.ranges()
-		
+		    align_blocks = cls.create_span(mapping.align_blocks)		
 	    
 	    gene_mappings.append(Mapping(contigs,
 	                                 align_blocks.ranges(),
 	                                 list(Set(chain(*transcripts))),
 	                                 )
 	                         )
-	    
-	#for mapping in gene_mappings:
-	    #mapping.overlap()
-	    #print 'gene', mapping.as_tab()
-	    
+	    	    
 	[mapping.overlap() for mapping in gene_mappings]
 	return gene_mappings
     
     @classmethod
     def output(cls, mappings, outfile):
+	"""Output mappings into output file"""
 	out = open(outfile, 'w')
 	out.write('%s\n' % cls.header())
 	for mapping in mappings:
@@ -1134,6 +1163,7 @@ class ExonMapper:
 	
 	aligns = []
 	for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
+	    sys.stdout.write('analyzing %s\n' % contig)
             alns = list(group)
 	    mappings = []
 	    
@@ -1146,7 +1176,7 @@ class ExonMapper:
 	    chimera_block_matches = []
 	    for align in aligns:
 		if align is None:
-		    sys.stdout.write('bad alignment' % contig)
+		    sys.stdout.write('bad alignment: %s\n' % contig)
 		    continue
 		
 		if re.search('[._Mm]', align.target):
@@ -1164,6 +1194,7 @@ class ExonMapper:
 		within_exon = []
 		
 		transcripts_mapped = Set()
+		events = []
 		# each gtf record corresponds to a feature
 		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
 		    # contigs within single intron or exon
@@ -1194,8 +1225,16 @@ class ExonMapper:
 			    full_matched_transcripts.append(transcripts[txt])
 			mappings.append((transcripts[txt], block_matches))
 			    
-		    if not full_matched_transcripts:			
-			events = self.find_events(all_block_matches, align, transcripts)
+		    if not full_matched_transcripts:	
+			best_mapping = Mapping.pick_best(mappings, align, debug=True)
+			self.mappings.append(best_mapping)
+			
+			# find events only for best transcript
+			best_transcript = best_mapping.transcripts[0]
+			events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]}, 
+			                          align, 
+			                          {best_transcript.id:best_transcript})
+			#events = self.find_events(all_block_matches, align, transcripts)
 			if events:
 			    self.events.extend(events)
 			elif self.debug:
@@ -1206,24 +1245,20 @@ class ExonMapper:
 		    
 		elif not chimera:
 		    if within_exon:
-			sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s %s %s" % (contig, 
-			                                                                             align.target, 
-			                                                                             align.tstart, 
-			                                                                             align.tend, 
-			                                                                             within_exon[0].gene_id, 
-			                                                                             within_exon[0].start, 
-			                                                                             within_exon[0].end
-			                                                                             ))
+			sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s\n" % (contig, 
+			                                                                         align.target, 
+			                                                                         align.tstart, 
+			                                                                         align.tend, 
+			                                                                         within_exon[0]
+			                                                                         ))
 		    
 		    elif within_intron:
-			sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s %s %s" % (contig, 
-			                                                                               align.target, 
-			                                                                               align.tstart, 
-			                                                                               align.tend, 
-			                                                                               within_intron[0].gene_id, 
-			                                                                               within_intron[0].start, 
-			                                                                               within_intron[0].end
-			                                                                               ))
+			sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s\n" % (contig, 
+			                                                                           align.target, 
+			                                                                           align.tstart, 
+			                                                                           align.tend, 
+			                                                                           within_intron[0]
+			                                                                           ))
 		
 	    # split aligns, try to find gene fusion
 	    if chimera and chimera_block_matches:
@@ -1232,11 +1267,11 @@ class ExonMapper:
 		    if fusion:
 			self.events.append(fusion)
 		
-	    # pick best matches
-	    if len(mappings) > 1:
-		best_mapping = Mapping.pick_best(mappings, align, debug=True)
-		self.mappings.append(best_mapping)
-			
+	    ## pick best matches
+	    #if len(mappings) > 1:
+		#best_mapping = Mapping.pick_best(mappings, align, debug=True)
+		#self.mappings.append(best_mapping)
+					
     def map_exons(self, blocks, exons):
 	"""Maps alignment blocks to exons
 	
@@ -1349,6 +1384,9 @@ class ExonMapper:
 		
 		# converts exon index to exon number (which takes transcript strand into account)
 		exons = event['exons'][0]
+		#if type(exons) is not list and type(exons) is not tuple:
+		    #print 'check', align.query, event, exons
+		    #continue
 		adj.exons = map(transcripts[event['transcript'][0]].exon_num, exons)
 		
 		adj.contig_breaks = event['contig_breaks']
