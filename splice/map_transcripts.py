@@ -248,16 +248,7 @@ class FusionFinder:
 	    fusion = call_event(aligns[0], aligns[1], no_sort=True)
 	    junc1, junc2 = cls.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
 	    if junc1 and junc2:
-		fusion.rna_event = 'fusion'
-		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
-		fusion.transcripts = (junc1[0], junc2[0])
-		#if junc1[1] is None or junc2[1] is None:
-		    #print 'check', junc1[0], junc2[0], transcripts[junc1[0]], transcripts[junc2[0]], junc1, junc2
-		    #return None
-		fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
-		fusion.exon_bound = junc1[2], junc2[2]
-		fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
-		cls.is_ptd(fusion)
+		cls.annotate_fusion(fusion, junc1, junc2, transcripts)
 		return fusion
 	    
 	return None
@@ -297,15 +288,8 @@ class FusionFinder:
 	                       '-',
 	                       orients=('L', 'R'),
 	                       contig_breaks = contig_breaks
-	                       )               
-	    fusion.rna_event = 'fusion'
-	    fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
-	    fusion.transcripts = (junc1[0], junc2[0])
-	    fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
-	    fusion.exon_bound = junc1[2], junc2[2]
-	    fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
-	    cls.is_ptd(fusion)
-	    
+	                       )     
+	    cls.annotate_fusion(fusion, junc1, junc2, transcripts)
 	    return fusion
 	
 	num_blocks = len(align.blocks)
@@ -406,11 +390,51 @@ class FusionFinder:
     @classmethod
     def is_ptd(cls, fusion):
 	"""Define PTD"""
-	if fusion.genes[0] == fusion.genes[1] and\
-	   fusion.exon_bound[0] and\
-	   fusion.exon_bound[1]:
+	if fusion.genes[0] == fusion.genes[1]:
 	    fusion.rna_event = 'PTD'
 	    
+    @classmethod
+    def annotate_fusion(cls, fusion, junc1, junc2, transcripts):
+	fusion.rna_event = 'fusion'
+	fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
+	fusion.transcripts = (junc1[0], junc2[0])
+	#if junc1[1] is None or junc2[1] is None:
+	    #print 'check', junc1[0], junc2[0], transcripts[junc1[0]], transcripts[junc2[0]], junc1, junc2
+	    #return None
+	fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
+	fusion.exon_bound = junc1[2], junc2[2]
+	fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
+	
+	sense_fusion = cls.is_sense(fusion, transcripts[junc1[0]], transcripts[junc2[0]], fusion.orients[0], fusion.orients[1])
+	if not sense_fusion:
+	    fusion.is_sense = False
+	    fusion.gene5, fusion.gene3 = '-', '-'
+	else:
+	    fusion.is_sense = True
+	    fusion.gene5, fusion.gene3 = sense_fusion[0].gene, sense_fusion[1].gene
+	
+	cls.is_ptd(fusion)
+	    
+    @classmethod
+    def is_sense(cls, fusion, transcript1, transcript2, orient1, orient2):
+	t5, t3 = None, None
+	if fusion.exon_bound[0] and fusion.exon_bound[1]:
+	    if orient1 == 'L' and transcript1.strand == '+' and orient2 == 'R' and transcript2.strand == '+':
+		t5, t3 = transcript1, transcript2
+	    elif orient1 == 'L' and transcript1.strand == '-' and orient2 == 'R' and transcript2.strand == '-':
+		t3, t5 = transcript1, transcript2
+	    elif orient1 == 'R' and transcript1.strand == '+' and orient2 == 'L' and transcript2.strand == '+':
+		t3, t5 = transcript1, transcript2
+	    elif orient1 == 'R' and transcript1.strand == '-' and orient2 == 'L' and transcript2.strand == '-':
+		t5, t3 = transcript1, transcript2
+		
+	print 'abc', transcript1.gene, transcript2.gene, orient1, orient2, fusion.exon_bound, t5, t3
+	if t5 is not None and t3 is not None:
+	    return (t5, t3)
+	else:
+	    return False
+		
+		
 class NovelSpliceFinder:    
     @classmethod
     def find_novel_junctions(cls, block_matches, align, transcripts, ref_fasta):
@@ -804,16 +828,24 @@ class Event:
                'gene1',
                'transcript1',
                'exon1',
+               'exon_bound1',
                'chrom2',
                'pos2',
                'orient2',
                'gene2',
                'transcript2',
                'exon2',
+               'exon_bound2',
                'size',
                'novel_sequence',
+               'homol_seq',
+               'homol_coords',
+               'homol_len',
                'contigs',
                'contig_breaks',
+               'sense_fusion',
+               "5'gene",
+               "3'gene",
                ]
     
     @classmethod
@@ -858,7 +890,7 @@ class Event:
 	    Tab-delimited line
 	"""
 	data = [event.rna_event]
-	for values in zip(event.chroms, event.breaks, event.orients, event.genes, event.transcripts, event.exons):
+	for values in zip(event.chroms, event.breaks, event.orients, event.genes, event.transcripts, event.exons, event.exon_bound):
 	    data.extend(values)
 	    
 	# size not applicable to fusion
@@ -866,9 +898,34 @@ class Event:
 	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
 	    data.append(event.novel_seq)
 	else:
-	    data.append('-')    
+	    data.append('-')
+	    
+	# homol_seq and coords
+	homol_seq = None
+	if type(event.homol_seq) is str:
+	    homol_seq = event.homol_seq
+	elif type(event.homol_seq) is list or type(event.homol_seq) is tuple:
+	    homol_seq = event.homol_seq[0]
+	if homol_seq:
+	    data.append(homol_seq)
+	
+	    if homol_seq != '-':
+		data.append('-'.join(map(str, event.homol_coords)))
+		data.append(event.homol_coords[1] - event.homol_coords[0] + 1)
+	    else:
+		data.append('-')
+		data.append('-')
+	else:
+	    data.append('-')
+	    data.append('-')
+	    data.append('-')
+	
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
+	
+	data.append(event.is_sense)
+	data.append(event.gene5)
+	data.append(event.gene3)
 	
 	return '\t'.join(map(str, data))
     
@@ -893,9 +950,12 @@ class Event:
 	# novel exons
 	else:
 	    exons = ('-', '-')
+	    
+	# exon_bound
+	exon_bound = ('-', '-')
 	
 	data = [event.rna_event]
-	for values in zip(chroms, event.breaks, orients, genes, transcripts, exons):
+	for values in zip(chroms, event.breaks, orients, genes, transcripts, exons, exon_bound):
 	    data.extend(values)
 	
 	if hasattr(event, 'size') and event.size is not None:
@@ -905,9 +965,21 @@ class Event:
 	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
 	    data.append(event.novel_seq)
 	else:
-	    data.append('-')    
+	    data.append('-')
+	    
+	# homol_seq and coords
+	data.append('-')
+	data.append('-')
+	data.append('-')
+		
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
+	
+	# sense fusion
+	data.append('-')
+	data.append('-')
+	data.append('-')
+
 	return '\t'.join(map(str, data))
 	
     @classmethod
@@ -1012,7 +1084,6 @@ class Mapping:
 	scores = {}
 	metrics = {}
 	for transcript, matches in mappings:
-	    print 'ggg', transcript.id, matches
 	    metric = {'score': 0,
 	              'from_edge': 0,
 	              'txt_size': 0
@@ -1164,9 +1235,7 @@ class ExonMapper:
 	aligns = []
 	for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
 	    sys.stdout.write('analyzing %s\n' % contig)
-            alns = list(group)
-	    mappings = []
-	    
+            alns = list(group)	    
 	    aligns = self.extract_aligns(alns)
 	    if aligns is None:
 		sys.stdout.write('no valid alignment: %s\n' % contig)
@@ -1213,6 +1282,7 @@ class ExonMapper:
 			    transcripts_mapped.add(gtf.transcript_id)
 			    		
 		if transcripts_mapped:
+		    mappings = []
 		    # key = transcript name, value = "matches"
 		    all_block_matches = {}
 		    # Transcript objects that are fully matched
@@ -1220,10 +1290,10 @@ class ExonMapper:
 		    for txt in transcripts_mapped:
 			block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
 			all_block_matches[txt] = block_matches
+			mappings.append((transcripts[txt], block_matches))
 			
 			if not chimera and self.is_full_match(block_matches):
 			    full_matched_transcripts.append(transcripts[txt])
-			mappings.append((transcripts[txt], block_matches))
 			    
 		    if not full_matched_transcripts:	
 			best_mapping = Mapping.pick_best(mappings, align, debug=True)
@@ -1265,6 +1335,12 @@ class ExonMapper:
 		if len(chimera_block_matches) == len(aligns):
 		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns)
 		    if fusion:
+			homol_seq, homol_coords = None, None
+			if self.aligner.lower() == 'gmap':
+			    homol_seq, homol_coords = gmap.find_microhomology(alns[0], self.contigs_fasta.fetch(contig))
+			if homol_seq is not None:
+			    fusion.homol_seq = homol_seq
+			    fusion.homol_coords = homol_coords
 			self.events.append(fusion)
 		
 	    ## pick best matches
