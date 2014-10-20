@@ -497,7 +497,7 @@ class Mapping:
 
 class ExonMapper:
     def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
-                 itd_min_len=None, itd_min_pid=None, itd_max_apart=None, debug=False):
+                 itd_min_len=None, itd_min_pid=None, itd_max_apart=None, exon_bound_fusion_only=False, debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
 	self.contigs_fasta_file = contigs_fasta_file
 	self.contigs_fasta = pysam.Fastafile(contigs_fasta_file)
@@ -521,6 +521,8 @@ class ExonMapper:
 	                       'min_pid': itd_min_pid,
 	                       'max_apart': itd_max_apart
 	                       }
+	
+	self.fusion_conditions = {'exon_bound_only': exon_bound_fusion_only}
 					
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
@@ -631,7 +633,8 @@ class ExonMapper:
 	    # split aligns, try to find gene fusion
 	    if chimera and chimera_block_matches:
 		if len(chimera_block_matches) == len(aligns):
-		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq)
+		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, 
+		                                       exon_bound_only=self.fusion_conditions['exon_bound_only'])
 		    if fusion:
 			homol_seq, homol_coords = None, None
 			if self.aligner.lower() == 'gmap':
@@ -741,7 +744,8 @@ class ExonMapper:
 	# for detecting whether there is a read-through fusion
 	genes = Set([transcripts[txt].gene for txt in matches_by_transcript.keys()])		
 	if len(genes) > 1:
-	    fusion = FusionFinder.find_read_through(matches_by_transcript, transcripts, align)
+	    fusion = FusionFinder.find_read_through(matches_by_transcript, transcripts, align, 
+	                                            exon_bound_only=self.fusion_conditions['exon_bound_only'])
 	    if fusion is not None:
 		events.append(fusion)
 	    	    	
@@ -949,14 +953,16 @@ def main(args, options):
                     itd_min_len=options.itd_min_len,
                     itd_min_pid=options.itd_min_pid,
                     itd_max_apart=options.itd_max_apart,
+                    exon_bound_fusion_only=options.exon_bound_fusion_only,
                     debug=options.debug)
     em.map_contigs_to_transcripts()
     
-    Event.screen(em.events, outdir, em.aligner, {'genome': options.genome,
-                                                 'index_dir': options.index_dir,
-                                                 'num_procs': options.num_threads,
-                                                 },
-                 debug=options.debug)
+    if options.genome and options.index_dir and os.path.exists(options.index_dir):
+	Event.screen(em.events, outdir, em.aligner, {'genome': options.genome,
+	                                             'index_dir': options.index_dir,
+	                                             'num_procs': options.num_threads,
+	                                             },
+	             debug=options.debug)
     
     if options.r2c_bam_file:
 	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
@@ -981,6 +987,7 @@ if __name__ == '__main__':
     parser.add_option("--itd_max_apart", dest="itd_max_apart", help="maximum distance apart of ITD. Default: 10", default=10, type=int)
     parser.add_option("--multimapped", dest="multimapped", help="reads-to-contigs alignment is multi-mapped", action="store_true", default=False)
     parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
+    parser.add_option("--exon_bound_fusion_only", dest="exon_bound_fusion_only", help="only find exon-bound fusion", action="store_true", default=False)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()

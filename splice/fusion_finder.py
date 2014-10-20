@@ -8,7 +8,7 @@ from SV import gapped_align
 
 class FusionFinder:
     @classmethod
-    def find_chimera(cls, chimera_block_matches, transcripts, aligns, contig_seq):
+    def find_chimera(cls, chimera_block_matches, transcripts, aligns, contig_seq, exon_bound_only=False):
 	"""Identify gene fusion between split alignments
 	
 	Args:
@@ -48,6 +48,8 @@ class FusionFinder:
 	    junc1, junc2 = cls.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
 	    if junc1 and junc2:
 		cls.annotate_fusion(fusion, junc1, junc2, transcripts)
+		if exon_bound_only and not (fusion.exon_bound[0] and fusion.exon_bound[1]):
+		    return None
 		return fusion
 	    
 	return None
@@ -89,6 +91,7 @@ class FusionFinder:
 	                       contig_breaks = contig_breaks
 	                       )     
 	    cls.annotate_fusion(fusion, junc1, junc2, transcripts)
+	    fusion.rna_event = 'read_through'
 	    return fusion
 	
 	num_blocks = len(align.blocks)
