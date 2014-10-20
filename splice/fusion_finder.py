@@ -1,10 +1,14 @@
 from sets import Set
+from itertools import groupby
+import sys
+import pysam
 from SV.split_align import call_event
 from SV.variant import Adjacency
+from SV import gapped_align
 
 class FusionFinder:
     @classmethod
-    def find_chimera(cls, chimera_block_matches, transcripts, aligns):
+    def find_chimera(cls, chimera_block_matches, transcripts, aligns, contig_seq):
 	"""Identify gene fusion between split alignments
 	
 	Args:
@@ -36,6 +40,11 @@ class FusionFinder:
     
 	    # create adjacency first to establish L/R orientations, which is necessary to pick best transcripts
 	    fusion = call_event(aligns[0], aligns[1], no_sort=True)
+	    
+	    probe = Adjacency.extract_probe(contig_seq, fusion.contig_breaks[0])
+	    if probe:
+		fusion.probes.append(probe[0])
+	    
 	    junc1, junc2 = cls.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
 	    if junc1 and junc2:
 		cls.annotate_fusion(fusion, junc1, junc2, transcripts)
@@ -218,8 +227,58 @@ class FusionFinder:
 	    elif orient1 == 'R' and transcript1.strand == '-' and orient2 == 'L' and transcript2.strand == '-':
 		t5, t3 = transcript1, transcript2
 		
-	print 'abc', transcript1.gene, transcript2.gene, orient1, orient2, fusion.exon_bound, t5, t3
 	if t5 is not None and t3 is not None:
 	    return (t5, t3)
 	else:
 	    return False
+	
+    @classmethod
+    def screen_realigns(cls, fusions, outdir, aligner, align_info, name_sep='-', debug=False):
+	"""Screens fusions by religning probes against reference genome
+	
+	Will filter out events whose probe can align to single location
+	
+	Args:
+	    fusions: (list) Adjacencies
+	    outdir: (str) absolute path of output directory, for storing re-alignment results
+	    aligner: (str) aligner name (gmap)
+	    align_info: (dict) 'genome', 'index_dir', 'num_procs'
+	    name_sep: (str) single character to separate event info in generating query name
+	    debug: (boolean) output debug info e.g. reason for screening out event
+	"""
+	if align_info is not None:
+	    realign_bam_file = Adjacency.realign_probe(fusions, outdir, aligner,
+	                                               name_sep=name_sep,
+	                                               num_procs=align_info['num_procs'],
+	                                               genome=align_info['genome'],
+	                                               index_dir=align_info['index_dir'])
+	    
+	try:
+	    bam = pysam.Samfile(realign_bam_file, 'rb')
+	except:
+	    sys.exit('Error parsing realignment BAM:%s' % realign_bam_file)
+	    
+	# creates mapping from query to fusion
+	query_to_fusion = {}
+	for i in range(len(fusions)):
+	    query = fusions[i].contigs[0] + name_sep + fusions[i].key()
+	    query_to_fusion[query] = i
+		
+	# captures contig names whose probe aligns to single position
+	# will remove any events coming from these contigs because the split-alignment is not reliable
+	failed_contigs = Set()
+	for key, group in groupby(bam.fetch(until_eof=True), lambda x: x.qname):
+	    alns = list(group)
+	    fusion_idx = query_to_fusion[key]
+	    fusion = fusions[fusion_idx]
+	    fusion_aligns = fusion.aligns[0]
+	    	    
+	    probe_alns = [aln for aln in alns if not aln.qname[-1].isdigit()]
+	    if not gapped_align.screen_probe_alns(fusion_aligns, probe_alns, fusion.align_types[0]):
+		if debug:
+		    sys.stdout.write('probe align completely to one location: %s - contigs(s) filtered out\n' % key)
+		for contig in fusion.contigs:
+		    failed_contigs.add(contig)
+		continue
+	    		
+	return failed_contigs
