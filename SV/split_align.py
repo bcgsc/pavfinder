@@ -587,12 +587,13 @@ def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', co
 		rearrangement = 'del'
 			    
 	elif breaks[0] > breaks[1]:
-	    # if difference is breaks is small, should be tandem dup
-	    if contig_breaks[0] >= contig_breaks[1]:
-		rearrangement = 'dup'
-	    # insertion with microhomology
-	    else:
-		rearrangement = 'ins'		
+	    rearrangement = 'dup' 
+	    ## if difference is breaks is small, should be tandem dup
+	    #if contig_breaks[0] >= contig_breaks[1]:
+		#rearrangement = 'dup'
+	    ## insertion with microhomology
+	    #else:
+		#rearrangement = 'ins'		
 	    
 	# breaks[0] == breaks[1]
 	else:
