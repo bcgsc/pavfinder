@@ -77,6 +77,7 @@ class NovelSpliceFinder:
 			for e in events:
 			    e['blocks'] = (i, j)
 			    e['transcript'] = transcript
+			    e['contig_breaks'] = (align.query_blocks[i][0], align.query_blocks[i][1])
 			all_events.extend(events)
 		    
 		# skip if junction is annotated
@@ -130,7 +131,7 @@ class NovelSpliceFinder:
 	                            'transcript': transcripts,
 	                            'exons': exons,
 	                            'pos': events[0]['pos'],
-	                            'contig_breaks': contig_breaks,
+	                            'contig_breaks': [contig_breaks],
 		                    'size': events[0]['size'],
 	                            }
 	                           )
