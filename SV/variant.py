@@ -981,3 +981,45 @@ class Adjacency:
 	    adjs_merged.append(adj)
 	    		
 	return adjs_merged
+    
+    @classmethod
+    def realign_probe(cls, adjs, out_dir, aligner, name_sep='-', use_realigns=False, genome=None, index_dir=None, num_procs=None):
+	"""Aligns probe and subsequences against genome again
+	
+	Will generate a Fasta file in the output direcotyr called 'realign.fa' containing all the 
+	(subsequences + probe) sequences to be realigned
+	Will run the alignment on the command line and generate a BAM file in the output directory 
+	called 'realign.bam'
+	
+	Args:
+	    name_sep: (str) Character used to combined various info into query name
+	""" 
+	def write_probe(adj, out, name_sep):
+	    """Outputs the probe sequence to output file
+	    
+	    Args:
+		adj: Variant object
+		out: Filehandle of output file
+		name_sep: (str) Character used to combined various info into query name
+	    """
+	    out.write('>%s%s%s\n%s\n' % (adj.contigs[0], name_sep, adj.key(), adj.probes[0]))
+	from shared import gmap
+	from shared import bwa_mem
+
+	prefix = 'realign'
+	if not use_realigns:
+	    out_file = '%s/%s.fa' % (out_dir, prefix)
+	    out = open(out_file, 'w')
+	    for adj in adjs:
+		write_probe(adj, out, name_sep)	    
+	    out.close()
+	
+	# run aligner
+	realign_bam_file = '%s/%s.bam' % (out_dir, prefix)
+	if not use_realigns:
+	    if aligner == 'gmap':
+		return_code = gmap.run(out_file, realign_bam_file, genome, index_dir, num_procs)
+	    elif aligner == 'bwa_mem':
+		return_code = bwa_mem.run(out_file, realign_bam_file, genome, index_dir, num_procs)
+	
+	return realign_bam_file
