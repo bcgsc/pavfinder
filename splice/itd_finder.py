@@ -30,7 +30,7 @@ class ITD_Finder:
 	
 	# try BLAST if regex fails
 	if not dup:
-	    dup = cls.search_by_align(adj.contigs[0], contig_seq, outdir, sorted(adj.contig_breaks), min_len, max_apart, min_pid, debug=debug)
+	    dup = cls.search_by_align(adj.contigs[0], contig_seq, outdir, sorted(adj.contig_breaks[0]), min_len, max_apart, min_pid, debug=debug)
 	    if dup:
 		cls.update_attrs(adj, align, dup, contig_seq)
 	
@@ -52,11 +52,11 @@ class ITD_Finder:
 	"""
 	adj.rna_event = 'ITD'
 	new_contig_breaks = (dup[0][1], dup[1][0])
-	adj.contig_breaks = new_contig_breaks
+	adj.contig_breaks = [new_contig_breaks]
 	
 	if contig_seq is not None:
 	    # adjust genome break coordiantes based on new contig break coordinates
-	    shift = dup[1][0] - adj.contig_breaks[0]
+	    shift = dup[1][0] - adj.contig_breaks[0][0]
 	    if align.strand == '+':
 		new_genome_pos = adj.breaks[0] + shift
 		new_genome_breaks = new_genome_pos - 1, new_genome_pos
