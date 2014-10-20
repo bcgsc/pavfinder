@@ -15,6 +15,7 @@ from SV.variant import Adjacency
 from itd_finder import ITD_Finder
 from fusion_finder import FusionFinder
 from novel_splice_finder import NovelSpliceFinder
+from shared.read_support import scan_all, fetch_support
 
 class Transcript:
     def __init__(self, id, gene=None, strand=None):
@@ -100,6 +101,7 @@ class Event:
                'sense_fusion',
                "5'gene",
                "3'gene",
+               'spanning_reads',
                ]
     
     @classmethod
@@ -181,6 +183,11 @@ class Event:
 	data.append(event.gene5)
 	data.append(event.gene3)
 	
+	if not event.support['spanning']:
+	    data.append('-')
+	else:
+	    data.append(event.support['spanning'][0])
+	
 	return '\t'.join(map(str, data))
     
     @classmethod
@@ -233,6 +240,12 @@ class Event:
 	data.append('-')
 	data.append('-')
 	data.append('-')
+	
+	if not event.support['spanning']:
+	    print 'failed_spanning', event.rna_event, event.contigs, event.support
+	    data.append('-')
+	else:
+	    data.append(event.support['spanning'][0])
 
 	return '\t'.join(map(str, data))
 	
@@ -270,7 +283,34 @@ class Event:
 		return '-'
 	else:
 	    return str(value)
-						    	    	
+	
+    @classmethod
+    def screen(cls, events, outdir, aligner, align_info=None, debug=False):
+	"""Screen events identified and filter out bad ones
+	
+	Right now it just screens out fusion whose probe sequence can align to one single location
+	
+	Args:
+	    events: (list) Events
+	    outdir: (str) absolute path of output directory, for storing re-alignment results
+	    aligner: (str) aligner name (gmap)
+	    align_info: (dict) 'genome', 'index_dir', 'num_procs'
+	    debug: (boolean) output debug info e.g. reason for screening out event
+	"""
+	fusions = [e for e in events if e.rna_event == 'fusion']
+	bad_contigs = FusionFinder.screen_realigns(fusions, outdir, aligner, align_info, debug=debug)
+	
+	bad_event_indices = []
+	# remove any event that involve contigs that failed screening as mapping is not reliable
+	for e in reversed(range(len(events))):
+	    for contig in events[e].contigs:
+		if contig in bad_contigs and not e in bad_event_indices:
+		    bad_event_indices.append(e)
+		    break
+		
+	for e in bad_event_indices:
+	    del events[e]
+	
 class Mapping:
     """Mapping per alignment"""
     def __init__(self, contig, align_blocks, transcripts=[]):
@@ -459,6 +499,7 @@ class ExonMapper:
     def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
                  itd_min_len=None, itd_min_pid=None, itd_max_apart=None, debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
+	self.contigs_fasta_file = contigs_fasta_file
 	self.contigs_fasta = pysam.Fastafile(contigs_fasta_file)
         self.ref_fasta = pysam.Fastafile(ref_fasta_file)
 	self.annot = pysam.Tabixfile(annotation_file, parser=pysam.asGTF())
@@ -494,6 +535,9 @@ class ExonMapper:
 	    if aligns is None:
 		sys.stdout.write('no valid alignment: %s\n' % contig)
 		continue
+	    	    
+	    # for finding microhomolgy sequence and generating probe in fusion
+	    contig_seq = self.contigs_fasta.fetch(contig)
 	    
 	    chimera = True if len(aligns) > 1 else False
 	    chimera_block_matches = []
@@ -587,11 +631,11 @@ class ExonMapper:
 	    # split aligns, try to find gene fusion
 	    if chimera and chimera_block_matches:
 		if len(chimera_block_matches) == len(aligns):
-		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns)
+		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq)
 		    if fusion:
 			homol_seq, homol_coords = None, None
 			if self.aligner.lower() == 'gmap':
-			    homol_seq, homol_coords = gmap.find_microhomology(alns[0], self.contigs_fasta.fetch(contig))
+			    homol_seq, homol_coords = gmap.find_microhomology(alns[0], contig_seq)
 			if homol_seq is not None:
 			    fusion.homol_seq = homol_seq
 			    fusion.homol_coords = homol_coords
@@ -666,7 +710,8 @@ class ExonMapper:
         
     def extract_novel_seq(self, adj):
 	"""Extracts novel sequence in adjacency, should be a method of Adjacency"""
-	start, end = (adj.contig_breaks[0], adj.contig_breaks[1]) if adj.contig_breaks[0] < adj.contig_breaks[1] else (adj.contig_breaks[1], adj.contig_breaks[0])
+	contig_breaks = adj.contig_breaks[0]
+	start, end = (contig_breaks[0], contig_breaks[1]) if contig_breaks[0] < contig_breaks[1] else (contig_breaks[1], contig_breaks[0])
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
 	return novel_seq
 	    
@@ -834,6 +879,61 @@ class ExonMapper:
 	    return True
 		
 	return False
+    
+    def find_support(self, r2c_bam_file=None, min_overlap=None, multi_mapped=False, perfect=True, num_procs=1):
+	"""Extracts read support from reads-to-contigs BAM
+	
+	Assumes reads-to-contigs is NOT multi-mapped 
+	(so we add the support of different contigs of the same event together)
+	
+	Args:
+	    bam_file: (str) Path of reads-to-contigs BAM
+	"""
+	coords = {}
+	for event in self.events:
+	    for i in range(len(event.contigs)):
+		contig = event.contigs[i]
+		print 'check', event.rna_event, contig, event.contigs, i, event.contig_breaks
+		span = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		try:
+		    coords[contig].append(span)
+		except:
+		    coords[contig] = [span]
+	
+	if coords:	    
+	    avg_tlen = None
+	    tlens = []
+	    # if fewer than 10000 adjs, use 'fetch' of Pysam
+	    if len(coords) < 1000 or num_procs == 1:
+		support, tlens = fetch_support(coords, r2c_bam_file, self.contigs_fasta, overlap_buffer=min_overlap, perfect=perfect, debug=self.debug)
+	    # otherwise use multi-process parsing of bam file
+	    else:
+		support, tlens = scan_all(coords, r2c_bam_file, self.contigs_fasta_file, num_procs, overlap_buffer=min_overlap, perfect=perfect, debug=self.debug)
+		    
+	    print 'total tlens', len(tlens)
+		
+	    for event in self.events:
+		for i in range(len(event.contigs)):
+		    contig = event.contigs[i]
+		    span = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		    coord = '%s-%s' % (span[0], span[1])
+					
+		    if support.has_key(contig) and support[contig].has_key(coord):
+			event.support['spanning'].append(support[contig][coord][0])
+			
+		if not multi_mapped:
+		    event.sum_support()	
+		    
+		print event.support
+		     
+	    if tlens:
+		avg_tlen = float(sum(tlens)) / len(tlens)
+		print 'avg tlen', avg_tlen, sample_type
+		    	
+	if self.debug:
+	    for event in self.events:
+		print 'support', event.support, event.support_total, event.support_final
+
 
 def main(args, options):
     outdir = args[-1]
@@ -851,6 +951,15 @@ def main(args, options):
                     itd_max_apart=options.itd_max_apart,
                     debug=options.debug)
     em.map_contigs_to_transcripts()
+    
+    Event.screen(em.events, outdir, em.aligner, {'genome': options.genome,
+                                                 'index_dir': options.index_dir,
+                                                 'num_procs': options.num_threads,
+                                                 },
+                 debug=options.debug)
+    
+    if options.r2c_bam_file:
+	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
 
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
@@ -863,11 +972,15 @@ if __name__ == '__main__':
     parser = OptionParser(usage=usage)
     
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
-    parser.add_option("-n", "--num_procs", dest="num_procs", help="number of processes. Default: 5", default=5, type=int)
+    parser.add_option("-t", "--num_threads", dest="num_threads", help="number of threads. Default:8", type='int', default=8) 
+    parser.add_option("-g", "--genome", dest="genome", help="genome")
+    parser.add_option("-G", "--index_dir", dest="index_dir", help="genome index directory")
     parser.add_option("--junctions", dest="junctions", help="output junctions", action="store_true", default=False)
     parser.add_option("--itd_min_len", dest="itd_min_len", help="minimum ITD length. Default: 10", default=10, type=int)
     parser.add_option("--itd_min_pid", dest="itd_min_pid", help="minimum ITD percentage of identity. Default: 0.95", default=0.95, type=float)
     parser.add_option("--itd_max_apart", dest="itd_max_apart", help="maximum distance apart of ITD. Default: 10", default=10, type=int)
+    parser.add_option("--multimapped", dest="multimapped", help="reads-to-contigs alignment is multi-mapped", action="store_true", default=False)
+    parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
