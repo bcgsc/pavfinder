@@ -182,7 +182,14 @@ class Event:
 	    Tab-delimited line
 	"""
 	data = [event.rna_event]
+	
+	# sort breakpoints for output
+	paired_values = []
 	for values in zip(event.chroms, event.breaks, event.orients, event.genes, event.transcripts, event.exons, event.exon_bound):
+	    paired_values.append(values)
+	if cls.compare_pos((event.chroms[0], event.breaks[0]), (event.chroms[1], event.breaks[1])) > 0:
+	    paired_values.reverse()
+	for values in paired_values:
 	    data.extend(values)
 	    
 	# size not applicable to fusion
@@ -357,7 +364,48 @@ class Event:
 		
 	for e in bad_event_indices:
 	    del events[e]
+	    
+    @classmethod
+    def compare_pos(cls, pos1, pos2):
+	"""Compares 2 genomic positions
 	
+	Args:
+	    pos1: (tuple) chromosome1, coordinate1
+	    pos2: (tuple) chromosome2, coordinate2
+	Returns:
+	    1 : pos2 > pos1
+	    -1: pos1 < pos2
+	    0 : pos1 == pos2
+	"""
+	chr1, coord1 = pos1
+	chr2, coord2 = pos2
+	
+	if chr1[:3].lower() == 'chr':
+	    chr1 = chr1[3:]
+	if chr2[:3].lower() == 'chr':
+	    chr2 = chr2[3:]
+	
+	if re.match('^\d+$', chr1) and not re.match('^\d+$', chr2):
+	    return -1
+	elif not re.match('^\d+$', chr1) and re.match('^\d+$', chr2):
+	    return 1
+	else:
+	    if re.match('^\d+$', chr1) and re.match('^\d+$', chr2):
+		chr1 = int(chr1)
+		chr2 = int(chr2)
+		
+	    if chr1 < chr2:
+		return -1
+	    elif chr1 > chr2:
+		return 1
+	    else:
+		if int(coord1) < int(coord2):
+		    return -1
+		elif int(coord1) > int(coord2):
+		    return 1
+		else:
+		    return 0
+		
 class Mapping:
     """Mapping per alignment"""
     def __init__(self, contig, align_blocks, transcripts=[]):
