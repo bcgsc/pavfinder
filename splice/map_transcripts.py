@@ -74,6 +74,41 @@ class Transcript:
 	    return index + 1
 	else:
 	    return len(self.exons) - index
+	
+    @classmethod
+    def extract_transcripts(cls, annotation_file):
+	"""Extracts all exon info into transcript objects
+	
+	Requires annotation file passed to object
+	Uses PyBedTool for parsing
+	
+	Returns:
+	    List of Transcripts with exon info, strand
+	"""
+	transcripts = {}
+	for feature in BedTool(annotation_file):
+	    if feature[2] == 'exon':
+		exon = (int(feature.start) + 1, int(feature.stop))
+		exon_num = int(feature.attrs['exon_number'])
+		transcript_id = feature.attrs['transcript_id']
+		gene = feature.attrs['gene_name']
+		strand = feature.strand
+		
+		if feature.attrs.has_key('gene_biotype') and feature.attrs['gene_biotype'] == 'protein_coding':
+		    coding = True
+		else:
+		    coding = False
+				
+		try:
+		    transcript = transcripts[transcript_id]
+		except:
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
+		    transcripts[transcript_id] = transcript
+		    
+		transcript.add_exon(exon)
+		
+	return transcripts
+
     
 class Event:
     # headers of tab-delimited output
@@ -525,7 +560,7 @@ class ExonMapper:
         self.overlaps_bed = '%s/blocks_olap.bed' % outdir
         self.aligns = {}        
 
-        self.annotations_file = annotation_file
+        self.annotation_file = annotation_file
 	
 	self.mappings = []
 	self.events = []
@@ -542,7 +577,7 @@ class ExonMapper:
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
 	# extract all transcripts info in dictionary
-	transcripts = self.extract_transcripts()
+	transcripts = Transcript.extract_transcripts(self.annotation_file)
 	
 	aligns = []
 	for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
@@ -698,40 +733,7 @@ class ExonMapper:
 	    result.append(block_matches)
 		
 	return result
-		    		    
-    def extract_transcripts(self):
-	"""Extracts all exon info into transcript objects
-	
-	Requires annotation file passed to object
-	Uses PyBedTool for parsing
-	
-	Returns:
-	    List of Transcripts with exon info, strand
-	"""
-	transcripts = {}
-	for feature in BedTool(self.annotations_file):
-	    if feature[2] == 'exon':
-		exon = (int(feature.start) + 1, int(feature.stop))
-		exon_num = int(feature.attrs['exon_number'])
-		transcript_id = feature.attrs['transcript_id']
-		gene = feature.attrs['gene_name']
-		strand = feature.strand
-		
-		if feature.attrs.has_key('gene_biotype') and feature.attrs['gene_biotype'] == 'protein_coding':
-		    coding = True
-		else:
-		    coding = False
-				
-		try:
-		    transcript = transcripts[transcript_id]
-		except:
-		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
-		    transcripts[transcript_id] = transcript
-		    
-		transcript.add_exon(exon)
-		
-	return transcripts
-        
+		    		            
     def extract_novel_seq(self, adj):
 	"""Extracts novel sequence in adjacency, should be a method of Adjacency"""
 	contig_breaks = adj.contig_breaks[0]
