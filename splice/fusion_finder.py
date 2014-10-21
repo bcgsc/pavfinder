@@ -1,6 +1,7 @@
 from sets import Set
 from itertools import groupby
 import sys
+import re
 import pysam
 from SV.split_align import call_event
 from SV.variant import Adjacency
@@ -200,9 +201,6 @@ class FusionFinder:
 	fusion.rna_event = 'fusion'
 	fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
 	fusion.transcripts = (junc1[0], junc2[0])
-	#if junc1[1] is None or junc2[1] is None:
-	    #print 'check', junc1[0], junc2[0], transcripts[junc1[0]], transcripts[junc2[0]], junc1, junc2
-	    #return None
 	fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
 	fusion.exon_bound = junc1[2], junc2[2]
 	fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
@@ -236,7 +234,7 @@ class FusionFinder:
 	    return False
 	
     @classmethod
-    def screen_realigns(cls, fusions, outdir, aligner, align_info, name_sep='-', debug=False):
+    def screen_realigns(cls, fusions, outdir, align_info, name_sep='-', debug=False):
 	"""Screens fusions by religning probes against reference genome
 	
 	Will filter out events whose probe can align to single location
@@ -250,7 +248,7 @@ class FusionFinder:
 	    debug: (boolean) output debug info e.g. reason for screening out event
 	"""
 	if align_info is not None:
-	    realign_bam_file = Adjacency.realign_probe(fusions, outdir, aligner,
+	    realign_bam_file = Adjacency.realign_probe(fusions, outdir, align_info['aligner'],
 	                                               name_sep=name_sep,
 	                                               num_procs=align_info['num_procs'],
 	                                               genome=align_info['genome'],
@@ -285,3 +283,33 @@ class FusionFinder:
 		continue
 	    		
 	return failed_contigs
+
+    @classmethod
+    def same_family(cls, gene1, gene2):
+	"""Checks if 2 genes belong to the same family based on regex"""
+        family_patterns = []
+        # e.g. KLF1;KLF2
+        family_patterns.append(re.compile(r'(.+?)(\d+)$'))
+        # e.g. TUBA1B;TUBA1A, DDX19B;DDX19A
+        family_patterns.append(re.compile(r'(.+?\d)([A-Z])$'))
+        
+        same = False
+        # e.g. CATSPER2;CATSPER2P1
+        if gene1 in gene2 or gene2 in gene1:
+            same = True
+            return same
+        
+        for family_pattern in family_patterns:
+            family1 = family2 = None
+            m1 = family_pattern.search(gene1)
+            if m1:
+                family1 = m1.group(1)
+        
+            m2 = family_pattern.search(gene2)
+            if m2:
+                family2 = m2.group(1)
+            
+            if family1 is not None and family2 is not None and family1 == family2:
+                same = True
+		
+	return same

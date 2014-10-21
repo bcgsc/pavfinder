@@ -285,7 +285,7 @@ class Event:
 	    return str(value)
 	
     @classmethod
-    def screen(cls, events, outdir, aligner, align_info=None, debug=False):
+    def screen(cls, events, outdir, align_info=None, debug=False):
 	"""Screen events identified and filter out bad ones
 	
 	Right now it just screens out fusion whose probe sequence can align to one single location
@@ -298,8 +298,18 @@ class Event:
 	    debug: (boolean) output debug info e.g. reason for screening out event
 	"""
 	fusions = [e for e in events if e.rna_event == 'fusion']
-	bad_contigs = FusionFinder.screen_realigns(fusions, outdir, aligner, align_info, debug=debug)
+	bad_contigs = Set()
 	
+	for fusion in fusions:
+	    if len(fusion.genes) == 2 and FusionFinder.same_family(fusion.genes[0], fusion.genes[1]):
+		for contig in fusion.contigs:
+		    bad_contigs.add(contig)	
+	
+	if align_info is not None:
+	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, debug=debug)
+	    if bad_contigs_realign:
+		bad_contigs = bad_contigs.union(bad_contigs_realign)
+		
 	bad_event_indices = []
 	# remove any event that involve contigs that failed screening as mapping is not reliable
 	for e in reversed(range(len(events))):
@@ -957,12 +967,15 @@ def main(args, options):
                     debug=options.debug)
     em.map_contigs_to_transcripts()
     
+    align_info = None
     if options.genome and options.index_dir and os.path.exists(options.index_dir):
-	Event.screen(em.events, outdir, em.aligner, {'genome': options.genome,
-	                                             'index_dir': options.index_dir,
-	                                             'num_procs': options.num_threads,
-	                                             },
-	             debug=options.debug)
+	align_info = {
+	    'aligner': em.aligner,
+	    'genome': options.genome,
+	    'index_dir': options.index_dir,
+	    'num_procs': options.num_threads,
+	}
+    Event.screen(em.events, outdir, align_info=align_info, debug=options.debug)
     
     if options.r2c_bam_file:
 	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
