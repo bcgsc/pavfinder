@@ -5,7 +5,7 @@ import re
 import pysam
 from SV.split_align import call_event
 from SV.variant import Adjacency
-from SV import gapped_align
+from SV import gapped_align, split_align
 
 class FusionFinder:
     @classmethod
@@ -234,7 +234,7 @@ class FusionFinder:
 	    return False
 	
     @classmethod
-    def screen_realigns(cls, fusions, outdir, align_info, name_sep='-', debug=False):
+    def screen_realigns(cls, fusions, outdir, align_info, contigs_fasta=None, name_sep='-', debug=False):
 	"""Screens fusions by religning probes against reference genome
 	
 	Will filter out events whose probe can align to single location
@@ -248,11 +248,13 @@ class FusionFinder:
 	    debug: (boolean) output debug info e.g. reason for screening out event
 	"""
 	if align_info is not None:
-	    realign_bam_file = Adjacency.realign_probe(fusions, outdir, align_info['aligner'],
-	                                               name_sep=name_sep,
-	                                               num_procs=align_info['num_procs'],
-	                                               genome=align_info['genome'],
-	                                               index_dir=align_info['index_dir'])
+	    realign_bam_file = Adjacency.realign(fusions, outdir, align_info['aligner'],
+	                                         probe=True, subseq=True,
+	                                         contigs_fasta=contigs_fasta,
+	                                         name_sep=name_sep,
+	                                         num_procs=align_info['num_procs'],
+	                                         genome=align_info['genome'],
+	                                         index_dir=align_info['index_dir'])
 	    
 	try:
 	    bam = pysam.Samfile(realign_bam_file, 'rb')
@@ -268,7 +270,7 @@ class FusionFinder:
 	# captures contig names whose probe aligns to single position
 	# will remove any events coming from these contigs because the split-alignment is not reliable
 	failed_contigs = Set()
-	for key, group in groupby(bam.fetch(until_eof=True), lambda x: x.qname):
+	for key, group in groupby(bam.fetch(until_eof=True), lambda x: name_sep.join(x.qname.split(name_sep)[:6])):
 	    alns = list(group)
 	    fusion_idx = query_to_fusion[key]
 	    fusion = fusions[fusion_idx]
@@ -281,7 +283,14 @@ class FusionFinder:
 		for contig in fusion.contigs:
 		    failed_contigs.add(contig)
 		continue
-	    		
+		
+	    subseq_alns = [aln for aln in alns if aln.qname[-1].isdigit()]
+	    specific1, specific2 = split_align.screen_subseq_alns(fusion_aligns, subseq_alns, bam, name_sep, debug=debug)
+	    if not specific1 or not specific2:
+		for contig in fusion.contigs:
+		    failed_contigs.add(contig)
+		continue
+	    
 	return failed_contigs
 
     @classmethod

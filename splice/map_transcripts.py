@@ -285,7 +285,7 @@ class Event:
 	    return str(value)
 	
     @classmethod
-    def screen(cls, events, outdir, align_info=None, debug=False):
+    def screen(cls, events, outdir, align_info=None, contigs_fasta=None, debug=False):
 	"""Screen events identified and filter out bad ones
 	
 	Right now it just screens out fusion whose probe sequence can align to one single location
@@ -306,7 +306,7 @@ class Event:
 		    bad_contigs.add(contig)	
 	
 	if align_info is not None:
-	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, debug=debug)
+	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, contigs_fasta=contigs_fasta, debug=debug)
 	    if bad_contigs_realign:
 		bad_contigs = bad_contigs.union(bad_contigs_realign)
 		
@@ -975,7 +975,7 @@ def main(args, options):
 	    'index_dir': options.index_dir,
 	    'num_procs': options.num_threads,
 	}
-    Event.screen(em.events, outdir, align_info=align_info, debug=options.debug)
+    Event.screen(em.events, outdir, align_info=align_info, debug=options.debug, contigs_fasta=em.contigs_fasta)
     
     if options.r2c_bam_file:
 	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
