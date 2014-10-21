@@ -18,11 +18,12 @@ from novel_splice_finder import NovelSpliceFinder
 from shared.read_support import scan_all, fetch_support
 
 class Transcript:
-    def __init__(self, id, gene=None, strand=None):
+    def __init__(self, id, gene=None, strand=None, coding=False):
 	self.id = id
 	self.gene = gene
 	self.strand = strand
 	self.exons = []
+	self.coding = coding
 	
     def add_exon(self, exon):
 	self.exons.append(exon)
@@ -305,18 +306,19 @@ class Event:
 		for contig in fusion.contigs:
 		    bad_contigs.add(contig)	
 	
-	if align_info is not None:
+	if fusions and align_info is not None:
 	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, contigs_fasta=contigs_fasta, debug=debug)
 	    if bad_contigs_realign:
 		bad_contigs = bad_contigs.union(bad_contigs_realign)
 		
 	bad_event_indices = []
-	# remove any event that involve contigs that failed screening as mapping is not reliable
-	for e in reversed(range(len(events))):
-	    for contig in events[e].contigs:
-		if contig in bad_contigs and not e in bad_event_indices:
-		    bad_event_indices.append(e)
-		    break
+	if bad_contigs:
+	    # remove any event that involve contigs that failed screening as mapping is not reliable
+	    for e in reversed(range(len(events))):
+		for contig in events[e].contigs:
+		    if contig in bad_contigs and not e in bad_event_indices:
+			bad_event_indices.append(e)
+			break
 		
 	for e in bad_event_indices:
 	    del events[e]
@@ -507,7 +509,9 @@ class Mapping:
 
 class ExonMapper:
     def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
-                 itd_min_len=None, itd_min_pid=None, itd_max_apart=None, exon_bound_fusion_only=False, debug=False):
+                 itd_min_len=None, itd_min_pid=None, itd_max_apart=None, 
+                 exon_bound_fusion_only=False, coding_fusion_only=False,
+                 debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
 	self.contigs_fasta_file = contigs_fasta_file
 	self.contigs_fasta = pysam.Fastafile(contigs_fasta_file)
@@ -532,7 +536,8 @@ class ExonMapper:
 	                       'max_apart': itd_max_apart
 	                       }
 	
-	self.fusion_conditions = {'exon_bound_only': exon_bound_fusion_only}
+	self.fusion_conditions = {'exon_bound_only': exon_bound_fusion_only,
+	                          'coding_only': coding_fusion_only}
 					
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
@@ -644,7 +649,8 @@ class ExonMapper:
 	    if chimera and chimera_block_matches:
 		if len(chimera_block_matches) == len(aligns):
 		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, 
-		                                       exon_bound_only=self.fusion_conditions['exon_bound_only'])
+		                                       exon_bound_only=self.fusion_conditions['exon_bound_only'],
+		                                       coding_only=self.fusion_conditions['coding_only'])
 		    if fusion:
 			homol_seq, homol_coords = None, None
 			if self.aligner.lower() == 'gmap':
@@ -710,11 +716,16 @@ class ExonMapper:
 		transcript_id = feature.attrs['transcript_id']
 		gene = feature.attrs['gene_name']
 		strand = feature.strand
+		
+		if feature.attrs.has_key('gene_biotype') and feature.attrs['gene_biotype'] == 'protein_coding':
+		    coding = True
+		else:
+		    coding = False
 				
 		try:
 		    transcript = transcripts[transcript_id]
 		except:
-		    transcript = Transcript(transcript_id, gene=gene, strand=strand)
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
 		    transcripts[transcript_id] = transcript
 		    
 		transcript.add_exon(exon)
@@ -755,7 +766,8 @@ class ExonMapper:
 	genes = Set([transcripts[txt].gene for txt in matches_by_transcript.keys()])		
 	if len(genes) > 1:
 	    fusion = FusionFinder.find_read_through(matches_by_transcript, transcripts, align, 
-	                                            exon_bound_only=self.fusion_conditions['exon_bound_only'])
+	                                            exon_bound_only=self.fusion_conditions['exon_bound_only'],
+	                                            coding_only=self.fusion_conditions['coding_only'])
 	    if fusion is not None:
 		events.append(fusion)
 	    	    	
@@ -964,6 +976,7 @@ def main(args, options):
                     itd_min_pid=options.itd_min_pid,
                     itd_max_apart=options.itd_max_apart,
                     exon_bound_fusion_only=options.exon_bound_fusion_only,
+                    coding_fusion_only=options.coding_fusion_only,
                     debug=options.debug)
     em.map_contigs_to_transcripts()
     
@@ -1001,6 +1014,7 @@ if __name__ == '__main__':
     parser.add_option("--multimapped", dest="multimapped", help="reads-to-contigs alignment is multi-mapped", action="store_true", default=False)
     parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
     parser.add_option("--exon_bound_fusion_only", dest="exon_bound_fusion_only", help="only find exon-bound fusion", action="store_true", default=False)
+    parser.add_option("--coding_fusion_only", dest="coding_fusion_only", help="only find fusion where both genes are coding", action="store_true", default=False)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
