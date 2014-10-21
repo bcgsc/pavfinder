@@ -200,7 +200,7 @@ def screen_subseq_alns(adj_aligns, subseq_alns, realign_bam, name_sep, debug=Fal
 	    if aln.is_unmapped or re.search('[-_.]', realign_bam.getrname(aln.tid)):
 		continue
 		
-	    idx = int(aln.qname.rprimary_aligns(name_sep, 1)[1])
+	    idx = int(aln.qname.split(name_sep)[-1])
 	    	    	    		    
 	    # if end-to-end match
 	    if re.match('\d+.*M$', aln.cigarstring) and not re.search('[SH]', aln.cigarstring):
