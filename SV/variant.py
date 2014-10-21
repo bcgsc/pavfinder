@@ -981,45 +981,78 @@ class Adjacency:
 	    adjs_merged.append(adj)
 	    		
 	return adjs_merged
-    
+        
     @classmethod
-    def realign_probe(cls, adjs, out_dir, aligner, name_sep='-', use_realigns=False, genome=None, index_dir=None, num_procs=None):
-	"""Aligns probe and subsequences against genome again
+    def realign(cls, adjs, out_dir, aligner, 
+                probe=False, subseq=False, 
+                contigs_fasta = None,
+                use_realigns=False, 
+                name_sep='-', genome=None, index_dir=None, num_procs=None):
+	"""Aligns probe and subsequences against reference genome
 	
-	Will generate a Fasta file in the output direcotyr called 'realign.fa' containing all the 
-	(subsequences + probe) sequences to be realigned
-	Will run the alignment on the command line and generate a BAM file in the output directory 
-	called 'realign.bam'
+	The output of the fasta sequences will be called 'realign.fa',
+	and the alignments will be in 'realign.bam', put in the output directory
 	
 	Args:
-	    name_sep: (str) Character used to combined various info into query name
-	""" 
+	    adjs: (list) Adjacencies for extracting sequences
+	    out_dir: (str) full path of output directory for storing sequences and alignments
+	    aligner: (str) Name of aligner (gmap, bwa_mem)
+	    probe: (boolean) Align probe sequence. Default: None
+	    subseq: (boolean) Align subsequences. Default: None
+	    contigs_fasta: (pysam.fastafile) For extracting sub-sequences
+	    use_realigns: (boolean) Use existing realignments. Default: False
+	    name_sep: (str) Character used to combine various info into query name
+	    genome: (str) prefix of the index of the refernece genome
+	    index_dir: (str) full path of the directory of location of the genome index
+	    num_procs: (int) number of threads to run the alignment
+	
+	Returns:
+	    pysam.samfile handle of realignment bam
+	"""
 	def write_probe(adj, out, name_sep):
 	    """Outputs the probe sequence to output file
 	    
 	    Args:
 		adj: Variant object
 		out: Filehandle of output file
-		name_sep: (str) Character used to combined various info into query name
+		name_sep: (str) Character used to combine various info into query name
 	    """
 	    out.write('>%s%s%s\n%s\n' % (adj.contigs[0], name_sep, adj.key(), adj.probes[0]))
+	    
+	def write_subseq(adj, out, name_sep, contigs_fasta):
+	    """Outputs the sub-sequence of a split alignment to output file
+	
+	    Args:
+	        adj: Variant object
+		out: Filehandle of output file
+		name_sep: (str) Character used to combine various info into query name
+	    """	    
+	    subseqs = adj.extract_subseqs(contigs_fasta)
+	    for i in range(len(subseqs)):
+		out.write('>%s%s%s%s%d\n%s\n' % (adj.contigs[0], name_sep, adj.key(), name_sep, i, subseqs[i]))
+	    
 	from shared import gmap
 	from shared import bwa_mem
-
+	
 	prefix = 'realign'
 	if not use_realigns:
 	    out_file = '%s/%s.fa' % (out_dir, prefix)
 	    out = open(out_file, 'w')
 	    for adj in adjs:
-		write_probe(adj, out, name_sep)	    
+		if probe:
+		    write_probe(adj, out, name_sep)
+		if subseq and contigs_fasta is not None:
+		    write_subseq(adj, out, name_sep, contigs_fasta)
 	    out.close()
-	
+	    
 	# run aligner
 	realign_bam_file = '%s/%s.bam' % (out_dir, prefix)
 	if not use_realigns:
 	    if aligner == 'gmap':
-		return_code = gmap.run(out_file, realign_bam_file, genome, index_dir, num_procs)
+		return_code = gmap.run(out_file, realign_bam_file, genome, index_dir, num_procs, multi=True)
 	    elif aligner == 'bwa_mem':
 		return_code = bwa_mem.run(out_file, realign_bam_file, genome, index_dir, num_procs)
 	
 	return realign_bam_file
+
+	
