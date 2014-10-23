@@ -525,7 +525,7 @@ def find_adjs(aligns, aligner, contig_seq, dubious=None, debug=False):
 		
     return adjs
 
-def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', contig_seq=None, no_sort=False, debug=False):
+def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', contig_seq=None, no_sort=False, probe_side_len=25, debug=False):
     """Curates adj based on info given by primary_aligns alignments
     
     Args:
@@ -632,7 +632,7 @@ def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', co
 	               )
     
 	if contig_seq is not None:
-	    adj.probes.append(Adjacency.extract_probe(contig_seq, contig_breaks)[0])
+	    adj.probes.append(Adjacency.extract_probe(contig_seq, contig_breaks, len_on_each_side=probe_side_len)[0])
 	    
     elif debug:
 	sys.stdout.write("cannot figure out event of primary_aligns alignment contig:%s targets:%s,%s orients:%s breaks:%s contig_breaks:%s\n" % (aligns[0].query,

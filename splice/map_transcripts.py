@@ -200,17 +200,14 @@ class Event:
 	    data.append('-')
 	    
 	# homol_seq and coords
-	homol_seq = None
-	if type(event.homol_seq) is str:
-	    homol_seq = event.homol_seq
-	elif type(event.homol_seq) is list or type(event.homol_seq) is tuple:
-	    homol_seq = event.homol_seq[0]
+	homol_seq = event.homol_seq[0]
+	homol_coords = event.homol_coords[0]
 	if homol_seq:
 	    data.append(homol_seq)
 	
 	    if homol_seq != '-':
-		data.append('-'.join(map(str, event.homol_coords)))
-		data.append(event.homol_coords[1] - event.homol_coords[0] + 1)
+		data.append('-'.join(map(str, homol_coords)))
+		data.append(homol_coords[1] - homol_coords[0] + 1)
 	    else:
 		data.append('-')
 		data.append('-')
@@ -229,7 +226,7 @@ class Event:
 	if not event.support['spanning']:
 	    data.append('-')
 	else:
-	    data.append(event.support['spanning'][0])
+	    data.append(max(event.support['spanning']))
 	
 	return '\t'.join(map(str, data))
     
@@ -288,7 +285,7 @@ class Event:
 	    print 'failed_spanning', event.rna_event, event.contigs, event.support
 	    data.append('-')
 	else:
-	    data.append(event.support['spanning'][0])
+	    data.append(max(event.support['spanning']))
 
 	return '\t'.join(map(str, data))
 	
@@ -343,10 +340,10 @@ class Event:
 	fusions = [e for e in events if e.rna_event == 'fusion']
 	bad_contigs = Set()
 	
-	for fusion in fusions:
-	    if len(fusion.genes) == 2 and FusionFinder.same_family(fusion.genes[0], fusion.genes[1]):
-		for contig in fusion.contigs:
-		    bad_contigs.add(contig)	
+	#for fusion in fusions:
+	    #if len(fusion.genes) == 2 and FusionFinder.same_family(fusion.genes[0], fusion.genes[1]):
+		#for contig in fusion.contigs:
+		    #bad_contigs.add(contig)	
 	
 	if fusions and align_info is not None:
 	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, contigs_fasta=contigs_fasta, debug=debug)
@@ -702,7 +699,8 @@ class ExonMapper:
 			events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]}, 
 			                          align, 
 			                          {best_transcript.id:best_transcript})
-			#events = self.find_events(all_block_matches, align, transcripts)
+			for event in events:
+			    event.contig_sizes.append(len(contig_seq))
 			if events:
 			    self.events.extend(events)
 			elif self.debug:
@@ -739,8 +737,9 @@ class ExonMapper:
 			if self.aligner.lower() == 'gmap':
 			    homol_seq, homol_coords = gmap.find_microhomology(alns[0], contig_seq)
 			if homol_seq is not None:
-			    fusion.homol_seq = homol_seq
-			    fusion.homol_coords = homol_coords
+			    fusion.homol_seq.append(homol_seq)
+			    fusion.homol_coords.append(homol_coords)
+			fusion.contig_sizes.append(len(contig_seq))
 			self.events.append(fusion)
 		
 	    ## pick best matches
@@ -969,7 +968,6 @@ class ExonMapper:
 	for event in self.events:
 	    for i in range(len(event.contigs)):
 		contig = event.contigs[i]
-		print 'check', event.rna_event, contig, event.contigs, i, event.contig_breaks
 		span = event.contig_breaks[i][0], event.contig_breaks[i][1]
 		try:
 		    coords[contig].append(span)
@@ -999,9 +997,7 @@ class ExonMapper:
 			
 		if not multi_mapped:
 		    event.sum_support()	
-		    
-		print event.support
-		     
+		    		     
 	    if tlens:
 		avg_tlen = float(sum(tlens)) / len(tlens)
 		print 'avg tlen', avg_tlen, sample_type
@@ -1029,7 +1025,7 @@ def main(args, options):
                     coding_fusion_only=options.coding_fusion_only,
                     debug=options.debug)
     em.map_contigs_to_transcripts()
-    
+	
     align_info = None
     if options.genome and options.index_dir and os.path.exists(options.index_dir):
 	align_info = {
@@ -1038,16 +1034,21 @@ def main(args, options):
 	    'index_dir': options.index_dir,
 	    'num_procs': options.num_threads,
 	}
-    Event.screen(em.events, outdir, align_info=align_info, debug=options.debug, contigs_fasta=em.contigs_fasta)
-    
+    Event.screen(em.events, outdir, align_info=align_info, debug=options.debug, contigs_fasta=em.contigs_fasta)  
+    #events_merged = Adjacency.merge(em.events, transcriptome=True)
     if options.r2c_bam_file:
 	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
-
+	
+    #for e in events_merged:
+	#print 'abc', e.support, e.contigs
+    #for e in em.events:
+	#print 'abcd', e.contigs, e.support
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
     
-    Event.output(em.events, outdir)
+    events_merged = Adjacency.merge(em.events, transcriptome=True)
+    Event.output(events_merged, outdir)
     
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contigs_fasta annotation_file genome_file(indexed) out_dir"

@@ -2,6 +2,7 @@ from shared.alignment import compare_chr, reverse_complement
 from vcf import VCF
 from sets import Set
 import sys
+import copy
 
 class Variant:
     def __init__(self, event, adjs, chrom=None, pos=None):
@@ -637,13 +638,37 @@ class Adjacency:
 	    
 	    support_total[kind] = sum(nums)
 	            
-    def key(self):
-	return '-'.join([self.rearrangement, 
-	                 str(self.breaks[0]), 
-	                 str(self.breaks[1]),
-	                 self.orients[0],
-	                 self.orients[1]
-	                 ])
+    def key(self, transcriptome=False, include_novel_seq=False):
+	"""Constructs a unique key for grouping adjacencies
+	
+	Args:
+	    transcriptome: (boolean) whether adjacency is genomic or transcriptomic
+	Returns:
+	    A string that is used for grouping adjacencies
+	"""
+	if not transcriptome:
+	    if include_novel_seq:
+		return '-'.join([self.rearrangement, 
+		                 str(self.breaks[0]), 
+		                 str(self.breaks[1]),
+		                 self.orients[0],
+		                 self.orients[1],
+		                 self.novel_seq
+		                 ])
+	    else:
+		return '-'.join([self.rearrangement, 
+		                 str(self.breaks[0]), 
+		                 str(self.breaks[1]),
+		                 self.orients[0],
+		                 self.orients[1],
+		                 ])
+	else:
+	    info = [self.rna_event]
+	    info.extend(self.breaks)
+	    if self.orients:
+		info.extend(self.orients)
+	    info.append(self.novel_seq)
+	    return '-'.join(map(str, info))
         
     @classmethod
     def extract_probe(cls, contig_seq, contig_breaks, len_on_each_side=25):
@@ -927,56 +952,65 @@ class Adjacency:
 	return insertions, used_adjs    	
 		        
     @classmethod
-    def merge(cls, adjs):
+    def merge(cls, adjs, transcriptome=False):
 	"""Merge adjacencies that have the same breakpoint (and same event type) together
 	Args:
 	    adjs: (list) Adjacency
+	    transcriptome: (boolean) whether adjacency is genomic or transcriptomic
 	Returns:
 	    List of adjs with subsets that represent the same adjacency merged
 	"""
 	keys = {}
 	for adj in adjs:
-	    key = adj.key()
+	    key = adj.key(transcriptome=transcriptome)
 
 	    if not keys.has_key(key):
-		keys[key] = adj
+		keys[key] = copy.deepcopy(adj)
 	    else:
 		first_adj = keys[key]
 		first_adj.contigs.append(adj.contigs[0])
 		first_adj.contig_breaks.append(adj.contig_breaks[0])
 		first_adj.contig_sizes.append(adj.contig_sizes[0])
-		first_adj.probes.append(adj.probes[0])
+		if adj.probes:
+		    first_adj.probes.append(adj.probes[0])
+		else:
+		    first_adj.probes.append('-')
 		first_adj.aligns.append(adj.aligns[0])
 		first_adj.align_types.append(adj.align_types[0])
 		first_adj.homol_seq.append(adj.homol_seq[0])
 		first_adj.homol_coords.append(adj.homol_coords[0])
+		for support_type in ('spanning', 'tiling', 'flanking'):
+		    if adj.support[support_type]:
+			first_adj.support[support_type].append(adj.support[support_type][0])
 	
 	# for generating ID
 	count = 1
 	adjs_merged = []
 	for key, adj in sorted(keys.iteritems()):
 	    adj.id = str(count)
-	    if len(adj.contigs) > 1:
-		if adj.homol_seq and adj.homol_coords:
-		    adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types, adj.homol_seq, adj.homol_coords =\
-		           (list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
-		                                             adj.contigs, 
-		                                             adj.contig_breaks, 
-		                                             adj.probes,
-		                                             adj.aligns,
-		                                             adj.align_types,
-		                                             adj.homol_seq,
-		                                             adj.homol_coords), 
-		                                         reverse=True)))
-		else:
-		    adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types =\
-		           (list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
-		                                             adj.contigs, 
-		                                             adj.contig_breaks, 
-		                                             adj.probes,
-		                                             adj.aligns,
-		                                             adj.align_types),
-		                                         reverse=True)))
+	    #if len(adj.contigs) > 1:
+		#if adj.homol_seq and adj.homol_coords:
+		    #adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types, adj.homol_seq, adj.homol_coords, adj.support['spanning'] =\
+		           #(list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
+		                                             #adj.contigs, 
+		                                             #adj.contig_breaks, 
+		                                             #adj.probes,
+		                                             #adj.aligns,
+		                                             #adj.align_types,
+		                                             #adj.homol_seq,
+		                                             #adj.homol_coords,
+		                                             #adj.support['spanning']), 
+		                                         #reverse=True)))
+		#else:
+		    #adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types, adj.support['spanning'] =\
+		           #(list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
+		                                             #adj.contigs, 
+		                                             #adj.contig_breaks, 
+		                                             #adj.probes,
+		                                             #adj.aligns,
+		                                             #adj.align_types,
+		                                             #adj.support['spanning']),
+		                                         #reverse=True)))	    	
 	    count += 1
 	    adjs_merged.append(adj)
 	    		

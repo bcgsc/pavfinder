@@ -40,14 +40,10 @@ class FusionFinder:
 		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
     
 	    # create adjacency first to establish L/R orientations, which is necessary to pick best transcripts
-	    fusion = call_event(aligns[0], aligns[1], no_sort=True)
-	    
-	    probe = Adjacency.extract_probe(contig_seq, fusion.contig_breaks[0])
-	    if probe:
-		fusion.probes.append(probe[0])
-	    
+	    fusion = call_event(aligns[0], aligns[1], no_sort=True, probe_side_len=50, contig_seq=contig_seq)
+	    	    	    
 	    junc1, junc2 = cls.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
-	    if junc1 and junc2:
+	    if junc1 and junc2 and junc1[1] is not None and junc2[1] is not None:
 		cls.annotate_fusion(fusion, junc1, junc2, transcripts)
 		if exon_bound_only and not (fusion.exon_bound[0] and fusion.exon_bound[1]):
 		    return None
