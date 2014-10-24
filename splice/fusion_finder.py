@@ -40,8 +40,8 @@ class FusionFinder:
 		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
     
 	    # create adjacency first to establish L/R orientations, which is necessary to pick best transcripts
-	    fusion = call_event(aligns[0], aligns[1], no_sort=True, probe_side_len=50, contig_seq=contig_seq)
-	    	    	    
+	    fusion = call_event(aligns[0], aligns[1], no_sort=True, contig_seq=contig_seq, probe_side_len=50)
+	    	    	    	    
 	    junc1, junc2 = cls.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
 	    if junc1 and junc2 and junc1[1] is not None and junc2[1] is not None:
 		cls.annotate_fusion(fusion, junc1, junc2, transcripts)
@@ -211,7 +211,7 @@ class FusionFinder:
 	fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
 	fusion.exon_bound = junc1[2], junc2[2]
 	fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
-	
+			
 	sense_fusion = cls.is_sense(fusion, transcripts[junc1[0]], transcripts[junc2[0]], fusion.orients[0], fusion.orients[1])
 	if not sense_fusion:
 	    fusion.is_sense = False
@@ -284,7 +284,7 @@ class FusionFinder:
 	    fusion_aligns = fusion.aligns[0]
 	    	    
 	    probe_alns = [aln for aln in alns if not aln.qname[-1].isdigit()]
-	    if not gapped_align.screen_probe_alns(fusion_aligns, probe_alns, fusion.align_types[0]):
+	    if not gapped_align.screen_probe_alns(fusion_aligns, probe_alns, fusion.align_types[0], min_pc_mapped=0.9):
 		if debug:
 		    sys.stdout.write('probe align completely to one location: %s - contigs(s) filtered out\n' % key)
 		for contig in fusion.contigs:
@@ -300,32 +300,3 @@ class FusionFinder:
 	    
 	return failed_contigs
 
-    @classmethod
-    def same_family(cls, gene1, gene2):
-	"""Checks if 2 genes belong to the same family based on regex"""
-        family_patterns = []
-        # e.g. KLF1;KLF2
-        family_patterns.append(re.compile(r'(.+?)(\d+)$'))
-        # e.g. TUBA1B;TUBA1A, DDX19B;DDX19A
-        family_patterns.append(re.compile(r'(.+?\d)([A-Z])$'))
-        
-        same = False
-        # e.g. CATSPER2;CATSPER2P1
-        if gene1 in gene2 or gene2 in gene1:
-            same = True
-            return same
-        
-        for family_pattern in family_patterns:
-            family1 = family2 = None
-            m1 = family_pattern.search(gene1)
-            if m1:
-                family1 = m1.group(1)
-        
-            m2 = family_pattern.search(gene2)
-            if m2:
-                family2 = m2.group(1)
-            
-            if family1 is not None and family2 is not None and family1 == family2:
-                same = True
-		
-	return same
