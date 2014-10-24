@@ -112,7 +112,8 @@ class Transcript:
     
 class Event:
     # headers of tab-delimited output
-    headers = ['event_type',
+    headers = ['id',
+               'event_type',
                'chrom1',
                'pos1',
                'orient1',
@@ -181,7 +182,7 @@ class Event:
 	Returns:
 	    Tab-delimited line
 	"""
-	data = [event.rna_event]
+	data = [event.id, event.rna_event]
 	
 	# sort breakpoints for output
 	paired_values = []
@@ -255,7 +256,7 @@ class Event:
 	# exon_bound
 	exon_bound = ('-', '-')
 	
-	data = [event.rna_event]
+	data = [event.id, event.rna_event]
 	for values in zip(chroms, event.breaks, orients, genes, transcripts, exons, exon_bound):
 	    data.extend(values)
 	
@@ -282,7 +283,6 @@ class Event:
 	data.append('-')
 	
 	if not event.support['spanning']:
-	    print 'failed_spanning', event.rna_event, event.contigs, event.support
 	    data.append('-')
 	else:
 	    data.append(max(event.support['spanning']))
@@ -1056,7 +1056,10 @@ def main(args, options):
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
     
     events_merged = Adjacency.merge(em.events, transcriptome=True)
-    Event.filter_by_support(events_merged, options.min_support)
+    
+    if options.r2c_bam_file:
+	Event.filter_by_support(events_merged, options.min_support)
+	
     Event.output(events_merged, outdir)
     
 if __name__ == '__main__':
