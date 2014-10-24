@@ -339,12 +339,7 @@ class Event:
 	"""
 	fusions = [e for e in events if e.rna_event == 'fusion']
 	bad_contigs = Set()
-	
-	#for fusion in fusions:
-	    #if len(fusion.genes) == 2 and FusionFinder.same_family(fusion.genes[0], fusion.genes[1]):
-		#for contig in fusion.contigs:
-		    #bad_contigs.add(contig)	
-	
+		
 	if fusions and align_info is not None:
 	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, contigs_fasta=contigs_fasta, debug=debug)
 	    if bad_contigs_realign:
@@ -361,6 +356,22 @@ class Event:
 		
 	for e in bad_event_indices:
 	    del events[e]
+	    
+    @classmethod
+    def filter_by_support(cls, events, min_support):
+	"""Filters out events that don't have minimum spanning read support
+	
+	Args:
+	    events: (list) Event
+	    min_support: (int) minimum spanning read support
+	"""
+	out_indices = []
+	for i in reversed(range(len(events))):
+	    if max(events[i].support['spanning']) < min_support:
+		out_indices.append(i)
+		
+	for i in out_indices:
+	    del events[i]
 	    
     @classmethod
     def compare_pos(cls, pos1, pos2):
@@ -1035,19 +1046,17 @@ def main(args, options):
 	    'num_procs': options.num_threads,
 	}
     Event.screen(em.events, outdir, align_info=align_info, debug=options.debug, contigs_fasta=em.contigs_fasta)  
-    #events_merged = Adjacency.merge(em.events, transcriptome=True)
+    
+    # added support
     if options.r2c_bam_file:
 	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
 	
-    #for e in events_merged:
-	#print 'abc', e.support, e.contigs
-    #for e in em.events:
-	#print 'abcd', e.contigs, e.support
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
     
     events_merged = Adjacency.merge(em.events, transcriptome=True)
+    Event.filter_by_support(events_merged, options.min_support)
     Event.output(events_merged, outdir)
     
 if __name__ == '__main__':
@@ -1064,6 +1073,7 @@ if __name__ == '__main__':
     parser.add_option("--itd_max_apart", dest="itd_max_apart", help="maximum distance apart of ITD. Default: 10", default=10, type=int)
     parser.add_option("--multimapped", dest="multimapped", help="reads-to-contigs alignment is multi-mapped", action="store_true", default=False)
     parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
+    parser.add_option("--min_support", dest="min_support", help="minimum read support. Default:2", type='int', default=2)
     parser.add_option("--exon_bound_fusion_only", dest="exon_bound_fusion_only", help="only find exon-bound fusion", action="store_true", default=False)
     parser.add_option("--coding_fusion_only", dest="coding_fusion_only", help="only find fusion where both genes are coding", action="store_true", default=False)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
