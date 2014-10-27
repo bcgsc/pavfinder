@@ -1045,14 +1045,14 @@ def main(args, options):
 	which = find_executable(binary)
 	if not which:
 	    sys.exit('"%s" not in PATH - abort' % binary)
-    
+	        
     # find events
     em = ExonMapper(*args, 
                     itd_min_len=options.itd_min_len,
                     itd_min_pid=options.itd_min_pid,
                     itd_max_apart=options.itd_max_apart,
-                    exon_bound_fusion_only=options.exon_bound_fusion_only,
-                    coding_fusion_only=options.coding_fusion_only,
+                    exon_bound_fusion_only=not options.include_non_exon_bound_fusion,
+                    coding_fusion_only=not options.include_noncoding_fusion,
                     debug=options.debug)
     em.map_contigs_to_transcripts()
 	
@@ -1064,22 +1064,27 @@ def main(args, options):
 	    'index_dir': options.index_dir,
 	    'num_procs': options.num_threads,
 	}
+    # screen events based on realignments
     Event.screen(em.events, outdir, align_info=align_info, debug=options.debug, contigs_fasta=em.contigs_fasta)  
     
     # added support
     if options.r2c_bam_file:
 	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
 	
-    Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
-    gene_mappings = Mapping.group(em.mappings)
-    Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
-    
+    # merge events captured by different contigs into single events
     events_merged = Adjacency.merge(em.events, transcriptome=True)
     
+    # filter read support after merging
     if options.r2c_bam_file:
 	Event.filter_by_support(events_merged, options.min_support)
 	
+    # output events
     Event.output(events_merged, outdir)
+    
+    # output mappings
+    Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
+    gene_mappings = Mapping.group(em.mappings)
+    Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
     
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contigs_fasta annotation_file genome_file(indexed) out_dir"
@@ -1096,8 +1101,9 @@ if __name__ == '__main__':
     parser.add_option("--multimapped", dest="multimapped", help="reads-to-contigs alignment is multi-mapped", action="store_true", default=False)
     parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
     parser.add_option("--min_support", dest="min_support", help="minimum read support. Default:2", type='int', default=2)
-    parser.add_option("--exon_bound_fusion_only", dest="exon_bound_fusion_only", help="only find exon-bound fusion", action="store_true", default=False)
-    parser.add_option("--coding_fusion_only", dest="coding_fusion_only", help="only find fusion where both genes are coding", action="store_true", default=False)
+    parser.add_option("--include_non_exon_bound_fusion", dest="include_non_exon_bound_fusion", help="include fusions where breakpoints are not at exon boundaries", 
+                      action="store_true", default=False)
+    parser.add_option("--include_noncoding_fusion", dest="include_noncoding_fusion", help="include non-coding genes in detecting fusions", action="store_true", default=False)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
