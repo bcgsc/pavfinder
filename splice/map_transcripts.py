@@ -142,7 +142,7 @@ class Event:
                ]
     
     @classmethod
-    def output(cls, events, outdir):
+    def output(cls, events, outdir, sort_by_event_type=False):
 	"""Output events
 
 	Args:
@@ -151,28 +151,59 @@ class Event:
 	Returns:
 	    events will be output in file outdir/events.tsv
 	"""
+	def get_smaller_pos(event):
+	    """Returns 'smaller' coordinate of given event"""
+	    if cls.compare_pos((event.chroms[0], event.breaks[0]), (event.chroms[1], event.breaks[1])) > 0:
+		return (event.chroms[1], event.breaks[1])
+	    else:
+		return (event.chroms[0], event.breaks[0])
+	    
+	event_handlings = {
+	    'fusion': cls.from_fusion,
+	    'ITD': cls.from_single_locus,
+	    'PTD': cls.from_fusion,
+	    'ins': cls.from_single_locus,
+	    'del': cls.from_single_locus,
+	    'skipped_exon': cls.from_single_locus,
+	    'novel_exon': cls.from_single_locus,
+	    'novel_donor': cls.from_single_locus,
+	    'novel_acceptor': cls.from_single_locus,
+	    'novel_intron': cls.from_single_locus,
+	    'retained_intron': cls.from_single_locus,
+	}
+
 	out_file = '%s/events.tsv' % outdir
 	out = open(out_file, 'w')
 	out.write('%s\n' % '\t'.join(cls.headers))
-	for event in events:
+	
+	if sort_by_event_type:
+	    events_sorted = []
+	    event_types = ['fusion',
+	                   'ITD',
+	                   'PTD',
+	                   'ins',
+	                   'del',
+	                   'skipped_exon',
+	                   'novel_exon',
+	                   'novel_donor',
+	                   'novel_acceptor',
+	                   'novel_intron',
+	                   'retained_intron',
+	                   ]
+	    for event_type in event_types:
+		events_sorted.extend(sorted([e for e in events if e.rna_event == event_type], 
+		                            cmp=lambda x,y: cls.compare_pos(get_smaller_pos(x), get_smaller_pos(y))))
+	
+	else:
+	    events_sorted = sorted(events, cmp=lambda x,y: cls.compare_pos(get_smaller_pos(x), get_smaller_pos(y)))
+	
+	for event in events_sorted:
 	    if event.rna_event:
-		out_line = {
-		    'fusion': cls.from_fusion,
-		    'ITD': cls.from_single_locus,
-		    'PTD': cls.from_fusion,
-		    'ins': cls.from_single_locus,
-		    'del': cls.from_single_locus,
-		    'skipped_exon': cls.from_single_locus,
-		    'novel_exon': cls.from_single_locus,
-		    'novel_donor': cls.from_single_locus,
-		    'novel_acceptor': cls.from_single_locus,
-		    'novel_intron': cls.from_single_locus,
-		    'retained_intron': cls.from_single_locus,
-		    }[event.rna_event](event)
+		out_line = event_handlings[event.rna_event](event)
 		if out_line:
 		    out.write('%s\n' % out_line)
 	out.close()
-				
+					
     @classmethod
     def from_fusion(cls, event):
 	"""Generates output line for a fusion/PTD event
@@ -854,7 +885,7 @@ class ExonMapper:
 	local_events = NovelSpliceFinder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta)
 	if local_events:
 	    for event in local_events:
-		adj = Adjacency((align.target,), event['pos'], '-', contig=align.query)
+		adj = Adjacency((align.target, align.target), event['pos'], '-', contig=align.query)
 		if event['event'] in ('ins', 'del', 'dup', 'inv'):
 		    adj.rearrangement = event['event']
 		adj.rna_event = event['event']
@@ -1079,7 +1110,7 @@ def main(args, options):
 	Event.filter_by_support(events_merged, options.min_support)
 	
     # output events
-    Event.output(events_merged, outdir)
+    Event.output(events_merged, outdir, sort_by_event_type=options.sort_by_event_type)
     
     # output mappings
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
@@ -1104,6 +1135,7 @@ if __name__ == '__main__':
     parser.add_option("--include_non_exon_bound_fusion", dest="include_non_exon_bound_fusion", help="include fusions where breakpoints are not at exon boundaries", 
                       action="store_true", default=False)
     parser.add_option("--include_noncoding_fusion", dest="include_noncoding_fusion", help="include non-coding genes in detecting fusions", action="store_true", default=False)
+    parser.add_option("--sort_by_event_type", dest="sort_by_event_type", help="sort output by event type", action="store_true", default=False)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
