@@ -112,29 +112,29 @@ class Transcript:
     
 class Event:
     # headers of tab-delimited output
-    headers = ['id',
-               'event_type',
+    headers = ['ID',
+               'event',
                'chrom1',
                'pos1',
                'orient1',
+               'chrom2',
+               'pos2',
+               'orient2',
+               'size',
+               'contigs',
+               'contig_breaks',
+               'homol_seq',
+               'homol_coords',
+               'homol_len',
+               'novel_sequence',
                'gene1',
                'transcript1',
                'exon1',
                'exon_bound1',
-               'chrom2',
-               'pos2',
-               'orient2',
                'gene2',
                'transcript2',
                'exon2',
                'exon_bound2',
-               'size',
-               'novel_sequence',
-               'homol_seq',
-               'homol_coords',
-               'homol_len',
-               'contigs',
-               'contig_breaks',
                'sense_fusion',
                "5'gene",
                "3'gene",
@@ -191,15 +191,15 @@ class Event:
 	if cls.compare_pos((event.chroms[0], event.breaks[0]), (event.chroms[1], event.breaks[1])) > 0:
 	    paired_values.reverse()
 	for values in paired_values:
-	    data.extend(values)
+	    data.extend(values[:3])
 	    
 	# size not applicable to fusion
 	data.append('-')
-	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
-	    data.append(event.novel_seq)
-	else:
-	    data.append('-')
-	    
+	
+	# contigs and contig breaks
+	data.append(','.join(event.contigs))
+	data.append(cls.to_string(event.contig_breaks))
+		    
 	# homol_seq and coords
 	homol_seq = event.homol_seq[0]
 	homol_coords = event.homol_coords[0]
@@ -216,14 +216,23 @@ class Event:
 	    data.append('-')
 	    data.append('-')
 	    data.append('-')
+	    
+	# novel_seq
+	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
+	    data.append(event.novel_seq)
+	else:
+	    data.append('-')
 	
-	data.append(','.join(event.contigs))
-	data.append(cls.to_string(event.contig_breaks))
+	# gene, transcripts, exons, exon_bounds
+	for values in paired_values:
+	    data.extend(values[3:])
 	
+	# sense fusion, 5'gene, 3'gene
 	data.append(event.is_sense)
 	data.append(event.gene5)
 	data.append(event.gene3)
 	
+	# support
 	if not event.support['spanning']:
 	    data.append('-')
 	else:
@@ -240,8 +249,35 @@ class Event:
 	Returns:
 	    Tab-delimited line
 	"""
+	data = [event.id, event.rna_event]
+	
 	chroms = (event.chroms[0], event.chroms[0])
 	orients = ('L', 'R')
+	for values in zip(chroms, event.breaks, orients):
+	    data.extend(values)
+	    
+	# size
+	if hasattr(event, 'size') and event.size is not None:
+	    data.append(event.size)
+	else:
+	    data.append('-')
+	    
+	# contigs and contig breaks
+	data.append(','.join(event.contigs))
+	data.append(cls.to_string(event.contig_breaks))
+		
+	# homol_seq and coords
+	data.append('-')
+	data.append('-')
+	data.append('-')
+	
+	# novel seq
+	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
+	    data.append(event.novel_seq)
+	else:
+	    data.append('-')
+	
+	# gene, transcripts, exons, exon_bounds
 	genes = (event.genes[0], event.genes[0])
 	transcripts = (event.transcripts[0], event.transcripts[0])
 	if event.exons:
@@ -256,32 +292,15 @@ class Event:
 	# exon_bound
 	exon_bound = ('-', '-')
 	
-	data = [event.id, event.rna_event]
-	for values in zip(chroms, event.breaks, orients, genes, transcripts, exons, exon_bound):
+	for values in zip(genes, transcripts, exons, exon_bound):
 	    data.extend(values)
-	
-	if hasattr(event, 'size') and event.size is not None:
-	    data.append(event.size)
-	else:
-	    data.append('-')
-	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
-	    data.append(event.novel_seq)
-	else:
-	    data.append('-')
-	    
-	# homol_seq and coords
+	    	    
+	# sense fusion, 5'gene, 3'gene
 	data.append('-')
 	data.append('-')
 	data.append('-')
-		
-	data.append(','.join(event.contigs))
-	data.append(cls.to_string(event.contig_breaks))
-	
-	# sense fusion
-	data.append('-')
-	data.append('-')
-	data.append('-')
-	
+
+	#support
 	if not event.support['spanning']:
 	    data.append('-')
 	else:
@@ -413,7 +432,7 @@ class Event:
 		    return 1
 		else:
 		    return 0
-		
+	
 class Mapping:
     """Mapping per alignment"""
     def __init__(self, contig, align_blocks, transcripts=[]):
