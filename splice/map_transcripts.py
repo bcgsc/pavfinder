@@ -417,7 +417,7 @@ class Event:
 	"""
 	out_indices = []
 	for i in reversed(range(len(events))):
-	    if max(events[i].support['spanning']) < min_support:
+	    if not events[i].support['spanning'] or max(events[i].support['spanning']) < min_support:
 		out_indices.append(i)
 		
 	for i in out_indices:
