@@ -58,10 +58,11 @@ def find_spanning(reads, breaks, contig_seq, overlap_buffer=1, debug=False, perf
 		    names.add(read.qname)
 		    
 		    if debug:
-			sys.stdout.write("Accepted spanning read(perfect:%s): %s %s %s %s\n" % (perfect, 
+			sys.stdout.write("Accepted spanning read(perfect:%s): %s %s %s %s %s\n" % (perfect, 
 			                                                                        read.qname, 
 			                                                                        breaks, 
-			                                                                        (read.pos + 1, read.pos + read.alen), 
+			                                                                        (read.pos + 1, read.pos + read.alen),
+			                                                                        read.seq,
 			                                                                        strand))
 			
     return len(pos)
