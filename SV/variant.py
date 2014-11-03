@@ -117,14 +117,13 @@ class Adjacency:
         self.homol_seq = []
 	if homol_seq is not None:
 	    self.homol_seq.append(homol_seq)
-	else:
-	    self.homol_seq.append('-')
+	#else:
+	    #self.homol_seq.append('-')
 	self.homol_coords = []
-
 	if homol_coords is not None:
 	    self.homol_coords.append(homol_coords)
-	else:
-	    self.homol_coords.append(('-', '-'))
+	#else:
+	    #self.homol_coords.append(('-', '-'))
         
         # assume initialization always with single contig
         self.contigs = []
@@ -977,8 +976,10 @@ class Adjacency:
 		    first_adj.probes.append('-')
 		first_adj.aligns.append(adj.aligns[0])
 		first_adj.align_types.append(adj.align_types[0])
-		first_adj.homol_seq.append(adj.homol_seq[0])
-		first_adj.homol_coords.append(adj.homol_coords[0])
+		if adj.homol_seq:
+		    first_adj.homol_seq.append(adj.homol_seq[0])
+		if adj.homol_coords:
+		    first_adj.homol_coords.append(adj.homol_coords[0])
 		for support_type in ('spanning', 'tiling', 'flanking'):
 		    if adj.support[support_type]:
 			first_adj.support[support_type].append(adj.support[support_type][0])

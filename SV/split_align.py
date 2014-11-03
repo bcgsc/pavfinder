@@ -525,7 +525,7 @@ def find_adjs(aligns, aligner, contig_seq, dubious=None, debug=False):
 		
     return adjs
 
-def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', contig_seq=None, no_sort=False, probe_side_len=25, debug=False):
+def call_event(align1, align2, homol_seq=None, homol_coords=None, novel_seq='-', contig_seq=None, no_sort=False, probe_side_len=25, debug=False):
     """Curates adj based on info given by primary_aligns alignments
     
     Args:

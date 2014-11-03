@@ -232,21 +232,37 @@ class Event:
 	data.append(cls.to_string(event.contig_breaks))
 		    
 	# homol_seq and coords
-	homol_seq = event.homol_seq[0]
-	homol_coords = event.homol_coords[0]
-	if homol_seq:
-	    data.append(homol_seq)
-	
-	    if homol_seq != '-':
-		data.append('-'.join(map(str, homol_coords)))
-		data.append(homol_coords[1] - homol_coords[0] + 1)
-	    else:
-		data.append('-')
-		data.append('-')
+	if event.homol_seq:
+	    data.append(event.homol_seq[0])
 	else:
 	    data.append('-')
+	if event.homol_coords:
+	    homol_coords = []
+	    for coords in event.homol_coords:
+		homol_coords.append('-'.join(map(str, coords)))
+	    data.append(';'.join(homol_coords))
+	else:
 	    data.append('-')
+	if event.homol_seq:
+	    data.append(len(event.homol_seq[0]))
+	else:
 	    data.append('-')
+	
+	#homol_seq = event.homol_seq[0]
+	#homol_coords = event.homol_coords[0]
+	#if homol_seq:
+	    #data.append(homol_seq)
+	
+	    #if homol_seq != '-':
+		#data.append('-'.join(map(str, homol_coords)))
+		#data.append(homol_coords[1] - homol_coords[0] + 1)
+	    #else:
+		#data.append('-')
+		#data.append('-')
+	#else:
+	    #data.append('-')
+	    #data.append('-')
+	    #data.append('-')
 	    
 	# novel_seq
 	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
@@ -375,7 +391,7 @@ class Event:
 	    return str(value)
 	
     @classmethod
-    def screen(cls, events, outdir, align_info=None, contigs_fasta=None, debug=False):
+    def screen(cls, events, outdir, align_info=None, max_homol_allowed=None, contigs_fasta=None, debug=False):
 	"""Screen events identified and filter out bad ones
 	
 	Right now it just screens out fusion whose probe sequence can align to one single location
@@ -387,9 +403,20 @@ class Event:
 	    align_info: (dict) 'genome', 'index_dir', 'num_procs'
 	    debug: (boolean) output debug info e.g. reason for screening out event
 	"""
-	fusions = [e for e in events if e.rna_event == 'fusion']
 	bad_contigs = Set()
-		
+	if max_homol_allowed is not None:
+	    for event in events:
+		if event.homol_seq and len(event.homol_seq[0]) > max_homol_allowed:
+		    if debug:
+			sys.stdout.write('Screen out %s: homol_seq(%d-%d:%d) longer than maximum allowed(%d)\n' % (','.join(event.contigs),
+			                                                                                     event.homol_coords[0][0],
+			                                                                                     event.homol_coords[0][1],
+			                                                                                     len(event.homol_seq[0]), 
+			                                                                                     max_homol_allowed))
+		    for contig in event.contigs:
+			bad_contigs.add(contig)
+	
+	fusions = [e for e in events if e.rna_event == 'fusion']		
 	if fusions and align_info is not None:
 	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, contigs_fasta=contigs_fasta, debug=debug)
 	    if bad_contigs_realign:
@@ -1096,7 +1123,7 @@ def main(args, options):
 	    'num_procs': options.num_threads,
 	}
     # screen events based on realignments
-    Event.screen(em.events, outdir, align_info=align_info, debug=options.debug, contigs_fasta=em.contigs_fasta)  
+    Event.screen(em.events, outdir, align_info=align_info, max_homol_allowed=options.max_homol_allowed, debug=options.debug, contigs_fasta=em.contigs_fasta)  
     
     # added support
     if options.r2c_bam_file:
@@ -1136,6 +1163,7 @@ if __name__ == '__main__':
                       action="store_true", default=False)
     parser.add_option("--include_noncoding_fusion", dest="include_noncoding_fusion", help="include non-coding genes in detecting fusions", action="store_true", default=False)
     parser.add_option("--sort_by_event_type", dest="sort_by_event_type", help="sort output by event type", action="store_true", default=False)
+    parser.add_option("--max_homol_allowed", dest="max_homol_allowed", help="maximun amount of microhomology allowed. Default:10", type="int", default=10)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
