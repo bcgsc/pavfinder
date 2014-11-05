@@ -178,14 +178,13 @@ class NovelSpliceFinder:
 		else:
 		    donor_start = blocks[1][0] - 2
 		    acceptor_start = blocks[0][1] + 1
-		print 'special check', match1, match2, pos
+		    
 		gap_size = blocks[1][0] - blocks[0][1] - 1
 		pos = (blocks[0][1], blocks[1][0])
 		event = None
 		if gap_size > 0:
 		    if gap_size > min_intron_size and\
 		       cls.check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
-			print 'aaa', transcript.id
 			event = 'novel_intron'
 		    else:
 			event = 'del'
@@ -217,7 +216,6 @@ class NovelSpliceFinder:
 		if gap_size > 0:
 		    if gap_size > min_intron_size and\
 		       cls.check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
-			print 'bbb'
 			event = 'novel_intron'
 		    else:
 			event = 'del'
