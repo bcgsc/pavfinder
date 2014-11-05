@@ -51,8 +51,6 @@ class ITD_Finder:
 				  needs to be reset
 	"""
 	adj.rna_event = 'ITD'
-	new_contig_breaks = (dup[0][1], dup[1][0])
-	adj.contig_breaks = [new_contig_breaks]
 	
 	if contig_seq is not None:
 	    # adjust genome break coordiantes based on new contig break coordinates
