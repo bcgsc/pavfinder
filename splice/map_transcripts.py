@@ -786,20 +786,30 @@ class ExonMapper:
 		# each gtf record corresponds to a feature
 		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
 		    # contigs within single intron or exon
-		    if not chimera and align.tstart >= gtf.start and align.tend <= gtf.end:
-			match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
+		    #if not chimera and align.tstart >= gtf.start and align.tend <= gtf.end:
+			#match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
 			
-			if gtf.feature == 'intron':	
-			    within_intron.append((gtf, match))
+			#if gtf.feature == 'intron':	
+			    #within_intron.append((gtf, match))
 			    
-			elif gtf.feature == 'exon':
-			    within_exon.append((gtf, match))
+			#elif gtf.feature == 'exon':
+			    #within_exon.append((gtf, match))
 			  
+		    ## collect all the transcripts that have exon overlapping alignment
+		    #else:
+			#if gtf.feature == 'exon':
+			    #transcripts_mapped.add(gtf.transcript_id)
+		    
 		    # collect all the transcripts that have exon overlapping alignment
-		    else:
-			if gtf.feature == 'exon':
-			    transcripts_mapped.add(gtf.transcript_id)
-			    		
+		    if gtf.feature == 'exon':
+			transcripts_mapped.add(gtf.transcript_id)
+		    # contigs within single intron 
+		    elif gtf.feature == 'intron' and\
+		         not chimera and\
+		         align.tstart >= gtf.start and align.tend <= gtf.end:
+			match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
+			within_intron.append((gtf, match))		
+			    	
 		if transcripts_mapped:
 		    mappings = []
 		    # key = transcript name, value = "matches"
@@ -972,9 +982,6 @@ class ExonMapper:
 		
 		# converts exon index to exon number (which takes transcript strand into account)
 		exons = event['exons'][0]
-		#if type(exons) is not list and type(exons) is not tuple:
-		    #print 'check', align.query, event, exons
-		    #continue
 		adj.exons = map(transcripts[event['transcript'][0]].exon_num, exons)
 		
 		adj.contig_breaks = event['contig_breaks']
