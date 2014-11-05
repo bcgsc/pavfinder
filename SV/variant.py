@@ -95,7 +95,7 @@ class Variant:
 
 class Adjacency:
     def __init__(self, chroms, breaks, rearrangement, novel_seq='-',
-                 contig=None, contig_breaks=None, contig_sizes=None, 
+                 contig=None, contig_breaks=None, contig_sizes=None, contig_support_span=None,
                  probes=None, orients=None, 
                  homol_seq=None, homol_coords=None,
                  aligns=None, align_types=None):
@@ -132,6 +132,9 @@ class Adjacency:
         self.contig_breaks = []
         if contig_breaks is not None:
             self.contig_breaks.append(contig_breaks)
+	self.contig_support_span = []
+        if contig_support_span is not None:
+            self.contig_support_span.append(contig_support_span)
 	self.contig_sizes = []
 	if contig_sizes is not None:
             self.contig_sizes.append(contig_sizes)
@@ -970,6 +973,7 @@ class Adjacency:
 		first_adj.contigs.append(adj.contigs[0])
 		first_adj.contig_breaks.append(adj.contig_breaks[0])
 		first_adj.contig_sizes.append(adj.contig_sizes[0])
+		first_adj.contig_support_span.append(adj.contig_support_span[0])
 		if adj.probes:
 		    first_adj.probes.append(adj.probes[0])
 		else:
