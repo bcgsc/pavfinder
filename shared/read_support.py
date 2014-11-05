@@ -374,6 +374,86 @@ def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=Fals
                                            
     return results, tlens_all
 
+def expand_contig_breaks(chrom, breaks, contig, contig_breaks, event, ref_fasta, contig_fasta, debug=False):
+    def extract_repeat(seq):
+	repeat = {'start':None, 'end':None}
+	if len(seq) == 1:
+	    repeat['start'] = seq
+	    repeat['end'] = seq
+	else:
+	    re_start = re.compile(r"^(.+?)\1+")
+	    re_end = re.compile(r"(.+?)\1+$")
+
+	    repeats = re_start.findall(seq)
+	    if repeats:
+		repeat['start'] = repeats[0]
+	    repeats = re_end.findall(seq)
+	    if repeats:
+		repeat['end'] = repeats[0]
+	
+	return repeat
+
+    contig_breaks_sorted = sorted(contig_breaks)
+    pos_strand = True if contig_breaks[0] < contig_breaks[1] else False
+    contig_seq = contig_fasta.fetch(contig)
+    contig_breaks_expanded = [contig_breaks[0], contig_breaks[1]]
+    
+    seq = None
+    if event == 'del':
+	seq = ref_fasta.fetch(chrom, breaks[0], breaks[1] - 1)
+	if not pos_strand:
+	    seq = reverse_complement(seq)
+	    
+    elif event == 'ins':
+	seq = contig_seq[contig_breaks_sorted[0] : contig_breaks_sorted[1] - 1]
+	    
+    if seq is None:
+	return None
+    
+    repeat = extract_repeat(seq)
+    
+    if repeat['end'] is not None:
+	seq = repeat['end']
+	size = len(seq)
+	# downstream
+	start = contig_breaks_sorted[1]
+	expand = 0
+	while start + size <= len(contig_seq):
+	    next_seq = contig_seq[start : start + size]
+	    if next_seq.upper() != seq.upper():
+		break
+	    else:
+		expand += size
+		start += size
+	if pos_strand:
+	    contig_breaks_expanded[1] += expand
+	else:
+	    contig_breaks_expanded[0] += expand
+	
+    # upstream
+    if repeat['start'] is not None:
+	seq = repeat['start']
+	size = len(seq)
+	start = contig_breaks_sorted[0] - 1
+	expand = 0
+	while start - size >= 0:
+	    next_seq = contig_seq[start - size : start]
+	    if next_seq.upper() != seq.upper():
+		break
+	    else:
+		expand -= size
+		start -= size
+	if pos_strand:
+	    contig_breaks_expanded[0] += expand
+	else:
+	    contig_breaks_expanded[1] += expand
+	
+    if debug and tuple(contig_breaks_expanded) != contig_breaks:
+	sys.stdout.write('contig breaks expanded:%s %s -> %s\n' % (contig, contig_breaks, contig_breaks_expanded))
+	
+    return tuple(contig_breaks_expanded)
+
+
 def main(args, options):
     coords_file = args[0]
         
