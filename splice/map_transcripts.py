@@ -15,7 +15,7 @@ from SV.variant import Adjacency
 from itd_finder import ITD_Finder
 from fusion_finder import FusionFinder
 from novel_splice_finder import NovelSpliceFinder
-from shared.read_support import scan_all, fetch_support
+from shared.read_support import scan_all, fetch_support, expand_contig_breaks
 
 class Transcript:
     def __init__(self, id, gene=None, strand=None, coding=False):
@@ -24,6 +24,8 @@ class Transcript:
 	self.strand = strand
 	self.exons = []
 	self.coding = coding
+	self.cds_start = None
+	self.cds_end = None
 	
     def add_exon(self, exon):
 	self.exons.append(exon)
@@ -107,6 +109,36 @@ class Transcript:
 		    
 		transcript.add_exon(exon)
 		
+	    elif feature[2] == 'CDS':
+		transcript_id = feature.attrs['transcript_id']
+		strand = feature.strand
+		cds = (int(feature.start) + 1, int(feature.stop))
+		
+		try:
+		    transcript = transcripts[transcript_id]
+		except:
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
+		    transcripts[transcript_id] = transcript
+		    
+		
+		if strand == '+':
+		    if transcript.cds_start is None or cds[0] < transcript.cds_start:
+			transcript.cds_start = cds[0]
+		    if transcript.cds_end is None or cds[1] > transcript.cds_end:
+			transcript.cds_end = cds[1]
+		else:
+		    if transcript.cds_end is None or cds[0] < transcript.cds_end:
+			transcript.cds_end = cds[0]
+		    if transcript.cds_start is None or cds[1] > transcript.cds_start:
+			transcript.cds_start = cds[1]
+			
+	for transcript in transcripts.values():
+	    if not transcript.coding and\
+	       transcript.cds_start is not None and\
+	       transcript.cds_end is not None and\
+	       transcript.cds_start != transcript.cds_end:
+		transcript.coding = True
+		
 	return transcripts
 
     
@@ -123,6 +155,7 @@ class Event:
                'size',
                'contigs',
                'contig_breaks',
+               'contig_support_span',
                'homol_seq',
                'homol_coords',
                'homol_len',
@@ -227,9 +260,10 @@ class Event:
 	# size not applicable to fusion
 	data.append('-')
 	
-	# contigs and contig breaks
+	# contigs and contig breaks and contig support span
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
+	data.append(cls.to_string(event.contig_support_span))
 		    
 	# homol_seq and coords
 	if event.homol_seq:
@@ -309,10 +343,11 @@ class Event:
 	else:
 	    data.append('-')
 	    
-	# contigs and contig breaks
+	# contigs and contig breaks and contig support span
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
-		
+	data.append(cls.to_string(event.contig_support_span))
+	
 	# homol_seq and coords
 	data.append('-')
 	data.append('-')
@@ -678,7 +713,7 @@ class Mapping:
 class ExonMapper:
     def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
                  itd_min_len=None, itd_min_pid=None, itd_max_apart=None, 
-                 exon_bound_fusion_only=False, coding_fusion_only=False,
+                 exon_bound_fusion_only=False, coding_fusion_only=False, sense_fusion_only=False,
                  debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
 	self.contigs_fasta_file = contigs_fasta_file
@@ -705,7 +740,8 @@ class ExonMapper:
 	                       }
 	
 	self.fusion_conditions = {'exon_bound_only': exon_bound_fusion_only,
-	                          'coding_only': coding_fusion_only}
+	                          'coding_only': coding_fusion_only,
+	                          'sense_only': sense_fusion_only}
 					
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
@@ -819,7 +855,8 @@ class ExonMapper:
 		if len(chimera_block_matches) == len(aligns):
 		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, 
 		                                       exon_bound_only=self.fusion_conditions['exon_bound_only'],
-		                                       coding_only=self.fusion_conditions['coding_only'])
+		                                       coding_only=self.fusion_conditions['coding_only'],
+		                                       sense_only=self.fusion_conditions['sense_only'])
 		    if fusion:
 			homol_seq, homol_coords = None, None
 			if self.aligner.lower() == 'gmap':
@@ -830,10 +867,21 @@ class ExonMapper:
 			fusion.contig_sizes.append(len(contig_seq))
 			self.events.append(fusion)
 		
-	    ## pick best matches
-	    #if len(mappings) > 1:
-		#best_mapping = Mapping.pick_best(mappings, align, debug=True)
-		#self.mappings.append(best_mapping)
+	# expand contig span
+	for event in self.events:
+	    event.contig_support_span = event.contig_breaks
+	    if event.rearrangement == 'ins' or event.rearrangement == 'dup':
+		expanded_contig_breaks = expand_contig_breaks(event.chroms[0], 
+		                                              event.breaks, 
+		                                              event.contigs[0], 
+		                                              [event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1], 
+		                                              event.rearrangement, 
+		                                              self.ref_fasta,
+		                                              self.contigs_fasta,
+		                                              self.debug)
+		if expanded_contig_breaks is not None:
+		    event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
+
 					
     def map_exons(self, blocks, exons):
 	"""Maps alignment blocks to exons
@@ -871,6 +919,7 @@ class ExonMapper:
 		    		            
     def extract_novel_seq(self, adj):
 	"""Extracts novel sequence in adjacency, should be a method of Adjacency"""
+	aa = self.contigs_fasta.fetch(adj.contigs[0])
 	contig_breaks = adj.contig_breaks[0]
 	start, end = (contig_breaks[0], contig_breaks[1]) if contig_breaks[0] < contig_breaks[1] else (contig_breaks[1], contig_breaks[0])
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
@@ -904,7 +953,8 @@ class ExonMapper:
 	if len(genes) > 1:
 	    fusion = FusionFinder.find_read_through(matches_by_transcript, transcripts, align, 
 	                                            exon_bound_only=self.fusion_conditions['exon_bound_only'],
-	                                            coding_only=self.fusion_conditions['coding_only'])
+	                                            coding_only=self.fusion_conditions['coding_only'],
+	                                            sense_only=self.fusion_conditions['sense_only'])
 	    if fusion is not None:
 		events.append(fusion)
 	    	    	
@@ -1056,7 +1106,8 @@ class ExonMapper:
 	for event in self.events:
 	    for i in range(len(event.contigs)):
 		contig = event.contigs[i]
-		span = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		#span = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		span = event.contig_support_span[i][0], event.contig_support_span[i][1]
 		try:
 		    coords[contig].append(span)
 		except:
@@ -1088,7 +1139,7 @@ class ExonMapper:
 		    		     
 	    if tlens:
 		avg_tlen = float(sum(tlens)) / len(tlens)
-		print 'avg tlen', avg_tlen, sample_type
+		print 'avg tlen', avg_tlen
 		    	
 	if self.debug:
 	    for event in self.events:
@@ -1111,6 +1162,7 @@ def main(args, options):
                     itd_max_apart=options.itd_max_apart,
                     exon_bound_fusion_only=not options.include_non_exon_bound_fusion,
                     coding_fusion_only=not options.include_noncoding_fusion,
+                    sense_fusion_only=not options.include_antisense_fusion,
                     debug=options.debug)
     em.map_contigs_to_transcripts()
 	
@@ -1162,6 +1214,7 @@ if __name__ == '__main__':
     parser.add_option("--include_non_exon_bound_fusion", dest="include_non_exon_bound_fusion", help="include fusions where breakpoints are not at exon boundaries", 
                       action="store_true", default=False)
     parser.add_option("--include_noncoding_fusion", dest="include_noncoding_fusion", help="include non-coding genes in detecting fusions", action="store_true", default=False)
+    parser.add_option("--include_antisense_fusion", dest="include_antisense_fusion", help="include antisense fusions", action="store_true", default=False)
     parser.add_option("--sort_by_event_type", dest="sort_by_event_type", help="sort output by event type", action="store_true", default=False)
     parser.add_option("--max_homol_allowed", dest="max_homol_allowed", help="maximun amount of microhomology allowed. Default:10", type="int", default=10)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
