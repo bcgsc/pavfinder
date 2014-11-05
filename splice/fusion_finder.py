@@ -9,7 +9,7 @@ from SV import gapped_align, split_align
 
 class FusionFinder:
     @classmethod
-    def find_chimera(cls, chimera_block_matches, transcripts, aligns, contig_seq, exon_bound_only=False, coding_only=False):
+    def find_chimera(cls, chimera_block_matches, transcripts, aligns, contig_seq, exon_bound_only=False, coding_only=False, sense_only=False):
 	"""Identify gene fusion between split alignments
 	
 	Args:
@@ -51,12 +51,15 @@ class FusionFinder:
 		if coding_only and not (transcripts[junc1[0]].coding and transcripts[junc2[0]].coding):
 		    return None
 		
+		if sense_only and not fusion.is_sense:
+		    return None
+		
 		return fusion
 	    
 	return None
 
     @classmethod
-    def find_read_through(cls, matches_by_transcript, transcripts, align, exon_bound_only=False, coding_only=False):
+    def find_read_through(cls, matches_by_transcript, transcripts, align, exon_bound_only=False, coding_only=False, sense_only=False):
 	"""Identify read-through fusion
 	
 	Assume single alignment is spanning 2 genes
@@ -96,6 +99,9 @@ class FusionFinder:
 		return None
 		
 	    if coding_only and not (transcripts[junc1[0]].coding and transcripts[junc2[0]].coding):
+		return None
+	    
+	    if sense_only and not fusion.is_sense:
 		return None
 	    
 	    cls.annotate_fusion(fusion, junc1, junc2, transcripts)
