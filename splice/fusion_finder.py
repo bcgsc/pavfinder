@@ -231,15 +231,17 @@ class FusionFinder:
     @classmethod
     def is_sense(cls, fusion, transcript1, transcript2, orient1, orient2):
 	t5, t3 = None, None
-	#if fusion.exon_bound[0] and fusion.exon_bound[1]:
-	if orient1 == 'L' and transcript1.strand == '+' and orient2 == 'R' and transcript2.strand == '+':
+	if (orient1 == 'L' and transcript1.strand == '+' and orient2 == 'R' and transcript2.strand == '+') or\
+	   (orient1 == 'R' and transcript1.strand == '-' and orient2 == 'L' and transcript2.strand == '-') or\
+	   (orient1 == 'L' and transcript1.strand == '+' and orient2 == 'L' and transcript2.strand == '-') or\
+	   (orient1 == 'R' and transcript1.strand == '-' and orient2 == 'R' and transcript2.strand == '+'):
 	    t5, t3 = transcript1, transcript2
-	elif orient1 == 'L' and transcript1.strand == '-' and orient2 == 'R' and transcript2.strand == '-':
+	elif (orient1 == 'L' and transcript1.strand == '-' and orient2 == 'R' and transcript2.strand == '-') or\
+	     (orient1 == 'R' and transcript1.strand == '+' and orient2 == 'L' and transcript2.strand == '+') or\
+	     (orient1 == 'L' and transcript1.strand == '-' and orient2 == 'L' and transcript2.strand == '+') or\
+	     (orient1 == 'R' and transcript1.strand == '+' and orient2 == 'R' and transcript2.strand == '-'):
 	    t3, t5 = transcript1, transcript2
-	elif orient1 == 'R' and transcript1.strand == '+' and orient2 == 'L' and transcript2.strand == '+':
-	    t3, t5 = transcript1, transcript2
-	elif orient1 == 'R' and transcript1.strand == '-' and orient2 == 'L' and transcript2.strand == '-':
-	    t5, t3 = transcript1, transcript2
+	    
 		
 	if t5 is not None and t3 is not None:
 	    return (t5, t3)
