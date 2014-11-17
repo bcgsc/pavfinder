@@ -91,9 +91,14 @@ class Transcript:
 	for feature in BedTool(annotation_file):
 	    if feature[2] == 'exon':
 		exon = (int(feature.start) + 1, int(feature.stop))
-		exon_num = int(feature.attrs['exon_number'])
+		#if feature.attrs.has_key('exon_number'):
+		    #exon_num = int(feature.attrs['exon_number'])
 		transcript_id = feature.attrs['transcript_id']
-		gene = feature.attrs['gene_name']
+		gene = None
+		if feature.attrs.has_key('gene_name'):
+		    gene = feature.attrs['gene_name']
+		elif feature.attrs.has_key('gene_id'):
+		    gene = feature.attrs['gene_id']
 		strand = feature.strand
 		
 		if feature.attrs.has_key('gene_biotype') and feature.attrs['gene_biotype'] == 'protein_coding':
@@ -785,21 +790,6 @@ class ExonMapper:
 		events = []
 		# each gtf record corresponds to a feature
 		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
-		    # contigs within single intron or exon
-		    #if not chimera and align.tstart >= gtf.start and align.tend <= gtf.end:
-			#match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
-			
-			#if gtf.feature == 'intron':	
-			    #within_intron.append((gtf, match))
-			    
-			#elif gtf.feature == 'exon':
-			    #within_exon.append((gtf, match))
-			  
-		    ## collect all the transcripts that have exon overlapping alignment
-		    #else:
-			#if gtf.feature == 'exon':
-			    #transcripts_mapped.add(gtf.transcript_id)
-		    
 		    # collect all the transcripts that have exon overlapping alignment
 		    if gtf.feature == 'exon':
 			transcripts_mapped.add(gtf.transcript_id)
@@ -824,10 +814,11 @@ class ExonMapper:
 			if not chimera and self.is_full_match(block_matches):
 			    full_matched_transcripts.append(transcripts[txt])
 			    
+		    # report mapping
+		    best_mapping = Mapping.pick_best(mappings, align, debug=True)
+		    self.mappings.append(best_mapping)
+		    	
 		    if not full_matched_transcripts:	
-			best_mapping = Mapping.pick_best(mappings, align, debug=True)
-			self.mappings.append(best_mapping)
-			
 			# find events only for best transcript
 			best_transcript = best_mapping.transcripts[0]
 			events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]}, 
@@ -838,8 +829,8 @@ class ExonMapper:
 			if events:
 			    self.events.extend(events)
 			elif self.debug:
-			    sys.stdout.write('%s - partial but no events\n' % align.query)		    
-			    			    
+			    sys.stdout.write('%s - partial but no events\n' % align.query)	
+		    
 		    if chimera:
 			chimera_block_matches.append(all_block_matches)
 		    
@@ -879,19 +870,21 @@ class ExonMapper:
 		
 	# expand contig span
 	for event in self.events:
-	    event.contig_support_span = event.contig_breaks
-	    if event.rearrangement == 'ins' or event.rearrangement == 'dup':
-		expanded_contig_breaks = expand_contig_breaks(event.chroms[0], 
-		                                              event.breaks, 
-		                                              event.contigs[0], 
-		                                              [event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1], 
-		                                              event.rearrangement, 
-		                                              self.ref_fasta,
-		                                              self.contigs_fasta,
-		                                              self.debug)
-		if expanded_contig_breaks is not None:
-		    event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
-
+	    # if contig_support_span is not defined (it can be pre-defined in ITD)
+	    # then set it
+	    if not event.contig_support_span:
+		event.contig_support_span = event.contig_breaks
+		if event.rearrangement == 'ins' or event.rearrangement == 'dup':
+		    expanded_contig_breaks = expand_contig_breaks(event.chroms[0], 
+			                                          event.breaks, 
+			                                          event.contigs[0], 
+			                                          [event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1], 
+			                                          event.rearrangement, 
+			                                          self.ref_fasta,
+			                                          self.contigs_fasta,
+			                                          self.debug)
+		    if expanded_contig_breaks is not None:
+			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
 					
     def map_exons(self, blocks, exons):
 	"""Maps alignment blocks to exons
@@ -935,7 +928,7 @@ class ExonMapper:
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
 	return novel_seq
 	    
-    def find_events(self, matches_by_transcript, align, transcripts):
+    def find_events(self, matches_by_transcript, align, transcripts, small=20):
 	"""Find events from single alignment
 	
 	Wrapper for finding events within a single alignment
@@ -953,6 +946,8 @@ class ExonMapper:
 							     or None if no_match
 	    align: (Alignment) alignment object
 	    transcripts: (dictionary) key=transcript_id value: Transcript
+	    small: (int) max size of ins or dup that the span of the novel seq would be used in contig_support_span,
+	                 anything larger than that we just check if there is any spanning reads that cross the breakpoint
 	Returns:
 	    List of Adjacencies
 	"""
@@ -999,6 +994,10 @@ class ExonMapper:
 			                      )
 		    			
 		    adj.size = len(adj.novel_seq)
+		    
+		    # bigger events mean we can only check if there is reads that cross the breakpoint
+		    #if adj.size > small:
+			#adj.contig_support_span = [(min(adj.contig_breaks[0]), min(adj.contig_breaks[0]) + 1)]
 		    
 		elif adj.rearrangement == 'del':
 		    adj.size = adj.breaks[1] - adj.breaks[0] - 1
@@ -1135,7 +1134,7 @@ class ExonMapper:
 	    for event in self.events:
 		for i in range(len(event.contigs)):
 		    contig = event.contigs[i]
-		    span = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		    span = event.contig_support_span[i][0], event.contig_support_span[i][1]
 		    coord = '%s-%s' % (span[0], span[1])
 					
 		    if support.has_key(contig) and support[contig].has_key(coord):
