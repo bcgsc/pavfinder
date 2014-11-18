@@ -666,8 +666,9 @@ class Mapping:
 		sys.stdout.write("mapping %s %s %s %s %s %s\n" % (align.query, transcript.id, transcript.gene, score, penalty, metric))
 	    
 	transcripts_sorted = sorted(metrics.keys(), key = lambda txt: (-1 * metrics[txt]['score'], metrics[txt]['from_edge'], metrics[txt]['txt_size']))
-	for t in transcripts_sorted:
-	    print 'sorted', t.id, metrics[t]
+	if debug:
+	    for t in transcripts_sorted:
+		sys.stdout.write('sorted %s %s\n' % (t.id, metrics[t]))
 	    	    
 	best_transcript = transcripts_sorted[0]
 	best_matches = [mapping[1] for mapping in mappings if mapping[0] == best_transcript]
@@ -815,7 +816,7 @@ class ExonMapper:
 			    full_matched_transcripts.append(transcripts[txt])
 			    
 		    # report mapping
-		    best_mapping = Mapping.pick_best(mappings, align, debug=True)
+		    best_mapping = Mapping.pick_best(mappings, align, debug=self.debug)
 		    self.mappings.append(best_mapping)
 		    	
 		    if not full_matched_transcripts:	
