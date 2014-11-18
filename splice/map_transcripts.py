@@ -996,8 +996,8 @@ class ExonMapper:
 		    adj.size = len(adj.novel_seq)
 		    
 		    # bigger events mean we can only check if there is reads that cross the breakpoint
-		    #if adj.size > small:
-			#adj.contig_support_span = [(min(adj.contig_breaks[0]), min(adj.contig_breaks[0]) + 1)]
+		    if adj.size > small:
+			adj.contig_support_span = [(min(adj.contig_breaks[0]), min(adj.contig_breaks[0]) + 1)]
 		    
 		elif adj.rearrangement == 'del':
 		    adj.size = adj.breaks[1] - adj.breaks[0] - 1
