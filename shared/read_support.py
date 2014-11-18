@@ -77,38 +77,6 @@ def is_break_region_perfect(read, break_seq, breaks, overlap_buffer):
     else:
 	return False
     
-def find_spanning_old(reads, breaks, contig_len, overlap_buffer=1, debug=False, perfect=False, partial=False):
-    """Returns number of spanning reads across spanning breakpont
-    Args:
-        reads: (list) Pysam AlignedRead objects of all reads in a contig
-        breaks: (tuple) sorted coordinates of breakpoint positions in contigs
-        overlap_buffer: (int) minium number of bases from the edges of the breakpoint must lie 
-	partial: (boolean) don't have to span 'breaks', overlap is fine
-    Returns:
-        tuple of number of postively and negatively aligned spanning reads 
-    """
-    spanning = {'+': Set(), '-': Set()}
-    for read in reads:
-        # make sure read is mapped
-        if read.alen:
-            good = False
-            if partial:
-                if ((read.pos < breaks[0] - overlap_buffer and read.pos + read.alen > breaks[0] + overlap_buffer) or \
-                    (read.pos < breaks[1] - overlap_buffer and read.pos + read.alen > breaks[1] + overlap_buffer)) and \
-                   is_fully_mapped(read, contig_len, perfect=perfect):
-                    good = True
-            else:
-                if read.pos < breaks[0] - overlap_buffer and read.pos + read.alen >= breaks[1] + overlap_buffer and is_fully_mapped(read, contig_len, perfect=perfect):
-                    good = True
-                    
-            if good:
-                strand = '+' if not read.is_reverse else '-'
-                spanning[strand].add(read.pos)
-                if debug:
-                    sys.stdout.write("Accepted spanning read(perfect:%s partial:%s): %s %s %s %s\n" % (perfect, partial, read.qname, breaks, (read.pos + 1, read.pos + read.alen), strand))
-            
-    return len(spanning['+']) + len(spanning['-'])
-
 def check_tiling(reads, breaks, contig_len, debug=False):
     """Checks if there are reads tiling across breakpoints with no gaps
     
