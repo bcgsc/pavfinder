@@ -206,7 +206,7 @@ class FusionFinder:
     @classmethod
     def is_ptd(cls, fusion):
 	"""Define PTD"""
-	if fusion.genes[0] == fusion.genes[1]:
+	if fusion.genes[0] == fusion.genes[1] and fusion.exon_bound[0] and fusion.exon_bound[1]:
 	    fusion.rna_event = 'PTD'
 	    
     @classmethod
@@ -285,7 +285,7 @@ class FusionFinder:
 	# captures contig names whose probe aligns to single position
 	# will remove any events coming from these contigs because the split-alignment is not reliable
 	failed_contigs = Set()
-	for key, group in groupby(bam.fetch(until_eof=True), lambda x: name_sep.join(x.qname.split(name_sep)[:6])):
+	for key, group in groupby(bam.fetch(until_eof=True), lambda x: name_sep.join(x.qname.split(name_sep)[:8])):
 	    alns = list(group)
 	    fusion_idx = query_to_fusion[key]
 	    fusion = fusions[fusion_idx]
