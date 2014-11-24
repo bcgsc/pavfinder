@@ -648,30 +648,18 @@ class Adjacency:
 	Returns:
 	    A string that is used for grouping adjacencies
 	"""
-	if not transcriptome:
-	    if include_novel_seq:
-		return '-'.join([self.rearrangement, 
-		                 str(self.breaks[0]), 
-		                 str(self.breaks[1]),
-		                 self.orients[0],
-		                 self.orients[1],
-		                 self.novel_seq
-		                 ])
-	    else:
-		return '-'.join([self.rearrangement, 
-		                 str(self.breaks[0]), 
-		                 str(self.breaks[1]),
-		                 self.orients[0],
-		                 self.orients[1],
-		                 ])
-	else:
+	info = [self.rearrangement]
+	if transcriptome:
 	    info = [self.rna_event]
-	    info.extend(self.breaks)
+	for i in (0,1):
+	    info.append(self.chroms[i])
+	    info.append(self.breaks[i])
 	    if self.orients:
-		info.extend(self.orients)
-	    info.append(self.novel_seq)
-	    return '-'.join(map(str, info))
-        
+		info.append(self.orients[i])
+	    if include_novel_seq:
+		info.append(self.novel_seq)
+	return '-'.join(map(str, info))
+	        
     @classmethod
     def extract_probe(cls, contig_seq, contig_breaks, len_on_each_side=25):
 	start, end = contig_breaks
