@@ -5,6 +5,7 @@ import pysam
 import sys
 import re
 import os
+import gzip
 from distutils.spawn import find_executable
 from shared import gmap
 from shared.annotate import overlap
@@ -199,7 +200,7 @@ class Event:
 	event_handlings = {
 	    'fusion': cls.from_fusion,
 	    'ITD': cls.from_single_locus,
-	    'PTD': cls.from_fusion,
+	    'PTD': cls.from_single_locus,
 	    'ins': cls.from_single_locus,
 	    'del': cls.from_single_locus,
 	    'skipped_exon': cls.from_single_locus,
@@ -241,7 +242,28 @@ class Event:
 		if out_line:
 		    out.write('%s\n' % out_line)
 	out.close()
-					
+	
+    @classmethod
+    def output_reads(cls, events, support_reads, outfile):
+	"""Outputs support spanning reads for events
+	
+	Args:
+	    events: (List) Events to be reported
+	    support_reads: (Dict) key = event.key() value = list of (read_name, read_seq)
+	    outfile: (str) absolute path of output file name
+	"""
+	recs = ''
+	for event in events:
+	    key = event.key(transcriptome=True)
+	    if support_reads.has_key(key):
+		for read_name, seq in support_reads[key]:
+		    recs += '>%s-%s\n%s\n' % (key, read_name, seq)
+
+	gzipped_outfile = outfile + '.gz'
+	out = gzip.open(gzipped_outfile, 'wb')
+	out.write(recs)
+	out.close()
+		    
     @classmethod
     def from_fusion(cls, event):
 	"""Generates output line for a fusion/PTD event
@@ -975,6 +997,7 @@ class ExonMapper:
 		adj.genes = (list(genes)[0],)
 		adj.transcripts = (event['transcript'][0],)
 		adj.size = event['size']
+		adj.orients = 'L', 'R'
 		
 		# converts exon index to exon number (which takes transcript strand into account)
 		exons = event['exons'][0]
@@ -1100,7 +1123,7 @@ class ExonMapper:
 		
 	return False
     
-    def find_support(self, r2c_bam_file=None, min_overlap=None, multi_mapped=False, perfect=True, num_procs=1):
+    def find_support(self, r2c_bam_file=None, min_overlap=None, multi_mapped=False, perfect=True, get_seq=False, num_procs=1):
 	"""Extracts read support from reads-to-contigs BAM
 	
 	Assumes reads-to-contigs is NOT multi-mapped 
@@ -1119,16 +1142,25 @@ class ExonMapper:
 		    coords[contig].append(span)
 		except:
 		    coords[contig] = [span]
-	
+		    
+	support_reads = {}
 	if coords:	    
 	    avg_tlen = None
 	    tlens = []
 	    # if fewer than 10000 adjs, use 'fetch' of Pysam
 	    if len(coords) < 1000 or num_procs == 1:
-		support, tlens = fetch_support(coords, r2c_bam_file, self.contigs_fasta, overlap_buffer=min_overlap, perfect=perfect, debug=self.debug)
+		support, tlens = fetch_support(coords, r2c_bam_file, self.contigs_fasta, 
+		                               overlap_buffer=min_overlap, 
+		                               perfect=perfect, 
+		                               get_seq=get_seq, 
+		                               debug=self.debug)
 	    # otherwise use multi-process parsing of bam file
 	    else:
-		support, tlens = scan_all(coords, r2c_bam_file, self.contigs_fasta_file, num_procs, overlap_buffer=min_overlap, perfect=perfect, debug=self.debug)
+		support, tlens = scan_all(coords, r2c_bam_file, self.contigs_fasta_file, num_procs, 
+		                          overlap_buffer=min_overlap, 
+		                          perfect=perfect, 
+		                          get_seq=get_seq, 
+		                          debug=self.debug)
 		    
 	    print 'total tlens', len(tlens)
 		
@@ -1141,16 +1173,28 @@ class ExonMapper:
 		    if support.has_key(contig) and support[contig].has_key(coord):
 			event.support['spanning'].append(support[contig][coord][0])
 			
+			# if reads are to be extracted
+			if get_seq:
+			    if support[contig][coord][-1]:
+				key = event.key(transcriptome=True)
+				for read in support[contig][coord][-1]:
+				    try:
+					support_reads[key].add(read)
+				    except:
+					support_reads[key] = Set([read])
+			
 		if not multi_mapped:
 		    event.sum_support()	
 		    		     
 	    if tlens:
-		avg_tlen = float(sum(tlens)) / len(tlens)
-		print 'avg tlen', avg_tlen
+		#avg_tlen = float(sum(tlens)) / len(tlens)
+		print 'avg tlen', tlens[:10]
 		    	
 	if self.debug:
 	    for event in self.events:
 		print 'support', event.support, event.support_total, event.support_final
+		
+	return support_reads
 
 
 def main(args, options):
@@ -1186,7 +1230,9 @@ def main(args, options):
     
     # added support
     if options.r2c_bam_file:
-	em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, num_procs=options.num_threads)
+	support_reads = em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, 
+	                                num_procs=options.num_threads, 
+	                                get_seq=options.output_support_reads)
 	
     # merge events captured by different contigs into single events
     events_merged = Adjacency.merge(em.events, transcriptome=True)
@@ -1197,6 +1243,10 @@ def main(args, options):
 	
     # output events
     Event.output(events_merged, outdir, sort_by_event_type=options.sort_by_event_type)
+    
+    # output support reads
+    if options.output_support_reads and support_reads:
+	Event.output_reads(events_merged, support_reads, '%s/support_reads.fa' % outdir)
     
     # output mappings
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
@@ -1223,6 +1273,7 @@ if __name__ == '__main__':
     parser.add_option("--include_noncoding_fusion", dest="include_noncoding_fusion", help="include non-coding genes in detecting fusions", action="store_true", default=False)
     parser.add_option("--include_antisense_fusion", dest="include_antisense_fusion", help="include antisense fusions", action="store_true", default=False)
     parser.add_option("--sort_by_event_type", dest="sort_by_event_type", help="sort output by event type", action="store_true", default=False)
+    parser.add_option("--output_support_reads", dest="output_support_reads", help="output support reads", action="store_true", default=False)
     parser.add_option("--max_homol_allowed", dest="max_homol_allowed", help="maximun amount of microhomology allowed. Default:10", type="int", default=10)
     parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
