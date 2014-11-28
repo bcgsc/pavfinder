@@ -137,6 +137,9 @@ def is_duplicated(novel_seq, contig_breaks, contig_seq, min_len=3):
 	    
 def screen_probe_alns(adj_aligns, probe_alns, align_type, min_pc_mapped=1.0):
     for aln in probe_alns:
+	if aln.is_unmapped:
+	    continue
+	
 	matched_len = 0
 	query_len = sum([a[1] for a in aln.cigar if a[0] in (0, 1, 4, 5)])
 	matched_len = sum([a[1] for a in aln.cigar if a[0] == 0])
