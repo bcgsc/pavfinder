@@ -625,7 +625,7 @@ class Adjacency:
 		
 	return '\t'.join(data)
     
-    def contig_support_span(self, contig_index):
+    def get_contig_support_span(self, contig_index):
 	if self.homol_coords and self.homol_coords[contig_index][0] is int and self.homol_coords[contig_index][1] is int:
 	    return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
 	else:
@@ -961,7 +961,8 @@ class Adjacency:
 		first_adj.contigs.append(adj.contigs[0])
 		first_adj.contig_breaks.append(adj.contig_breaks[0])
 		first_adj.contig_sizes.append(adj.contig_sizes[0])
-		first_adj.contig_support_span.append(adj.contig_support_span[0])
+		if adj.contig_support_span:
+		    first_adj.contig_support_span.append(adj.contig_support_span[0])
 		if adj.probes:
 		    first_adj.probes.append(adj.probes[0])
 		else:
@@ -1060,7 +1061,7 @@ class Adjacency:
 	    
 	from shared import gmap
 	from shared import bwa_mem
-	
+		
 	prefix = 'realign'
 	if not use_realigns:
 	    out_file = '%s/%s.fa' % (out_dir, prefix)
