@@ -149,19 +149,7 @@ class Adjacency:
 	
         # small-scale events may not have this information
         self.orients = orients
-        	
-	self.genes = ['NA', 'NA']
-	self.transcripts = ['NA', 'NA']
-	self.gene_strands = ['NA', 'NA']
-	self.exons = ['NA', 'NA']
-	self.exon_bounds = ['NA', 'NA']
-	self.introns = ['NA', 'NA']
-	self.rna_event = 'NA'
-	self.fusion_type = 'NA'
-	self.gene5 = 'NA'
-	self.gene3 = 'NA'
-	self.frames = 'NA'
-			
+        			
 	self.support = {'spanning':[], 'flanking':[], 'tiling':[]}
 	self.support_total = {'flanking':'NA', 'spanning':'NA'}
 	self.support_final = None
@@ -473,24 +461,7 @@ class Adjacency:
 	           'homol_coord2',
 	           'novel_seq',
 	           'probe',
-	           'gene1',
-	           'gene2',
-	           'transcript1',
-	           'transcript2',
-	           'exon1',
-	           'exon2',
-	           'exon_bound1',
-	           'exon_bound2',
-	           'intron1',
-	           'intron2',
-	           'RNA_event',
-	           'fusion_type',
-	           '5_gene',
-	           '3_gene',
-	           'frame',
 	           'spanning_reads',
-	           'flanking_pairs',
-	           'read_tiling',
                    )
         return '\t'.join(headers)
     
@@ -508,39 +479,27 @@ class Adjacency:
 	    data.append(str(self.get_size()))
 	    data.append(','.join(self.contigs))
 	    data.append(','.join([str(b[0]) for b in self.contig_breaks]))
-	    data.append(','.join([str(b[1]) for b in self.contig_breaks]))	    
-	    data.append(','.join(self.homol_seq))
-	    try:
+	    data.append(','.join([str(b[1]) for b in self.contig_breaks]))
+	    	    
+	    if self.homol_seq:
+		data.append(','.join(self.homol_seq))
+	    else:
+		data.append('-')
+		
+	    if self.homol_coords:
 		data.append(','.join([str(b[0]) for b in self.homol_coords]))
-	    except:
-		data.append('-')
-	    try:
 		data.append(','.join([str(b[1]) for b in self.homol_coords]))
-	    except:
+	    else:
 		data.append('-')
+		data.append('-')
+		
 	    data.append(self.novel_seq)
+	    
 	    try:
 		data.append(self.probes[0])
 	    except:
 		data.append('-')
-	    data.append(self.genes[0])
-	    data.append(self.genes[1])
-	    data.append(self.transcripts[0])
-	    data.append(self.transcripts[1])
-	    data.append(str(self.exons[0]))
-	    data.append(str(self.exons[1]))
-	    data.append(str(self.exon_bounds[0]))
-	    data.append(str(self.exon_bounds[1]))
-	    data.append(str(self.introns[0]))
-	    data.append(str(self.introns[1]))
-	    data.append(self.rna_event)
-	    data.append(self.fusion_type)
-	    data.append(self.gene5)
-	    data.append(self.gene3)
-	    data.append(str(self.frames))
 	    data.append(str(self.support_total['spanning']))
-	    data.append(str(self.support_total['flanking']))
-	    data.append(','.join(str(t) for t in self.support['tiling']))
 	    outputs.append('\t'.join(map(str, data)))
 	    
 	else:
@@ -785,10 +744,8 @@ class Adjacency:
 			source_orients = trls[i].orients[0], trls[j].orients[0]
 			
 			if trls[i].aligns[0][1].dubious:
-			    #print 'anchor', target_chrom, target_breaks, trls[i].aligns[0][1].target, trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend
 			    anchor_dubious = True
 			    
-		    #print 'anchor', anchor_dubious
 		    if anchor_dubious:
 			continue
 								    
