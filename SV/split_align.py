@@ -200,7 +200,7 @@ def screen_subseq_alns(adj_aligns, subseq_alns, realign_bam, name_sep, debug=Fal
 	    if aln.is_unmapped or re.search('[-_.]', realign_bam.getrname(aln.tid)):
 		continue
 		
-	    idx = int(aln.qname.rprimary_aligns(name_sep, 1)[1])
+	    idx = int(aln.qname.split(name_sep)[-1])
 	    	    	    		    
 	    # if end-to-end match
 	    if re.match('\d+.*M$', aln.cigarstring) and not re.search('[SH]', aln.cigarstring):
@@ -525,7 +525,7 @@ def find_adjs(aligns, aligner, contig_seq, dubious=None, debug=False):
 		
     return adjs
 
-def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', contig_seq=None, debug=False):
+def call_event(align1, align2, homol_seq=None, homol_coords=None, novel_seq='-', contig_seq=None, no_sort=False, probe_side_len=25, debug=False):
     """Curates adj based on info given by primary_aligns alignments
     
     Args:
@@ -559,11 +559,12 @@ def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', co
 	orients[1] = 'L' if max(align1.tstart, align1.tend) == breaks[1] else 'R'
 	contig_breaks = [align2.qend, align1.qstart]
 	
-    if (aligns[0].target != aligns[1].target and compare_chr(aligns[0].target, aligns[1].target) > 0) or\
-       (aligns[0].target == aligns[1].target and breaks[0] > breaks[1]):
-	aligns.reverse()
-	breaks.reverse()
-	orients.reverse()
+    if not no_sort:
+	if (aligns[0].target != aligns[1].target and compare_chr(aligns[0].target, aligns[1].target) > 0) or\
+	   (aligns[0].target == aligns[1].target and breaks[0] > breaks[1]):
+	    aligns.reverse()
+	    breaks.reverse()
+	    orients.reverse()
 	
     rearrangement = None
     if aligns[0].target != aligns[1].target:
@@ -586,12 +587,13 @@ def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', co
 		rearrangement = 'del'
 			    
 	elif breaks[0] > breaks[1]:
-	    # if difference is breaks is small, should be tandem dup
-	    if contig_breaks[0] >= contig_breaks[1]:
-		rearrangement = 'dup'
-	    # insertion with microhomology
-	    else:
-		rearrangement = 'ins'		
+	    rearrangement = 'dup' 
+	    ## if difference is breaks is small, should be tandem dup
+	    #if contig_breaks[0] >= contig_breaks[1]:
+		#rearrangement = 'dup'
+	    ## insertion with microhomology
+	    #else:
+		#rearrangement = 'ins'		
 	    
 	# breaks[0] == breaks[1]
 	else:
@@ -630,7 +632,7 @@ def call_event(align1, align2, homol_seq='-', homol_coords=(), novel_seq='-', co
 	               )
     
 	if contig_seq is not None:
-	    adj.probes.append(Adjacency.extract_probe(contig_seq, contig_breaks)[0])
+	    adj.probes.append(Adjacency.extract_probe(contig_seq, contig_breaks, len_on_each_side=probe_side_len)[0])
 	    
     elif debug:
 	sys.stdout.write("cannot figure out event of primary_aligns alignment contig:%s targets:%s,%s orients:%s breaks:%s contig_breaks:%s\n" % (aligns[0].query,

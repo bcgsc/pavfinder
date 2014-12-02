@@ -195,7 +195,7 @@ def find_untemplated_sequence(aligns, contig_seq):
     Returns:
         Untemplated sequence or None
     """
-    untemplated_seq = 'NA'
+    untemplated_seq = '-'
     
     contig_span1 = intspan('%s-%s' % (aligns[0].qstart, aligns[0].qend))
     contig_span2 = intspan('%s-%s' % (aligns[1].qstart, aligns[1].qend))

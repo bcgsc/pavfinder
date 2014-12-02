@@ -4,40 +4,29 @@ from pybedtools import create_interval_from_list, set_tempdir, BedTool
 import pysam
 import sys
 import re
+import os
+import gzip
+from distutils.spawn import find_executable
 from shared import gmap
 from shared.annotate import overlap
 from shared.alignment import reverse_complement
 from sets import Set
 from intspan import intspan
-from SV.split_align import call_event
 from SV.variant import Adjacency
-
-class Fusion:
-    def __init__(self, gene1, gene2):
-	self.gene1 = gene1
-	self.gene2 = gene2
-	self.contigs = []
-	self.breaks = []
-	self.txt1 = None
-	self.txt2 = None
-	self.exon1 = None
-	self.exon2 = None
-	self.junctions = None
-	
-    def as_tab(self):
-	data = []
-	data.append(self.gene1)
-	data.append(self.gene2)
-	data.append(','.join(self.contigs))
-	
-	return '\t'.join(data)
+from itd_finder import ITD_Finder
+from fusion_finder import FusionFinder
+from novel_splice_finder import NovelSpliceFinder
+from shared.read_support import scan_all, fetch_support, expand_contig_breaks
 
 class Transcript:
-    def __init__(self, id, gene=None, strand=None):
+    def __init__(self, id, gene=None, strand=None, coding=False):
 	self.id = id
 	self.gene = gene
 	self.strand = strand
 	self.exons = []
+	self.coding = coding
+	self.cds_start = None
+	self.cds_end = None
 	
     def add_exon(self, exon):
 	self.exons.append(exon)
@@ -68,165 +57,381 @@ class Transcript:
     def txEnd(self):
 	return self.exons[-1][1]
     
+    def exon_num(self, index):
+	"""Converts exon index to exon number
+	Exon number is always starting from the transcription start site
+	i.e. for positive transcripts, the first exon is exon 1
+	     for negative transcripts, the last exon is exon 1
+	Need this method because a lot of the splicing variant code just keep
+	track of the index instead of actual exon number
+	
+	Args:
+	    index: (int) index of exon in list
+	Returns:
+	    Exon number in int
+	"""
+	assert type(index) is int, 'exon index %s not given in int' % index
+	assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: %s %s' % (self.id, self.strand)
+	assert index >= 0 and index < len(self.exons), 'exon index out of range:%s %d' % (index, len(self.exons))
+	if self.strand == '+':
+	    return index + 1
+	else:
+	    return len(self.exons) - index
+	
+    @classmethod
+    def extract_transcripts(cls, annotation_file):
+	"""Extracts all exon info into transcript objects
+	
+	Requires annotation file passed to object
+	Uses PyBedTool for parsing
+	
+	Returns:
+	    List of Transcripts with exon info, strand
+	"""
+	transcripts = {}
+	for feature in BedTool(annotation_file):
+	    if feature[2] == 'exon':
+		exon = (int(feature.start) + 1, int(feature.stop))
+		#if feature.attrs.has_key('exon_number'):
+		    #exon_num = int(feature.attrs['exon_number'])
+		transcript_id = feature.attrs['transcript_id']
+		gene = None
+		if feature.attrs.has_key('gene_name'):
+		    gene = feature.attrs['gene_name']
+		elif feature.attrs.has_key('gene_id'):
+		    gene = feature.attrs['gene_id']
+		strand = feature.strand
+		
+		if feature.attrs.has_key('gene_biotype') and feature.attrs['gene_biotype'] == 'protein_coding':
+		    coding = True
+		else:
+		    coding = False
+				
+		try:
+		    transcript = transcripts[transcript_id]
+		except:
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
+		    transcripts[transcript_id] = transcript
+		    
+		transcript.add_exon(exon)
+		
+	    elif feature[2] == 'CDS':
+		transcript_id = feature.attrs['transcript_id']
+		strand = feature.strand
+		cds = (int(feature.start) + 1, int(feature.stop))
+		
+		try:
+		    transcript = transcripts[transcript_id]
+		except:
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
+		    transcripts[transcript_id] = transcript
+		    
+		
+		if strand == '+':
+		    if transcript.cds_start is None or cds[0] < transcript.cds_start:
+			transcript.cds_start = cds[0]
+		    if transcript.cds_end is None or cds[1] > transcript.cds_end:
+			transcript.cds_end = cds[1]
+		else:
+		    if transcript.cds_end is None or cds[0] < transcript.cds_end:
+			transcript.cds_end = cds[0]
+		    if transcript.cds_start is None or cds[1] > transcript.cds_start:
+			transcript.cds_start = cds[1]
+			
+	for transcript in transcripts.values():
+	    if not transcript.coding and\
+	       transcript.cds_start is not None and\
+	       transcript.cds_end is not None and\
+	       transcript.cds_start != transcript.cds_end:
+		transcript.coding = True
+		
+	return transcripts
+
+    
 class Event:
-    headers = ['event_type',
+    # headers of tab-delimited output
+    headers = ['ID',
+               'event',
                'chrom1',
                'pos1',
-               'gene1',
-               'transcripts1',
-               'exons1',
+               'orient1',
                'chrom2',
                'pos2',
-               'gene2',
-               'transcripts2',
-               'exons2',
+               'orient2',
+               'size',
                'contigs',
-               'contig_blocks',
                'contig_breaks',
+               'contig_support_span',
+               'homol_seq',
+               'homol_coords',
+               'homol_len',
+               'novel_sequence',
+               'gene1',
+               'transcript1',
+               'exon1',
+               'exon_bound1',
+               'gene2',
+               'transcript2',
+               'exon2',
+               'exon_bound2',
+               'sense_fusion',
+               "5'gene",
+               "3'gene",
+               'spanning_reads',
                ]
     
     @classmethod
-    def output(cls, events, outdir):
-	# chimeras
-	# svs
-	#svs = [event for event in events if event.event_type == 'ins' or event.event_type == 'del']
-	#cls.output_sv(svs, '%s/sv.tsv' % outdir)
-	
-	# splicing
-	splicing_types = ['novel_exon', 'skipped_exon']
-	splicing = [event for event in events if event.rna_event in splicing_types]
-	cls.output_splicing(splicing, '%s/splicing.tsv' % outdir)
-	
-	# fusions
-	fusions = [event for event in events if event.rna_event == 'fusion']
-	cls.output_fusion(fusions, '%s/fusions.tsv' % outdir)
-	
-	# indels
-	print len(events)
-	events[0].id = '123'
-	print 'abcd', events, events[0], events[0].rearrangement, events[0].breaks, events[0].chroms, events[0].genes, events[0].transcripts
-	indels = [event for event in events if event.rearrangement in ('ins', 'del')]
-	cls.output_indels(indels, '%s/indels.tsv' % outdir)
-	
-    @classmethod
-    def output_sv(cls, events, outfile):
-	out = open(outfile, 'w')
+    def output(cls, events, outdir, sort_by_event_type=False):
+	"""Output events
+
+	Args:
+	    events: (list) Adjacency
+	    outdir: (str) absolute path of output directory
+	Returns:
+	    events will be output in file outdir/events.tsv
+	"""
+	def get_smaller_pos(event):
+	    """Returns 'smaller' coordinate of given event"""
+	    if cls.compare_pos((event.chroms[0], event.breaks[0]), (event.chroms[1], event.breaks[1])) > 0:
+		return (event.chroms[1], event.breaks[1])
+	    else:
+		return (event.chroms[0], event.breaks[0])
+	    
+	event_handlings = {
+	    'fusion': cls.from_fusion,
+	    'ITD': cls.from_single_locus,
+	    'PTD': cls.from_single_locus,
+	    'ins': cls.from_single_locus,
+	    'del': cls.from_single_locus,
+	    'skipped_exon': cls.from_single_locus,
+	    'novel_exon': cls.from_single_locus,
+	    'novel_donor': cls.from_single_locus,
+	    'novel_acceptor': cls.from_single_locus,
+	    'novel_intron': cls.from_single_locus,
+	    'retained_intron': cls.from_single_locus,
+	}
+
+	out_file = '%s/events.tsv' % outdir
+	out = open(out_file, 'w')
 	out.write('%s\n' % '\t'.join(cls.headers))
-	for event in events:
-	    out.write('%s\n' % event.as_tab())
+	
+	if sort_by_event_type:
+	    events_sorted = []
+	    event_types = ['fusion',
+	                   'ITD',
+	                   'PTD',
+	                   'ins',
+	                   'del',
+	                   'skipped_exon',
+	                   'novel_exon',
+	                   'novel_donor',
+	                   'novel_acceptor',
+	                   'novel_intron',
+	                   'retained_intron',
+	                   ]
+	    for event_type in event_types:
+		events_sorted.extend(sorted([e for e in events if e.rna_event == event_type], 
+		                            cmp=lambda x,y: cls.compare_pos(get_smaller_pos(x), get_smaller_pos(y))))
+	
+	else:
+	    events_sorted = sorted(events, cmp=lambda x,y: cls.compare_pos(get_smaller_pos(x), get_smaller_pos(y)))
+	
+	for event in events_sorted:
+	    if event.rna_event:
+		out_line = event_handlings[event.rna_event](event)
+		if out_line:
+		    out.write('%s\n' % out_line)
 	out.close()
 	
     @classmethod
-    def output_indels(cls, events, outfile):
-	def as_indel(event):
-	    data = []
-	    data.append(event.rna_event)
-	    data.append(event.chroms[0])
-	    data.append(event.breaks[0])
-	    data.append(event.breaks[1])
-	    data.append(event.size)
-	    data.append(event.genes[0])
-	    data.append(event.transcripts[0])
-	    if event.exons:
-		data.append(','.join(map(str, event.exons)))
-	    else:
-		data.append('-')
-	    data.append(','.join(event.contigs))
-	    data.append(cls.to_string(event.contig_breaks))
-	    if event.novel_seq:
-		data.append(event.novel_seq)
-		
-	    return '\t'.join(map(str, data))
+    def output_reads(cls, events, support_reads, outfile):
+	"""Outputs support spanning reads for events
 	
-	headers = ['event',
-	           'chrom',
-	           'pos1',
-	           'pos2',
-	           'size',
-	           'gene',
-	           'transcript',
-	           'exon',
-	           'contigs',
-	           'contig_breaks',
-	           'novel_sequence',
-	           ]
-	out = open(outfile, 'w')
-	out.write('%s\n' % '\t'.join(headers))
+	Args:
+	    events: (List) Events to be reported
+	    support_reads: (Dict) key = event.key() value = list of (read_name, read_seq)
+	    outfile: (str) absolute path of output file name
+	"""
+	recs = ''
 	for event in events:
-	    out.write('%s\n' % as_indel(event))
+	    key = event.key(transcriptome=True)
+	    if support_reads.has_key(key):
+		for read_name, seq in support_reads[key]:
+		    recs += '>%s-%s\n%s\n' % (key, read_name, seq)
+
+	gzipped_outfile = outfile + '.gz'
+	out = gzip.open(gzipped_outfile, 'wb')
+	out.write(recs)
 	out.close()
-	
-	
+		    
     @classmethod
-    def output_splicing(cls, events, outfile):
-	def as_splice_variant(event):
-	    data = []
-	    data.append(event.rna_event)
-	    data.append(event.chroms[0])
-	    data.append(','.join(map(str, event.breaks)))
-	    data.append(event.genes[0])
-	    data.append(event.transcripts[0])
-	    if event.exons:
-		data.append(','.join(map(str, event.exons)))
-	    else:
-		data.append('-')
-	    data.append(','.join(event.contigs))
-	    data.append(cls.to_string(event.contig_breaks))
+    def from_fusion(cls, event):
+	"""Generates output line for a fusion/PTD event
+	
+	Args:
+	    event: (Adjacency) fusion or PTD event (coming from split alignment)
+	Returns:
+	    Tab-delimited line
+	"""
+	data = [event.id, event.rna_event]
+	
+	# sort breakpoints for output
+	paired_values = []
+	for values in zip(event.chroms, event.breaks, event.orients, event.genes, event.transcripts, event.exons, event.exon_bound):
+	    paired_values.append(values)
+	if cls.compare_pos((event.chroms[0], event.breaks[0]), (event.chroms[1], event.breaks[1])) > 0:
+	    paired_values.reverse()
+	for values in paired_values:
+	    data.extend(values[:3])
 	    
-	    return '\t'.join(map(str, data))
-	    
-	headers = ['event',
-	           'chrom',
-	           'coords',
-	           'gene',
-	           'transcript',
-	           'exon',
-	           'contigs',
-	           'contig_breaks',
-	           ]
-	out = open(outfile, 'w')
-	out.write('%s\n' % '\t'.join(headers))
-	for event in events:
-	    print 'lll', event.rna_event, event.breaks, event.exons, event.contigs, event.contig_breaks, event.genes, event.transcripts
-	    out.write('%s\n' % as_splice_variant(event))
-	out.close()
+	# size not applicable to fusion
+	data.append('-')
 	
-    @classmethod
-    def as_fusion(cls, event):
-	data = []
-	for values in zip(event.chroms, event.breaks, event.orients, event.genes, event.transcripts, event.exons):
-	    print 'abc', values
-	    data.extend(values)
-	
+	# contigs and contig breaks and contig support span
 	data.append(','.join(event.contigs))
 	data.append(cls.to_string(event.contig_breaks))
+	data.append(cls.to_string(event.contig_support_span))
+		    
+	# homol_seq and coords
+	if event.homol_seq:
+	    data.append(event.homol_seq[0])
+	else:
+	    data.append('-')
+	if event.homol_coords:
+	    homol_coords = []
+	    for coords in event.homol_coords:
+		homol_coords.append('-'.join(map(str, coords)))
+	    data.append(';'.join(homol_coords))
+	else:
+	    data.append('-')
+	if event.homol_seq:
+	    data.append(len(event.homol_seq[0]))
+	else:
+	    data.append('-')
+	
+	#homol_seq = event.homol_seq[0]
+	#homol_coords = event.homol_coords[0]
+	#if homol_seq:
+	    #data.append(homol_seq)
+	
+	    #if homol_seq != '-':
+		#data.append('-'.join(map(str, homol_coords)))
+		#data.append(homol_coords[1] - homol_coords[0] + 1)
+	    #else:
+		#data.append('-')
+		#data.append('-')
+	#else:
+	    #data.append('-')
+	    #data.append('-')
+	    #data.append('-')
+	    
+	# novel_seq
+	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
+	    data.append(event.novel_seq)
+	else:
+	    data.append('-')
+	
+	# gene, transcripts, exons, exon_bounds
+	for values in paired_values:
+	    data.extend(values[3:])
+	
+	# sense fusion, 5'gene, 3'gene
+	data.append(event.is_sense)
+	data.append(event.gene5)
+	data.append(event.gene3)
+	
+	# support
+	if not event.support['spanning']:
+	    data.append('-')
+	else:
+	    data.append(max(event.support['spanning']))
 	
 	return '\t'.join(map(str, data))
-	    
+    
     @classmethod
-    def output_fusion(cls, events, outfile):
-	headers = ['chrom1',
-	           'break1',
-	           'gene1',
-	           'transcript1',
-	           'exon1',
-	           'chrom2',
-	           'break2',
-	           'gene2',
-	           'transcript2',
-	           'exon2',
-	           'contigs',
-	           'contig_blocks',
-	           'contig_breaks',
-	           ]
-	out = open(outfile, 'w')
-	out.write('%s\n' % '\t'.join(headers))
-	for event in events:
-	    out.write('%s\n' % cls.as_fusion(event))
-	out.close()
+    def from_single_locus(cls, event):
+	"""Generates output line for an event from a single alignment
+	
+	Args:
+	    event: (Adjacency) indel, ITD, splicing event (coming from single alignment)
+	Returns:
+	    Tab-delimited line
+	"""
+	data = [event.id, event.rna_event]
+	
+	chroms = (event.chroms[0], event.chroms[0])
+	orients = ('L', 'R')
+	for values in zip(chroms, event.breaks, orients):
+	    data.extend(values)
+	    
+	# size
+	if hasattr(event, 'size') and event.size is not None:
+	    data.append(event.size)
+	else:
+	    data.append('-')
+	    
+	# contigs and contig breaks and contig support span
+	data.append(','.join(event.contigs))
+	data.append(cls.to_string(event.contig_breaks))
+	data.append(cls.to_string(event.contig_support_span))
+	
+	# homol_seq and coords
+	data.append('-')
+	data.append('-')
+	data.append('-')
+	
+	# novel seq
+	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
+	    data.append(event.novel_seq)
+	else:
+	    data.append('-')
+	
+	# gene, transcripts, exons, exon_bounds
+	genes = (event.genes[0], event.genes[0])
+	transcripts = (event.transcripts[0], event.transcripts[0])
+	if event.exons:
+	    if len(event.exons) == 2:
+		exons = event.exons
+	    else:
+		exons = (event.exons[0], event.exons[0])
+	# novel exons
+	else:
+	    exons = ('-', '-')
+	    
+	# exon_bound
+	exon_bound = ('-', '-')
+	
+	for values in zip(genes, transcripts, exons, exon_bound):
+	    data.extend(values)
+	    	    
+	# sense fusion, 5'gene, 3'gene
+	data.append('-')
+	data.append('-')
+	data.append('-')
+
+	#support
+	if not event.support['spanning']:
+	    data.append('-')
+	else:
+	    data.append(max(event.support['spanning']))
+
+	return '\t'.join(map(str, data))
 	
     @classmethod
     def to_string(cls, value):
+	"""Convert value of data types other than string usually used
+	in Adjacency attributes to string for print
+	
+	Args:
+	    value: can be
+	           1. None
+		   2. simple list/tuple
+		   3. list/tuple of list/tuple
+	Returns:
+	    string representation of value
+	    ';' used to separate items in top-level list/tuple
+	    ',' used to separate items in second-level list/tuple
+	"""
 	if value is None:
 	    return '-'
 	elif type(value) is list or type(value) is tuple:
@@ -248,68 +453,106 @@ class Event:
 	    return str(value)
 	
     @classmethod
-    def is_ITD(cls, adj, contigs_fasta, outdir, min_match=10):
-	result = False
-		
-	# run BLAST of contig sequence against itself
-	contig_seq = contigs_fasta.fetch(adj.contigs[0])
-	seq_file = '%s/tmp_seq.fa' % outdir
-	out = open(seq_file, 'w')
-	out.write('>%s\n%s\n' % (adj.contigs[0], contig_seq))
-	out.close()
+    def screen(cls, events, outdir, align_info=None, max_homol_allowed=None, contigs_fasta=None, debug=False):
+	"""Screen events identified and filter out bad ones
 	
-	blast_output = '%s/tmp_blastn.tsv' % outdir
-	cmd = 'blast -query %s -subject %s -outfmt 6 -out %s' % (seq_file, seq_file, blast_output)
-	print 'breaks', adj.contig_breaks
-	print cmd
-	try:
-	    subprocess.call(cmd, shell=True)
-	    #if os.path.exists(blast_output):
-		#blast_aligns = parse_tabular_blast(blast_output)
+	Right now it just screens out fusion whose probe sequence can align to one single location
+	
+	Args:
+	    events: (list) Events
+	    outdir: (str) absolute path of output directory, for storing re-alignment results
+	    aligner: (str) aligner name (gmap)
+	    align_info: (dict) 'genome', 'index_dir', 'num_procs'
+	    debug: (boolean) output debug info e.g. reason for screening out event
+	"""
+	bad_contigs = Set()
+	if max_homol_allowed is not None:
+	    for event in events:
+		if event.homol_seq and len(event.homol_seq[0]) > max_homol_allowed:
+		    if debug:
+			sys.stdout.write('Screen out %s: homol_seq(%d-%d:%d) longer than maximum allowed(%d)\n' % (','.join(event.contigs),
+			                                                                                     event.homol_coords[0][0],
+			                                                                                     event.homol_coords[0][1],
+			                                                                                     len(event.homol_seq[0]), 
+			                                                                                     max_homol_allowed))
+		    for contig in event.contigs:
+			bad_contigs.add(contig)
+	
+	fusions = [e for e in events if e.rna_event == 'fusion']		
+	if fusions and align_info is not None:
+	    bad_contigs_realign = FusionFinder.screen_realigns(fusions, outdir, align_info, contigs_fasta=contigs_fasta, debug=debug)
+	    if bad_contigs_realign:
+		bad_contigs = bad_contigs.union(bad_contigs_realign)
 		
-		## identify 'significant' stretch of duplication from BLAST result
-		## and see if it overlaps contig break position
-		#min_match = 10
-		#for align in blast_aligns:
-		    #if align.qend - align.qstart + 1 > min_match and\
-			#adj.contig_breaks[0] > align.qend:
-			    #result = True
-			
-	except:
-	    sys.stderr.write('Failed to run BLAST:%s\n' % cmd)
+	bad_event_indices = []
+	if bad_contigs:
+	    # remove any event that involve contigs that failed screening as mapping is not reliable
+	    for e in reversed(range(len(events))):
+		for contig in events[e].contigs:
+		    if contig in bad_contigs and not e in bad_event_indices:
+			bad_event_indices.append(e)
+			break
+		
+	for e in bad_event_indices:
+	    del events[e]
 	    
-	return False
-	    	
-
     @classmethod
-    def is_ITD_old(cls, adj, align, contigs_fasta, shift_size=20):
-	if adj.novel_seq:
-	    contig_seq = contigs_fasta.fetch(adj.contigs[0])
-	    print 'itd', contig_seq, align.strand, adj.novel_seq, len(adj.novel_seq)
+    def filter_by_support(cls, events, min_support):
+	"""Filters out events that don't have minimum spanning read support
+	
+	Args:
+	    events: (list) Event
+	    min_support: (int) minimum spanning read support
+	"""
+	out_indices = []
+	for i in reversed(range(len(events))):
+	    if not events[i].support['spanning'] or max(events[i].support['spanning']) < min_support:
+		out_indices.append(i)
+		
+	for i in out_indices:
+	    del events[i]
 	    
-	    novel_seq = adj.novel_seq if align.strand == '+' else reverse_complement(adj.novel_seq)
-	    matches = re.findall(novel_seq, contig_seq)
-	    if len(matches) > 1:
-		return True
+    @classmethod
+    def compare_pos(cls, pos1, pos2):
+	"""Compares 2 genomic positions
+	
+	Args:
+	    pos1: (tuple) chromosome1, coordinate1
+	    pos2: (tuple) chromosome2, coordinate2
+	Returns:
+	    1 : pos2 > pos1
+	    -1: pos1 < pos2
+	    0 : pos1 == pos2
+	"""
+	chr1, coord1 = pos1
+	chr2, coord2 = pos2
+	
+	if chr1[:3].lower() == 'chr':
+	    chr1 = chr1[3:]
+	if chr2[:3].lower() == 'chr':
+	    chr2 = chr2[3:]
+	
+	if re.match('^\d+$', chr1) and not re.match('^\d+$', chr2):
+	    return -1
+	elif not re.match('^\d+$', chr1) and re.match('^\d+$', chr2):
+	    return 1
+	else:
+	    if re.match('^\d+$', chr1) and re.match('^\d+$', chr2):
+		chr1 = int(chr1)
+		chr2 = int(chr2)
+		
+	    if chr1 < chr2:
+		return -1
+	    elif chr1 > chr2:
+		return 1
 	    else:
-		size_novel_seq = len(adj.novel_seq)
-		start = min(adj.contig_breaks) 
-		without_ins_seq_original = contig_seq[:start] + contig_seq[start + size_novel_seq:]
-		print align.query, 'itd xx', start, start + size_novel_seq, len(contig_seq[:start]), len(contig_seq[start + size_novel_seq:]), size_novel_seq
-		for i in range(1, shift_size + 1):
-		    without_ins_seq = contig_seq[:start - i] + contig_seq[start - i + size_novel_seq:]
-		    if without_ins_seq_original==without_ins_seq:
-			novel_seq = contig_seq[start - i: start - i + size_novel_seq]
-			if len(re.findall(novel_seq, contig_seq)) > 1:
-			    return True
-		    without_ins_seq = contig_seq[:start + i] + contig_seq[start + i + size_novel_seq:]
-		    if without_ins_seq_original==without_ins_seq:
-			novel_seq = contig_seq[start + i : start + i + size_novel_seq]
-			if len(re.findall(novel_seq, contig_seq)) > 1:
-			    return True		
-	    
-	return False
-	    	
+		if int(coord1) < int(coord2):
+		    return -1
+		elif int(coord1) > int(coord2):
+		    return 1
+		else:
+		    return 0
+	
 class Mapping:
     """Mapping per alignment"""
     def __init__(self, contig, align_blocks, transcripts=[]):
@@ -317,9 +560,13 @@ class Mapping:
 	self.transcripts = transcripts
 	self.genes = list(Set([txt.gene for txt in self.transcripts]))
 	self.align_blocks = align_blocks
+	# coverage for each transcript in self.transcripts
 	self.coverages = []
 	
     def overlap(self):
+	"""Overlaps alignment spans with exon-spans of each matching transcripts
+	Upates self.coverages
+	"""
 	align_span = self.create_span(self.align_blocks)
 	
 	for transcript in self.transcripts:
@@ -329,6 +576,9 @@ class Mapping:
 	    
     @classmethod
     def create_span(cls, blocks):
+	"""Creates intspan for each block
+	Used by self.overlap()
+	"""
 	span = None
 	for block in blocks:
 	    try:
@@ -347,6 +597,7 @@ class Mapping:
 	                  ])
 	    
     def as_tab(self):
+	"""Generates tab-delimited line for each mapping"""
 	data = []
 	data.append(self.contig)
 	if self.transcripts:
@@ -364,7 +615,8 @@ class Mapping:
 	return '\t'.join(map(str, data))
 	
     @classmethod
-    def pick_best(self, mappings, align, debug=False):	
+    def pick_best(self, mappings, align, debug=False):
+	"""Selects best mapping among transcripts"""
 	scores = {}
 	metrics = {}
 	for transcript, matches in mappings:
@@ -391,9 +643,9 @@ class Mapping:
 			score += 2
 			
 		if matches[i][0][1][1] == '=':
-		    score += 1
+		    score += 4
 		if matches[i][-1][1][1] == '=':
-		    score += 1		
+		    score += 4	
 			
 	    # points are deducted for events
 	    penalty = 0
@@ -436,8 +688,9 @@ class Mapping:
 		sys.stdout.write("mapping %s %s %s %s %s %s\n" % (align.query, transcript.id, transcript.gene, score, penalty, metric))
 	    
 	transcripts_sorted = sorted(metrics.keys(), key = lambda txt: (-1 * metrics[txt]['score'], metrics[txt]['from_edge'], metrics[txt]['txt_size']))
-	for t in transcripts_sorted:
-	    print 'sorted', t.id, metrics[t]
+	if debug:
+	    for t in transcripts_sorted:
+		sys.stdout.write('sorted %s %s\n' % (t.id, metrics[t]))
 	    	    
 	best_transcript = transcripts_sorted[0]
 	best_matches = [mapping[1] for mapping in mappings if mapping[0] == best_transcript]
@@ -451,7 +704,7 @@ class Mapping:
 	    	
     @classmethod
     def group(cls, all_mappings):
-	"""Group by gene"""
+	"""Group mappings by gene"""
 	gene_mappings = []
 	for gene, group in groupby(all_mappings, lambda m: m.genes[0]):
 	    mappings = list(group)
@@ -465,25 +718,20 @@ class Mapping:
 		try:
 		    align_blocks = align_blocks.union(cls.create_span(mapping.align_blocks))
 		except:
-		    align_blocks = cls.create_span(mapping.align_blocks)
-	    #print align_blocks.ranges()
-		
+		    align_blocks = cls.create_span(mapping.align_blocks)		
 	    
 	    gene_mappings.append(Mapping(contigs,
 	                                 align_blocks.ranges(),
 	                                 list(Set(chain(*transcripts))),
 	                                 )
 	                         )
-	    
-	#for mapping in gene_mappings:
-	    #mapping.overlap()
-	    #print 'gene', mapping.as_tab()
-	    
+	    	    
 	[mapping.overlap() for mapping in gene_mappings]
 	return gene_mappings
     
     @classmethod
     def output(cls, mappings, outfile):
+	"""Output mappings into output file"""
 	out = open(outfile, 'w')
 	out.write('%s\n' % cls.header())
 	for mapping in mappings:
@@ -491,135 +739,195 @@ class Mapping:
 	out.close()
 
 class ExonMapper:
-    def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir):
+    def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
+                 itd_min_len=None, itd_min_pid=None, itd_max_apart=None, 
+                 exon_bound_fusion_only=False, coding_fusion_only=False, sense_fusion_only=False,
+                 debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
+	self.contigs_fasta_file = contigs_fasta_file
 	self.contigs_fasta = pysam.Fastafile(contigs_fasta_file)
         self.ref_fasta = pysam.Fastafile(ref_fasta_file)
 	self.annot = pysam.Tabixfile(annotation_file, parser=pysam.asGTF())
         self.aligner = aligner
         self.outdir = outdir
+	self.debug = debug
         
         self.blocks_bed = '%s/blocks.bed' % outdir
         self.overlaps_bed = '%s/blocks_olap.bed' % outdir
         self.aligns = {}        
 
-        self.annotations_file = annotation_file
+        self.annotation_file = annotation_file
 	
 	self.mappings = []
 	self.events = []
 	
-	transcripts = self.extract_transcripts()
-	self.map_contigs_to_transcripts(transcripts)
-		
-    def get_attrs(self, attrs_str):
-	attrs = {}
-	for field in attrs_str.split(';'):
-	    cols = field.rstrip(' ').lstrip(' ').split(' ')
-	    if len(cols) == 2:
-		attrs[cols[0]] = cols[1].strip('"')
-	    
-	return attrs
+	# initialize ITD conditions
+	self.itd_conditions = {'min_len': itd_min_len,
+	                       'min_pid': itd_min_pid,
+	                       'max_apart': itd_max_apart
+	                       }
 	
-    def map_contigs_to_transcripts(self, transcripts):
+	self.fusion_conditions = {'exon_bound_only': exon_bound_fusion_only,
+	                          'coding_only': coding_fusion_only,
+	                          'sense_only': sense_fusion_only}
+					
+    def map_contigs_to_transcripts(self):
+	"""Maps contig alignments to transcripts, discovering variants at the same time"""
+	# extract all transcripts info in dictionary
+	transcripts = Transcript.extract_transcripts(self.annotation_file)
+	
 	aligns = []
 	for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
-            alns = list(group)
-	    mappings = []
-	    
+	    sys.stdout.write('analyzing %s\n' % contig)
+            alns = list(group)	    
 	    aligns = self.extract_aligns(alns)
 	    if aligns is None:
-		print 'no valid alignment', contig
+		sys.stdout.write('no valid alignment: %s\n' % contig)
 		continue
+	    	    
+	    # for finding microhomolgy sequence and generating probe in fusion
+	    contig_seq = self.contigs_fasta.fetch(contig)
 	    
 	    chimera = True if len(aligns) > 1 else False
 	    chimera_block_matches = []
-	    	    
 	    for align in aligns:
 		if align is None:
-		    print 'bad alignment', contig
+		    sys.stdout.write('bad alignment: %s\n' % contig)
 		    continue
 		
-		if '_' in align.target:
-		    print 'bad target', contig, align.target
+		if re.search('[._Mm]', align.target):
+		    sys.stdout.write('skip target:%s %s\n' % (contig, align.target))
 		    continue
 		
-		print 'bbb', align.query, align.blocks, align.query_blocks
+		if self.debug:
+		    sys.stdout.write('contig:%s genome_blocks:%s contig_blocks:%s\n' % (align.query, 
+		                                                                        align.blocks, 
+		                                                                        align.query_blocks
+		                                                                        ))
 		
 		# entire contig align within single exon or intron
 		within_intron = []
 		within_exon = []
 		
 		transcripts_mapped = Set()
-		if re.search('[._]', align.target):
-		    continue
-		
-		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):			
-		    if not chimera and align.tstart >= gtf.start and align.tend <= gtf.end:
+		events = []
+		# each gtf record corresponds to a feature
+		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
+		    # collect all the transcripts that have exon overlapping alignment
+		    if gtf.feature == 'exon':
+			transcripts_mapped.add(gtf.transcript_id)
+		    # contigs within single intron 
+		    elif gtf.feature == 'intron' and\
+		         not chimera and\
+		         align.tstart >= gtf.start and align.tend <= gtf.end:
 			match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
-			
-			if gtf.feature == 'intron':	
-			    within_intron.append((gtf, match))
-			    
-			elif gtf.feature == 'exon':
-			    within_exon.append((gtf, match))
-			       
-		    else:
-			attrs = self.get_attrs(gtf.attributes)
-			if gtf.feature == 'exon':
-			    transcripts_mapped.add(gtf.transcript_id)
-			    		
+			within_intron.append((gtf, match))		
+			    	
 		if transcripts_mapped:
+		    mappings = []
 		    # key = transcript name, value = "matches"
 		    all_block_matches = {}
 		    # Transcript objects that are fully matched
 		    full_matched_transcripts = []
 		    for txt in transcripts_mapped:
-			#print 'gene', contig, len(align.blocks), transcripts[txt].id, transcripts[txt].gene, transcripts[txt].strand, transcripts[txt].num_exons()			
 			block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
 			all_block_matches[txt] = block_matches
+			mappings.append((transcripts[txt], block_matches))
 			
 			if not chimera and self.is_full_match(block_matches):
-			    print 'full', contig
 			    full_matched_transcripts.append(transcripts[txt])
-			mappings.append((transcripts[txt], block_matches))
 			    
-		    if not full_matched_transcripts:			
-			events = self.find_events(all_block_matches, align, transcripts)
-			if not events:
-			    print 'partial_no_events', contig
-			else:
-			    print 'events', align.query, events
+		    # report mapping
+		    best_mapping = Mapping.pick_best(mappings, align, debug=self.debug)
+		    self.mappings.append(best_mapping)
+		    	
+		    if not full_matched_transcripts:	
+			# find events only for best transcript
+			best_transcript = best_mapping.transcripts[0]
+			events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]}, 
+			                          align, 
+			                          {best_transcript.id:best_transcript})
+			for event in events:
+			    event.contig_sizes.append(len(contig_seq))
+			if events:
 			    self.events.extend(events)
-			    			    
+			elif self.debug:
+			    sys.stdout.write('%s - partial but no events\n' % align.query)	
+		    
 		    if chimera:
 			chimera_block_matches.append(all_block_matches)
 		    
 		elif not chimera:
 		    if within_exon:
-			print 'exon', contig, align.target, align.tstart, align.tend#, within_exon[0].gene_id, within_exon[0].start, within_exon[0].end
+			sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s\n" % (contig, 
+			                                                                         align.target, 
+			                                                                         align.tstart, 
+			                                                                         align.tend, 
+			                                                                         within_exon[0]
+			                                                                         ))
 		    
 		    elif within_intron:
-			#print 'aa', within_intron
-			print 'intron', contig, align.target, align.tstart, align.tend#, within_intron[0].gene_id, within_intron[0].start, within_intron[0].end
+			sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s\n" % (contig, 
+			                                                                           align.target, 
+			                                                                           align.tstart, 
+			                                                                           align.tend, 
+			                                                                           within_intron[0]
+			                                                                           ))
 		
-		#if chimera:
-		    #chimera_block_matches.append(all_block_matches)
-		
+	    # split aligns, try to find gene fusion
 	    if chimera and chimera_block_matches:
 		if len(chimera_block_matches) == len(aligns):
-		    print 'chimera', chimera_block_matches
-		    fusion = self.find_chimera(chimera_block_matches, transcripts, aligns)
+		    fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, 
+		                                       exon_bound_only=self.fusion_conditions['exon_bound_only'],
+		                                       coding_only=self.fusion_conditions['coding_only'],
+		                                       sense_only=self.fusion_conditions['sense_only'])
 		    if fusion:
+			homol_seq, homol_coords = None, None
+			if self.aligner.lower() == 'gmap':
+			    homol_seq, homol_coords = gmap.find_microhomology(alns[0], contig_seq)
+			if homol_seq is not None:
+			    fusion.homol_seq.append(homol_seq)
+			    fusion.homol_coords.append(homol_coords)
+			fusion.contig_sizes.append(len(contig_seq))
 			self.events.append(fusion)
 		
-	   
-	    # pick best matches
-	    if len(mappings) > 1:
-		best_mapping = Mapping.pick_best(mappings, align, debug=True)
-		self.mappings.append(best_mapping)
-		
-	
+	# expand contig span
+	for event in self.events:
+	    # if contig_support_span is not defined (it can be pre-defined in ITD)
+	    # then set it
+	    if not event.contig_support_span:
+		event.contig_support_span = event.contig_breaks
+		if event.rearrangement == 'ins' or event.rearrangement == 'dup':
+		    expanded_contig_breaks = expand_contig_breaks(event.chroms[0], 
+			                                          event.breaks, 
+			                                          event.contigs[0], 
+			                                          [event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1], 
+			                                          event.rearrangement, 
+			                                          self.ref_fasta,
+			                                          self.contigs_fasta,
+			                                          self.debug)
+		    if expanded_contig_breaks is not None:
+			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
+					
     def map_exons(self, blocks, exons):
+	"""Maps alignment blocks to exons
+	
+	Crucial in mapping contigs to transcripts
+	
+	Args:
+	    blocks: (List) of 2-member list (start and end of alignment block)
+	    exons: (List) of 2-member list (start and end of exon)
+	Returns:
+	    List of list of tuples, where
+	         each item of the top-level list corresponds to each contig block
+		 each item of the second-level list corresponds to each exon match
+		 each exon-match tuple contains exon_index, 2-character matching string
+		 e.g. [ [ (0, '>='), (1, '<=') ], [ (2, '==') ], [ (3, '=<') ], [ (3, '>=') ] ]
+		 this says that the alignment has 4 blocks,
+		 first block matches to exon 0 and 1, find a retained-intron,
+		 second block matches perfectly to exon 2
+		 third and fourth blocks matching to exon 3, possible a deletion or novel_intron
+	"""
 	result = []
 	for b in range(len(blocks)):
 	    block_matches = []
@@ -632,243 +940,88 @@ class ExonMapper:
 	    if not block_matches:
 		block_matches = None
 	    result.append(block_matches)
-			
+		
 	return result
-		    		    
-    def extract_transcripts(self):
-	transcripts = {}
-	for feature in BedTool(self.annotations_file):
-	    if feature[2] == 'exon':
-		exon = (int(feature.start) + 1, int(feature.stop))
-		exon_num = int(feature.attrs['exon_number'])
-		transcript_id = feature.attrs['transcript_id']
-		gene = feature.attrs['gene_name']
-		strand = feature.strand
-				
-		try:
-		    transcript = transcripts[transcript_id]
-		except:
-		    transcript = Transcript(transcript_id, gene=gene, strand=strand)
-		    transcripts[transcript_id] = transcript
-		    
-		transcript.add_exon(exon)
-		
-	return transcripts
-    
-    def identify_fusion(self, matches1, matches2, transcripts):
-	"""Given 2 block matches pick the 2 transcripts"""
-	print 'iii', matches1, matches2
-	scores = {}
-	for transcript in matches1:
-	    score = 0
-	    if matches1[transcript] is not None:
-		if matches1[transcript][0][1][1] == '=':
-		    score += 100
-		    
-		# align block within exon gets more points
-		if matches1[transcript][0][1][0] == '=':
-		    score += 15
-		elif matches1[transcript][0][1][0] == '>':
-		    score += 10
-		elif matches1[transcript][0][1][0] == '<':
-		    score += 5
-	    scores[transcript] = score
-	    
-	best_score = max(scores.values())
-	best_txt1 = sorted([t for t in matches1.keys() if scores[t] == best_score], 
-	                   key=lambda t: transcripts[t].length(), reverse=True)[0]
-	
-	scores = {}
-	for transcript in matches2:
-	    score = 0
-	    if matches2[transcript] is not None:
-		if matches2[transcript][0][1][1] == '=':
-		    score += 100
-		    
-		if matches2[transcript][0][1][0] == '=':
-		    score += 15
-		elif matches2[transcript][0][1][0] == '>':
-		    score += 10
-		elif matches2[transcript][0][1][0] == '<':
-		    score += 5
-	    scores[transcript] = score
-	    
-	best_score = max(scores.values())
-	best_txt2 = sorted([t for t in matches2.keys() if scores[t] == best_score], 
-	                   key=lambda t: transcripts[t].length(), reverse=True)[0]
-	print 'fusion', best_txt1, matches1[best_txt1], best_txt2, matches2[best_txt2]
-	return (best_txt1, matches1[best_txt1]), (best_txt2, matches2[best_txt2])
-    
-    def identify_fusion_unknown_break(self, matches, transcripts):
-	all_matches = Set()
-	for txt in matches:
-	    if matches[txt] is None:
-		continue
-	    
-	    for match in matches[txt]:
-		all_matches.add((txt, match))
-		
-	left_bound_matches = [match for match in all_matches if match[1][1][0] == '=']
-	right_bound_matches = [match for match in all_matches if match[1][1][1] == '=']
-
-	print 'left', left_bound_matches
-	print 'right', right_bound_matches
-	
-	if left_bound_matches and right_bound_matches:
-	    left_bound_matches.sort(key=lambda m: transcripts[m[0]].length(), reverse=True)
-	    right_bound_matches.sort(key=lambda m: transcripts[m[0]].length(), reverse=True)
-	    
-	    print 'left', left_bound_matches
-	    print 'right', right_bound_matches
-	    
-	    print 'fusion_unknown_break', left_bound_matches[0], right_bound_matches[0]
-	    
-    def find_chimera(self, chimera_block_matches, transcripts, aligns):	
-	assert len(chimera_block_matches) == len(aligns), 'number of block matches(%d) != number of aligns(%d)' % \
-	       (len(chimera_block_matches), len(aligns))
-	for (matches1_by_txt, matches2_by_txt) in zip(chimera_block_matches, chimera_block_matches[1:]):
-	    print 'a', matches1_by_txt
-	    print 'b', matches2_by_txt
-	    
-	    genes1 = Set([transcripts[txt].gene for txt in matches1_by_txt.keys()])
-	    genes2 = Set([transcripts[txt].gene for txt in matches2_by_txt.keys()])
-	    	    
-	    print genes1, genes2
-	    # gene fusion
-	    print 'g1', genes1
-	    print 'g2', genes2
-	    
-	    junc_matches1 = {}
-	    num_blocks = len(aligns[0].blocks)
-	    for transcript in chimera_block_matches[0].keys():
-		#print 'ggg', transcript, chimera_block_matches[0][transcript]
-		junc_matches1[transcript] = chimera_block_matches[0][transcript][num_blocks - 1]
-	
-	    junc_matches2 = {}
-	    for transcript in chimera_block_matches[1].keys():
-		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
-    
-	    print 'j1', junc_matches1
-	    print 'j2', junc_matches2
-    
-	    #print 'contig', aligns[0].query
-	    junc1, junc2 = self.identify_fusion(junc_matches1, junc_matches2, transcripts)
-	    print 'fusion-chimera', aligns[0].query, transcripts[junc1[0]].gene, transcripts[junc2[0]].gene
-	    
-	    if junc1 and junc2:
-		fusion = call_event(aligns[0], aligns[1])
-		fusion.rna_event = 'fusion'
-		#print 'ggg', event.event_type, event.chroms, event.breaks, event.rearrangement, event.contig_breaks, event.orients
-		#print 'kkk0', adj.chroms, adj.breaks, adj.rearrangement, adj.contig_breaks, adj.orients
-		print 'kkk', junc1, junc2, transcripts[junc1[0]], transcripts[junc2[0]], fusion.breaks, fusion.contig_breaks
-		print 'kkk1', transcripts[junc1[0]].gene, junc1[0], junc1[1][0][0], transcripts[junc1[0]].strand, aligns[0].target, aligns[0].qstart, aligns[0].qend, aligns[0].strand
-		print 'kkk2', transcripts[junc2[0]].gene, junc2[0], junc2[1][0][0], transcripts[junc2[0]].strand, aligns[1].target, aligns[1].qstart, aligns[1].qend, aligns[1].strand
-
-		fusion.id = 'abc'
-		fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
-		fusion.transcripts = (junc1[0], junc2[0])
-		fusion.exons = (junc1[1][0][0] + 1, junc2[1][0][0] + 1)
-		
-		print 'kkko', fusion.as_tab()
-		
-		return fusion
-	    
-	return None
-    
-    def create_fusion_event(self, aligns, transcripts, junc1, junc2, pos=[], contig_breaks=None):
-	if len(aligns) == 2:
-	    fusion = call_event(aligns[0], aligns[1])
-	else:
-	    fusion = Adjacency((aligns[0].target, aligns[0].target),
-	                       pos,
-	                       '-',
-	                       orients=('L', 'R'),
-	                       contig_breaks = contig_breaks
-	                       )
-	                       
-	fusion.rna_event = 'fusion'
-	fusion.id = 'abc'
-	fusion.genes = (transcripts[junc1[0]].gene, transcripts[junc2[0]].gene)
-	fusion.transcripts = (junc1[0], junc2[0])
-	fusion.exons = (junc1[1][0][0] + 1, junc2[1][0][0] + 1)
-		
-	return fusion
-    
+		    		            
     def extract_novel_seq(self, adj):
-	print 'ens', adj.contigs, adj.contig_breaks, self.contigs_fasta.fetch(adj.contigs[0])
-	start, end = adj.contig_breaks if adj.contig_breaks[0] < adj.contig_breaks[1] else adj.contig_breaks[1], adj.contig_breaks[0]
+	"""Extracts novel sequence in adjacency, should be a method of Adjacency"""
+	aa = self.contigs_fasta.fetch(adj.contigs[0])
+	contig_breaks = adj.contig_breaks[0]
+	start, end = (contig_breaks[0], contig_breaks[1]) if contig_breaks[0] < contig_breaks[1] else (contig_breaks[1], contig_breaks[0])
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
-	print 'ens', start, end, novel_seq, len(novel_seq)
 	return novel_seq
 	    
-    def find_events(self, matches_by_transcript, align, transcripts):
-	genes = Set([transcripts[txt].gene for txt in matches_by_transcript.keys()])
-	num_blocks = len(align.blocks)
+    def find_events(self, matches_by_transcript, align, transcripts, small=20):
+	"""Find events from single alignment
 	
+	Wrapper for finding events within a single alignment
+	Maybe a read-through fusion, calls FusionFinder.find_read_through()
+	Maybe splicing or indels, call NovelSpliceFinder.find_novel_junctions()
+	Will take results in dictionary and convert them to Adjacencies
+	
+	Args:
+	    matches_by_transcript: (list) dictionaries where 
+	                                      key=transcript name, 
+	                                      value=[match1, match2, ...] where
+						    match1 = matches of each alignment block
+							     i.e.
+							     [(exon_id, '=='), (exon_id, '==')] 
+							     or None if no_match
+	    align: (Alignment) alignment object
+	    transcripts: (dictionary) key=transcript_id value: Transcript
+	    small: (int) max size of ins or dup that the span of the novel seq would be used in contig_support_span,
+	                 anything larger than that we just check if there is any spanning reads that cross the breakpoint
+	Returns:
+	    List of Adjacencies
+	"""
 	events = []
-		
-	print 'ttt', len(genes), genes
+	
+	# for detecting whether there is a read-through fusion
+	genes = Set([transcripts[txt].gene for txt in matches_by_transcript.keys()])		
 	if len(genes) > 1:
-	    matches_by_block = {}
-	    genes_in_block = {}
-	    for i in range(num_blocks):
-		matches_by_block[i] = {}
-		genes_in_block[i] = Set()
-		for transcript in matches_by_transcript.keys():
-		    matches_by_block[i][transcript] = matches_by_transcript[transcript][i]
-		    if matches_by_transcript[transcript][i] is not None:
-			genes_in_block[i].add(transcripts[transcript].gene)
-			
-			
-	    junctions = zip(range(num_blocks), range(num_blocks)[1:])
-	    print 'tttk', junctions
-	    for k in range(len(junctions)):
-		i, j = junctions[k]
-		print 'fff', i, j, junctions[k], genes_in_block[i], genes_in_block[j]
-		if len(genes_in_block[i]) == 1 and len(genes_in_block[j]) == 1:
-		    if list(genes_in_block[i])[0] != list(genes_in_block[j])[0]:
-			print 'fusion splice', i, j		    
-			junc1, junc2 = self.identify_fusion(matches_by_block[i], matches_by_block[j], transcripts)
-			print 'fusion-genes', align.query, transcripts[junc1[0]].gene, transcripts[junc2[0]].gene
-			pos = (align.blocks[i][1], align.blocks[j][0])
-			contig_breaks = (align.query_blocks[i][1], align.query_blocks[j][0])
-			event = self.create_fusion_event((align,), transcripts, junc1, junc2, pos=pos, contig_breaks=contig_breaks)
-			events.append(event)
-	    
-		elif len(genes_in_block[i]) > 1:
-		    print 'fusion block', i, j, genes_in_block
-		    
-		elif len(genes_in_block[j]) > 1:
-		    print 'fusion block', i, j
-		    
-	    for i in genes_in_block.keys():
-		if len(genes_in_block[i]) == 2:
-		    print 'fusion block', i, matches_by_block[i]
-		    self.identify_fusion_unknown_break(matches_by_block[i], transcripts)
-	    		
-	local_events = self.find_novel_junctions(matches_by_transcript, align, transcripts)
+	    fusion = FusionFinder.find_read_through(matches_by_transcript, transcripts, align, 
+	                                            exon_bound_only=self.fusion_conditions['exon_bound_only'],
+	                                            coding_only=self.fusion_conditions['coding_only'],
+	                                            sense_only=self.fusion_conditions['sense_only'])
+	    if fusion is not None:
+		events.append(fusion)
+	    	    	
+	# events within a gene
+	local_events = NovelSpliceFinder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta)
 	if local_events:
 	    for event in local_events:
-		#event_type, gene, transcript, contigs=[], contig_blocks=[], contig_breaks=[], exons=[]
-		print 'mmm', event
-		adj = Adjacency((align.target,), event['pos'], '-', contig=align.query)
+		adj = Adjacency((align.target, align.target), event['pos'], '-', contig=align.query)
 		if event['event'] in ('ins', 'del', 'dup', 'inv'):
 		    adj.rearrangement = event['event']
 		adj.rna_event = event['event']
 		adj.genes = (list(genes)[0],)
 		adj.transcripts = (event['transcript'][0],)
-		adj.exons = event['exons'][0]
+		adj.size = event['size']
+		adj.orients = 'L', 'R'
+		
+		# converts exon index to exon number (which takes transcript strand into account)
+		exons = event['exons'][0]
+		adj.exons = map(transcripts[event['transcript'][0]].exon_num, exons)
+		
 		adj.contig_breaks = event['contig_breaks']
 		
 		if adj.rearrangement == 'ins' or adj.rearrangement == 'dup':
 		    novel_seq = self.extract_novel_seq(adj)
 		    adj.novel_seq = novel_seq if align.strand == '+' else reverse_complement(novel_seq)
-		    print 'ens2', adj.novel_seq
 		    
-		    if Event.is_ITD(adj, align, self.contigs_fasta, self.outdir):
-			adj.rna_event = 'ITD'
-			
+		    if len(novel_seq) >= self.itd_conditions['min_len']:
+			ITD_Finder.detect_itd(adj, align, self.contigs_fasta.fetch(adj.contigs[0]), self.outdir, 
+			                      self.itd_conditions['min_len'],
+			                      self.itd_conditions['max_apart'],
+			                      self.itd_conditions['min_pid'],
+			                      debug=self.debug
+			                      )
+		    			
 		    adj.size = len(adj.novel_seq)
+		    
+		    # bigger events mean we can only check if there is reads that cross the breakpoint
+		    if adj.size > small:
+			adj.contig_support_span = [(min(adj.contig_breaks[0]), min(adj.contig_breaks[0]) + 1)]
 		    
 		elif adj.rearrangement == 'del':
 		    adj.size = adj.breaks[1] - adj.breaks[0] - 1
@@ -876,197 +1029,40 @@ class ExonMapper:
 		events.append(adj)
 			    
 	return events
-						    		    
-	    
-    def find_novel_junctions(self, block_matches, align, transcripts):	
-	# find annotated junctions
-	annotated = Set()
-	for transcript in block_matches.keys():
-	    matches = block_matches[transcript]
-	    # sort multiple exon matches for single exon by exon num
-	    [m.sort(key=lambda mm: int(mm[0])) for m in matches if m is not None]
-	    
-	    for i in range(len(matches) - 1):
-		j = i + 1
-		
-		if matches[i] == None or matches[j] == None:
-		    continue
-		
-		if (i, j) in annotated:
-		    continue
-		
-		if self.is_junction_annotated(matches[i][-1], matches[j][0]):
-		    annotated.add((i, j))
-		    continue
-		
-	all_events = []
-	for transcript in block_matches.keys():	  
-	    matches = block_matches[transcript]
-	    for i in range(len(matches) - 1):
-		j = i + 1
-			
-		if matches[i] is None and matches[j] is not None:
-		    # special case where the first 2 blocks is the utr and there's an insertion separating the 2 blocks
-		    if i == 0:
-			events = self.classify_novel_junction(matches[i], matches[j][0], chrom=align.target, blocks=align.blocks[i:j+1], transcript=transcripts[transcript])
-			for e in events:
-			    e['blocks'] = (i, j)
-			    e['transcript'] = transcript
-			all_events.extend(events)
-		    continue
-		
-		# for retained intron, not a 'junction'
-		if matches[i] is not None and len(matches[i]) > 1:
-		    events = self.classify_novel_junction(matches[i], chrom=align.target, blocks=align.blocks[i], transcript=transcripts[transcript])
-		    if events:
-			for e in events:
-			    e['blocks'] = (i, j)
-			    e['transcript'] = transcript
-			all_events.extend(events)
-		    
-		# skip if junction is annotated
-		if (i, j) in annotated:
-		    continue
-		
-		# for novel exon
-		if matches[j] == None and matches[i] is not None:
-		    for k in range(j + 1, len(matches)):
-			if matches[k] is not None and matches[k][0][0] - matches[i][-1][0] == 1:
-			    j = k
-			    break
-		
-		if matches[i] is not None and matches[j] is not None:
-		    # matches (i and j) are the flanking matches, blocks are the middle "novel" blocks
-		    events = self.classify_novel_junction(matches[i][-1], matches[j][0], chrom=align.target, blocks=align.blocks[i:j+1], transcript=transcripts[transcript])
-		    print 'event', i, j, align.blocks[i:j+1], transcript, events
-		    if events:
-			for e in events:
-			    #e['blocks'] = (i, j)
-			    e['blocks'] = range(i + 1, j)
-			    print 'eee', e['blocks'], align.query_blocks
-			    #e['contig_breaks'] = (align.query_blocks[i + 1][0], align.query_blocks[j][1])
-			    e['contig_breaks'] = (align.query_blocks[i][1], align.query_blocks[j][0])
-			    e['transcript'] = transcript
-			    print 'eeef', e
-			all_events.extend(events)
-		
-	if all_events:
-	    grouped = {}
-	    for event in all_events:
-		key = str(event['blocks']) + event['event']
-		try:
-		    grouped[key].append(event)
-		except:
-		    grouped[key] = [event]
-		
-	    uniq_events = []
-	    for events in grouped.values():
-		transcripts = [e['transcript'] for e in events]
-		exons = [e['exons'] for e in events]
-		
-		contig_breaks = []
-		if events[0].has_key('contig_breaks'):
-		    contig_breaks = events[0]['contig_breaks']
-		
-		uniq_events.append({'event': events[0]['event'],
-	                            'blocks': events[0]['blocks'],
-	                            'transcript': transcripts,
-	                            'exons': exons,
-	                            'pos': events[0]['pos'],
-	                            'contig_breaks': contig_breaks,
-	                            }
-	                           )
-		    
-	    print 'final', uniq_events
-	    return uniq_events
-	    
-	
-	
-	
-    def classify_novel_junction(self, match1, match2=None, chrom=None, blocks=None, transcript=None):
-	events = []
-	if type(blocks[0]) is int:
-	    pos = (blocks[0], blocks[1])
-	else:
-	    pos = (blocks[0][1], blocks[1][0])
-	print 'blocks', match1, match2, chrom, transcript, blocks, pos
-	
-	if match2 is None:
-	    if len(match1) == 2:
-		exons = [m[0] for m in match1]
-		if match1[0][1] == '=>' and\
-		   match1[-1][1] == '<=' and\
-		   len([(a, b) for a, b in zip(exons, exons[1:]) if b == a + 1]) == len(match1) - 1:
-		    events.append({'event': 'retained_intron', 'exons': exons, 'pos':pos})
-		    
-	elif match1 is None and match2 is not None:
-	    if match2[0] == 0 and match2[1] == '<=':
-		events.append({'event': 'ins', 'exons': match2[0], 'pos':pos})
-		
-	else:
-	    if match2[0] > match1[0] + 1 and\
-	       '=' in match1[1] and\
-	       '=' in match2[1]:    
-		events.append({'event': 'skipped_exon', 'exons': range(match1[0] + 1, match2[0]), 'pos':pos})
-	       
-	    if match1[0] == match2[0] and\
-	       match1[1][1] == '<' and match2[1][0] == '>':
-		expected_motif = 'gtag' if transcript.strand == '+' else 'ctac'
-		motif = self.ref_fasta.fetch(chrom, blocks[0][1], blocks[0][1] + 2) + self.ref_fasta.fetch(chrom, blocks[1][0] - 3, blocks[1][0] - 1)
-		
-		gap_size = blocks[1][0] - blocks[0][1] - 1
-		pos = (blocks[0][1], blocks[1][0])
-		min_intron_size = 20
-		event = None
-		if gap_size > 0:
-		    if gap_size > min_intron_size and expected_motif == motif.lower():
-			event = 'novel_intron'
-		    else:
-			event = 'del'
-		elif gap_size == 0:
-		    event = 'ins'
-		
-		if event is not None:
-		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos})
-		
-	    if match1[1][1] == '=' and\
-	       (match2[1][0] == '>=' or match2[1][0] == '<='):
-		events.append({'event': 'alt_3', 'exons': [match1[0], match2[0]], 'pos':pos})
-		
-	    if (match1[1][1] == '>=' or match1[1][1] == '<=') and\
-	       match2[1][0] == '=':
-		events.append({'event': 'alt_5', 'exons': [match1[0], match2[0]], 'pos':pos})
-		
-	    if match2[0] == match1[0] + 1 and\
-	       match1[1][1] == '=' and\
-	       match2[1][0] == '=': 
-		pos = ('%s-%s' % (blocks[0][1], blocks[1][0]), '%s-%s' % (blocks[-2][1], blocks[-1][0]))
-		events.append({'event': 'novel_exon', 'exons': [], 'pos':pos})
-	
-	return events
-		    
-	
-    def is_junction_annotated(self, match1, match2):
-	if match2[0] == match1[0] + 1 and\
-	   match1[1][1] == '=' and\
-	   match2[1][0] == '=':
-	    return True
-	
-	return False
-		
 		            
     def extract_aligns(self, alns):
-	chimeric_aligns = {
-	    'gmap': gmap.find_chimera,
-	    }[self.aligner](alns, self.bam)
-	if chimeric_aligns:
-	    return chimeric_aligns
-	else:
-	    return [{
-	        'gmap': gmap.find_single_unique,
-	        }[self.aligner](alns, self.bam)]
+	"""Generates Alignments objects of chimeric and single alignments
+
+	Args:
+	    alns: (list) Pysam.AlignedRead
+	Returns:
+	    List of Alignments that are either chimeras or single alignments
+	"""
+	try:
+	    chimeric_aligns = {
+		'gmap': gmap.find_chimera,
+		}[self.aligner](alns, self.bam)
+	    if chimeric_aligns:
+		return chimeric_aligns
+	    else:
+		return [{
+		    'gmap': gmap.find_single_unique,
+		    }[self.aligner](alns, self.bam)]
+	except:
+	    sys.exit("can't convert \"%s\" alignments - abort" % self.aligner)
         
     def match_exon(self, block, exon):
+	"""Match an alignment block to an exon
+	
+	Args:
+	    block: (Tuple/List) start and end of an alignment block
+	    exon: (Tuple/List) start and end of an exon
+	Returns:
+	    2 character string, each character the result of each coordinate
+	    '=': block coordinate = exon coordinate
+	    '<': block coordinate < exon coordinate
+	    '>': block coordinate > exon coordinate
+	"""
         assert len(block) == 2 and len(block) == len(exon), 'unmatched number of block(%d) and exon(%d)' % (len(block), len(exon))
         assert type(block[0]) is int and type(block[1]) is int and type(exon[0]) is int and type(exon[1]) is int,\
         'type of block and exon must be int'
@@ -1083,8 +1079,25 @@ class ExonMapper:
         
         return result
     
-    
     def is_full_match(self, block_matches):
+	"""Determines if a contig fully covers a transcript
+
+	A 'full' match is when every exon boundary matches, except the terminal boundaries
+	
+	Args:
+	    block_matches: List of list of tuples, where
+			   each item of the top-level list corresponds to each contig block
+			   each item of the second-level list corresponds to each exon match
+			   each exon-match tuple contains exon_index, 2-character matching string
+			   e.g. [ [ (0, '>='), (1, '<=') ], [ (2, '==') ], [ (3, '=<') ], [ (3, '>=') ] ]
+			   this says that the alignment has 4 blocks,
+			   first block matches to exon 0 and 1, find a retained-intron,
+			   second block matches perfectly to exon 2
+			   third and fourth blocks matching to exon 3, possible a deletion or novel_intron
+
+	Returns:
+	    True if full, False if partial
+	"""
 	if None in block_matches:
 	    return False
 	
@@ -1109,26 +1122,160 @@ class ExonMapper:
 	    return True
 		
 	return False
-
+    
+    def find_support(self, r2c_bam_file=None, min_overlap=None, multi_mapped=False, perfect=True, get_seq=False, num_procs=1):
+	"""Extracts read support from reads-to-contigs BAM
+	
+	Assumes reads-to-contigs is NOT multi-mapped 
+	(so we add the support of different contigs of the same event together)
+	
+	Args:
+	    bam_file: (str) Path of reads-to-contigs BAM
+	"""
+	coords = {}
+	for event in self.events:
+	    for i in range(len(event.contigs)):
+		contig = event.contigs[i]
+		#span = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		span = event.contig_support_span[i][0], event.contig_support_span[i][1]
+		try:
+		    coords[contig].append(span)
+		except:
+		    coords[contig] = [span]
+		    
+	support_reads = {}
+	if coords:	    
+	    avg_tlen = None
+	    tlens = []
+	    # if fewer than 10000 adjs, use 'fetch' of Pysam
+	    if len(coords) < 1000 or num_procs == 1:
+		support, tlens = fetch_support(coords, r2c_bam_file, self.contigs_fasta, 
+		                               overlap_buffer=min_overlap, 
+		                               perfect=perfect, 
+		                               get_seq=get_seq, 
+		                               debug=self.debug)
+	    # otherwise use multi-process parsing of bam file
+	    else:
+		support, tlens = scan_all(coords, r2c_bam_file, self.contigs_fasta_file, num_procs, 
+		                          overlap_buffer=min_overlap, 
+		                          perfect=perfect, 
+		                          get_seq=get_seq, 
+		                          debug=self.debug)
+		    
+	    print 'total tlens', len(tlens)
+		
+	    for event in self.events:
+		for i in range(len(event.contigs)):
+		    contig = event.contigs[i]
+		    span = event.contig_support_span[i][0], event.contig_support_span[i][1]
+		    coord = '%s-%s' % (span[0], span[1])
+					
+		    if support.has_key(contig) and support[contig].has_key(coord):
+			event.support['spanning'].append(support[contig][coord][0])
+			
+			# if reads are to be extracted
+			if get_seq:
+			    if support[contig][coord][-1]:
+				key = event.key(transcriptome=True)
+				for read in support[contig][coord][-1]:
+				    try:
+					support_reads[key].add(read)
+				    except:
+					support_reads[key] = Set([read])
+			
+		if not multi_mapped:
+		    event.sum_support()	
+		    		     
+	    if tlens:
+		#avg_tlen = float(sum(tlens)) / len(tlens)
+		print 'avg tlen', tlens[:10]
+		    	
+	if self.debug:
+	    for event in self.events:
+		print 'support', event.support, event.support_total, event.support_final
+		
+	return support_reads
 
 
 def main(args, options):
     outdir = args[-1]
+    # check executables
+    required_binaries = ('gmap', 'blastn')
+    for binary in required_binaries:
+	which = find_executable(binary)
+	if not which:
+	    sys.exit('"%s" not in PATH - abort' % binary)
+	        
     # find events
-    em = ExonMapper(*args)
+    em = ExonMapper(*args, 
+                    itd_min_len=options.itd_min_len,
+                    itd_min_pid=options.itd_min_pid,
+                    itd_max_apart=options.itd_max_apart,
+                    exon_bound_fusion_only=not options.include_non_exon_bound_fusion,
+                    coding_fusion_only=not options.include_noncoding_fusion,
+                    sense_fusion_only=not options.include_antisense_fusion,
+                    debug=options.debug)
+    em.map_contigs_to_transcripts()
+	
+    align_info = None
+    if options.genome and options.index_dir and os.path.exists(options.index_dir):
+	align_info = {
+	    'aligner': em.aligner,
+	    'genome': options.genome,
+	    'index_dir': options.index_dir,
+	    'num_procs': options.num_threads,
+	}
+    # screen events based on realignments
+    Event.screen(em.events, outdir, align_info=align_info, max_homol_allowed=options.max_homol_allowed, debug=options.debug, contigs_fasta=em.contigs_fasta)  
+    
+    # added support
+    if options.r2c_bam_file:
+	support_reads = em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, 
+	                                num_procs=options.num_threads, 
+	                                get_seq=options.output_support_reads)
+	
+    # merge events captured by different contigs into single events
+    events_merged = Adjacency.merge(em.events, transcriptome=True)
+    
+    # filter read support after merging
+    if options.r2c_bam_file:
+	Event.filter_by_support(events_merged, options.min_support)
+	
+    # output events
+    Event.output(events_merged, outdir, sort_by_event_type=options.sort_by_event_type)
+    
+    # output support reads
+    if options.output_support_reads and support_reads:
+	Event.output_reads(events_merged, support_reads, '%s/support_reads.fa' % outdir)
+    
+    # output mappings
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
-    
-    Event.output(em.events, outdir)
     
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contigs_fasta annotation_file genome_file(indexed) out_dir"
     parser = OptionParser(usage=usage)
     
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
-    parser.add_option("-n", "--num_procs", dest="num_procs", help="Number of processes. Default: 5", default=5, type=int)
+    parser.add_option("-t", "--num_threads", dest="num_threads", help="number of threads. Default:8", type='int', default=8) 
+    parser.add_option("-g", "--genome", dest="genome", help="genome")
+    parser.add_option("-G", "--index_dir", dest="index_dir", help="genome index directory")
     parser.add_option("--junctions", dest="junctions", help="output junctions", action="store_true", default=False)
+    parser.add_option("--itd_min_len", dest="itd_min_len", help="minimum ITD length. Default: 10", default=10, type=int)
+    parser.add_option("--itd_min_pid", dest="itd_min_pid", help="minimum ITD percentage of identity. Default: 0.95", default=0.95, type=float)
+    parser.add_option("--itd_max_apart", dest="itd_max_apart", help="maximum distance apart of ITD. Default: 10", default=10, type=int)
+    parser.add_option("--multimapped", dest="multimapped", help="reads-to-contigs alignment is multi-mapped", action="store_true", default=False)
+    parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
+    parser.add_option("--min_support", dest="min_support", help="minimum read support. Default:2", type='int', default=2)
+    parser.add_option("--include_non_exon_bound_fusion", dest="include_non_exon_bound_fusion", help="include fusions where breakpoints are not at exon boundaries", 
+                      action="store_true", default=False)
+    parser.add_option("--include_noncoding_fusion", dest="include_noncoding_fusion", help="include non-coding genes in detecting fusions", action="store_true", default=False)
+    parser.add_option("--include_antisense_fusion", dest="include_antisense_fusion", help="include antisense fusions", action="store_true", default=False)
+    parser.add_option("--sort_by_event_type", dest="sort_by_event_type", help="sort output by event type", action="store_true", default=False)
+    parser.add_option("--output_support_reads", dest="output_support_reads", help="output support reads", action="store_true", default=False)
+    parser.add_option("--max_homol_allowed", dest="max_homol_allowed", help="maximun amount of microhomology allowed. Default:10", type="int", default=10)
+    parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
     if len(args) == 6:

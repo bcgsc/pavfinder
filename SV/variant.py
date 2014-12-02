@@ -2,6 +2,7 @@ from shared.alignment import compare_chr, reverse_complement
 from vcf import VCF
 from sets import Set
 import sys
+import copy
 
 class Variant:
     def __init__(self, event, adjs, chrom=None, pos=None):
@@ -94,7 +95,7 @@ class Variant:
 
 class Adjacency:
     def __init__(self, chroms, breaks, rearrangement, novel_seq='-',
-                 contig=None, contig_breaks=None, contig_sizes=None, 
+                 contig=None, contig_breaks=None, contig_sizes=None, contig_support_span=None,
                  probes=None, orients=None, 
                  homol_seq=None, homol_coords=None,
                  aligns=None, align_types=None):
@@ -116,14 +117,13 @@ class Adjacency:
         self.homol_seq = []
 	if homol_seq is not None:
 	    self.homol_seq.append(homol_seq)
-	else:
-	    self.homol_seq.append('-')
+	#else:
+	    #self.homol_seq.append('-')
 	self.homol_coords = []
-
 	if homol_coords is not None:
 	    self.homol_coords.append(homol_coords)
-	else:
-	    self.homol_coords.append(('-', '-'))
+	#else:
+	    #self.homol_coords.append(('-', '-'))
         
         # assume initialization always with single contig
         self.contigs = []
@@ -132,6 +132,9 @@ class Adjacency:
         self.contig_breaks = []
         if contig_breaks is not None:
             self.contig_breaks.append(contig_breaks)
+	self.contig_support_span = []
+        if contig_support_span is not None:
+            self.contig_support_span.append(contig_support_span)
 	self.contig_sizes = []
 	if contig_sizes is not None:
             self.contig_sizes.append(contig_sizes)
@@ -146,19 +149,7 @@ class Adjacency:
 	
         # small-scale events may not have this information
         self.orients = orients
-        	
-	self.genes = ['NA', 'NA']
-	self.transcripts = ['NA', 'NA']
-	self.gene_strands = ['NA', 'NA']
-	self.exons = ['NA', 'NA']
-	self.exon_bounds = ['NA', 'NA']
-	self.introns = ['NA', 'NA']
-	self.rna_event = 'NA'
-	self.fusion_type = 'NA'
-	self.gene5 = 'NA'
-	self.gene3 = 'NA'
-	self.frames = 'NA'
-			
+        			
 	self.support = {'spanning':[], 'flanking':[], 'tiling':[]}
 	self.support_total = {'flanking':'NA', 'spanning':'NA'}
 	self.support_final = None
@@ -470,24 +461,7 @@ class Adjacency:
 	           'homol_coord2',
 	           'novel_seq',
 	           'probe',
-	           'gene1',
-	           'gene2',
-	           'transcript1',
-	           'transcript2',
-	           'exon1',
-	           'exon2',
-	           'exon_bound1',
-	           'exon_bound2',
-	           'intron1',
-	           'intron2',
-	           'RNA_event',
-	           'fusion_type',
-	           '5_gene',
-	           '3_gene',
-	           'frame',
 	           'spanning_reads',
-	           'flanking_pairs',
-	           'read_tiling',
                    )
         return '\t'.join(headers)
     
@@ -505,39 +479,27 @@ class Adjacency:
 	    data.append(str(self.get_size()))
 	    data.append(','.join(self.contigs))
 	    data.append(','.join([str(b[0]) for b in self.contig_breaks]))
-	    data.append(','.join([str(b[1]) for b in self.contig_breaks]))	    
-	    data.append(','.join(self.homol_seq))
-	    try:
+	    data.append(','.join([str(b[1]) for b in self.contig_breaks]))
+	    	    
+	    if self.homol_seq:
+		data.append(','.join(self.homol_seq))
+	    else:
+		data.append('-')
+		
+	    if self.homol_coords:
 		data.append(','.join([str(b[0]) for b in self.homol_coords]))
-	    except:
-		data.append('-')
-	    try:
 		data.append(','.join([str(b[1]) for b in self.homol_coords]))
-	    except:
+	    else:
 		data.append('-')
+		data.append('-')
+		
 	    data.append(self.novel_seq)
+	    
 	    try:
 		data.append(self.probes[0])
 	    except:
 		data.append('-')
-	    data.append(self.genes[0])
-	    data.append(self.genes[1])
-	    data.append(self.transcripts[0])
-	    data.append(self.transcripts[1])
-	    data.append(str(self.exons[0]))
-	    data.append(str(self.exons[1]))
-	    data.append(str(self.exon_bounds[0]))
-	    data.append(str(self.exon_bounds[1]))
-	    data.append(str(self.introns[0]))
-	    data.append(str(self.introns[1]))
-	    data.append(self.rna_event)
-	    data.append(self.fusion_type)
-	    data.append(self.gene5)
-	    data.append(self.gene3)
-	    data.append(str(self.frames))
 	    data.append(str(self.support_total['spanning']))
-	    data.append(str(self.support_total['flanking']))
-	    data.append(','.join(str(t) for t in self.support['tiling']))
 	    outputs.append('\t'.join(map(str, data)))
 	    
 	else:
@@ -622,7 +584,7 @@ class Adjacency:
 		
 	return '\t'.join(data)
     
-    def contig_support_span(self, contig_index):
+    def get_contig_support_span(self, contig_index):
 	if self.homol_coords and self.homol_coords[contig_index][0] is int and self.homol_coords[contig_index][1] is int:
 	    return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
 	else:
@@ -637,14 +599,26 @@ class Adjacency:
 	    
 	    support_total[kind] = sum(nums)
 	            
-    def key(self):
-	return '-'.join([self.rearrangement, 
-	                 str(self.breaks[0]), 
-	                 str(self.breaks[1]),
-	                 self.orients[0],
-	                 self.orients[1]
-	                 ])
-        
+    def key(self, transcriptome=False, include_novel_seq=False):
+	"""Constructs a unique key for grouping adjacencies
+	
+	Args:
+	    transcriptome: (boolean) whether adjacency is genomic or transcriptomic
+	Returns:
+	    A string that is used for grouping adjacencies
+	"""
+	info = [self.rearrangement]
+	if transcriptome:
+	    info = [self.rna_event]
+	for i in (0,1):
+	    info.append(self.chroms[i])
+	    info.append(self.breaks[i])
+	    if self.orients:
+		info.append(self.orients[i])
+	    if include_novel_seq:
+		info.append(self.novel_seq)
+	return '-'.join(map(str, info))
+	        
     @classmethod
     def extract_probe(cls, contig_seq, contig_breaks, len_on_each_side=25):
 	start, end = contig_breaks
@@ -770,10 +744,8 @@ class Adjacency:
 			source_orients = trls[i].orients[0], trls[j].orients[0]
 			
 			if trls[i].aligns[0][1].dubious:
-			    #print 'anchor', target_chrom, target_breaks, trls[i].aligns[0][1].target, trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend
 			    anchor_dubious = True
 			    
-		    #print 'anchor', anchor_dubious
 		    if anchor_dubious:
 			continue
 								    
@@ -927,57 +899,122 @@ class Adjacency:
 	return insertions, used_adjs    	
 		        
     @classmethod
-    def merge(cls, adjs):
+    def merge(cls, adjs, transcriptome=False):
 	"""Merge adjacencies that have the same breakpoint (and same event type) together
 	Args:
 	    adjs: (list) Adjacency
+	    transcriptome: (boolean) whether adjacency is genomic or transcriptomic
 	Returns:
 	    List of adjs with subsets that represent the same adjacency merged
 	"""
 	keys = {}
 	for adj in adjs:
-	    key = adj.key()
+	    key = adj.key(transcriptome=transcriptome)
 
 	    if not keys.has_key(key):
-		keys[key] = adj
+		keys[key] = copy.deepcopy(adj)
 	    else:
 		first_adj = keys[key]
 		first_adj.contigs.append(adj.contigs[0])
 		first_adj.contig_breaks.append(adj.contig_breaks[0])
 		first_adj.contig_sizes.append(adj.contig_sizes[0])
-		first_adj.probes.append(adj.probes[0])
+		if adj.contig_support_span:
+		    first_adj.contig_support_span.append(adj.contig_support_span[0])
+		if adj.probes:
+		    first_adj.probes.append(adj.probes[0])
+		else:
+		    first_adj.probes.append('-')
 		first_adj.aligns.append(adj.aligns[0])
 		first_adj.align_types.append(adj.align_types[0])
-		first_adj.homol_seq.append(adj.homol_seq[0])
-		first_adj.homol_coords.append(adj.homol_coords[0])
+		if adj.homol_seq:
+		    first_adj.homol_seq.append(adj.homol_seq[0])
+		if adj.homol_coords:
+		    first_adj.homol_coords.append(adj.homol_coords[0])
+		for support_type in ('spanning', 'tiling', 'flanking'):
+		    if adj.support[support_type]:
+			first_adj.support[support_type].append(adj.support[support_type][0])
 	
 	# for generating ID
 	count = 1
 	adjs_merged = []
 	for key, adj in sorted(keys.iteritems()):
 	    adj.id = str(count)
-	    if len(adj.contigs) > 1:
-		if adj.homol_seq and adj.homol_coords:
-		    adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types, adj.homol_seq, adj.homol_coords =\
-		           (list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
-		                                             adj.contigs, 
-		                                             adj.contig_breaks, 
-		                                             adj.probes,
-		                                             adj.aligns,
-		                                             adj.align_types,
-		                                             adj.homol_seq,
-		                                             adj.homol_coords), 
-		                                         reverse=True)))
-		else:
-		    adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types =\
-		           (list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
-		                                             adj.contigs, 
-		                                             adj.contig_breaks, 
-		                                             adj.probes,
-		                                             adj.aligns,
-		                                             adj.align_types),
-		                                         reverse=True)))
 	    count += 1
 	    adjs_merged.append(adj)
 	    		
 	return adjs_merged
+        
+    @classmethod
+    def realign(cls, adjs, out_dir, aligner, 
+                probe=False, subseq=False, 
+                contigs_fasta = None,
+                use_realigns=False, 
+                name_sep='-', genome=None, index_dir=None, num_procs=None):
+	"""Aligns probe and subsequences against reference genome
+	
+	The output of the fasta sequences will be called 'realign.fa',
+	and the alignments will be in 'realign.bam', put in the output directory
+	
+	Args:
+	    adjs: (list) Adjacencies for extracting sequences
+	    out_dir: (str) full path of output directory for storing sequences and alignments
+	    aligner: (str) Name of aligner (gmap, bwa_mem)
+	    probe: (boolean) Align probe sequence. Default: None
+	    subseq: (boolean) Align subsequences. Default: None
+	    contigs_fasta: (pysam.fastafile) For extracting sub-sequences
+	    use_realigns: (boolean) Use existing realignments. Default: False
+	    name_sep: (str) Character used to combine various info into query name
+	    genome: (str) prefix of the index of the refernece genome
+	    index_dir: (str) full path of the directory of location of the genome index
+	    num_procs: (int) number of threads to run the alignment
+	
+	Returns:
+	    pysam.samfile handle of realignment bam
+	"""
+	def write_probe(adj, out, name_sep):
+	    """Outputs the probe sequence to output file
+	    
+	    Args:
+		adj: Variant object
+		out: Filehandle of output file
+		name_sep: (str) Character used to combine various info into query name
+	    """
+	    out.write('>%s%s%s\n%s\n' % (adj.contigs[0], name_sep, adj.key(), adj.probes[0]))
+	    
+	def write_subseq(adj, out, name_sep, contigs_fasta):
+	    """Outputs the sub-sequence of a split alignment to output file
+	
+	    Args:
+	        adj: Variant object
+		out: Filehandle of output file
+		name_sep: (str) Character used to combine various info into query name
+	    """	    
+	    subseqs = adj.extract_subseqs(contigs_fasta)
+	    for i in range(len(subseqs)):
+		out.write('>%s%s%s%s%d\n%s\n' % (adj.contigs[0], name_sep, adj.key(), name_sep, i, subseqs[i]))
+	    
+	from shared import gmap
+	from shared import bwa_mem
+		
+	prefix = 'realign'
+	if not use_realigns:
+	    out_file = '%s/%s.fa' % (out_dir, prefix)
+	    out = open(out_file, 'w')
+	    for adj in adjs:
+		if probe:
+		    write_probe(adj, out, name_sep)
+		if subseq and contigs_fasta is not None:
+		    write_subseq(adj, out, name_sep, contigs_fasta)
+	    out.close()
+	    
+	# run aligner
+	realign_bam_file = '%s/%s.bam' % (out_dir, prefix)
+	if not use_realigns:
+	    if aligner == 'gmap':
+		return_code = gmap.run(out_file, realign_bam_file, genome, index_dir, num_procs, multi=True)
+	    elif aligner == 'bwa_mem':
+		return_code = bwa_mem.run(out_file, realign_bam_file, genome, index_dir, num_procs)
+	
+	return realign_bam_file
+
+	

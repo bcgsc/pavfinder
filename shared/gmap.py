@@ -39,13 +39,21 @@ def is_exon_exon_fusion(alns, prob_cutoff=0.9):
                
     return num_high_prob == len(alns)
 
-def run(fasta, output_bam, genome, index_dir=None, num_threads=4):
+def run(fasta, output_bam, genome, index_dir=None, num_threads=4, multi=False):
     if index_dir is None:
-        cmd = 'gmap -d %s %s -t %d -A -f samse -O -x 10 | samtools view -bhS - -o %s' %\
-        (genome, fasta, num_threads, output_bam)
+        if not multi:
+            cmd = 'gmap -d %s %s -t %d -A -f samse -O -x 10 -n 0 | samtools view -bhS - -o %s' %\
+                (genome, fasta, num_threads, output_bam)
+        else:
+            cmd = 'gmap -d %s %s -t %d -A -f samse -O -x 10 | samtools view -bhS - -o %s' %\
+                (genome, fasta, num_threads, output_bam)
     else:
-        cmd = 'gmap -d %s -D %s %s -t %d -A -f samse -O -x 10 | samtools view -bhS - -o %s' %\
-        (genome, index_dir, fasta, num_threads, output_bam)
+        if not multi:
+            cmd = 'gmap -d %s -D %s %s -t %d -A -f samse -O -x 10 -n 0 | samtools view -bhS - -o %s' %\
+                (genome, index_dir, fasta, num_threads, output_bam)
+        else:
+            cmd = 'gmap -d %s -D %s %s -t %d -A -f samse -O -x 10 | samtools view -bhS - -o %s' %\
+                (genome, index_dir, fasta, num_threads, output_bam)
 
     print cmd
     try:

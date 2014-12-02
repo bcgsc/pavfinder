@@ -15,13 +15,12 @@ from shared.alignment import reverse_complement, target_non_canonical
 from vcf import VCF
 from pybedtools import BedTool
 
-class SVFinder:
-    
-    name = 'PAVFinder'
-    version = '0.0.1'
-    
+# extract version from version.py
+execfile(os.path.dirname(os.path.realpath(__file__)) + "/../version.py")
+
+class SVFinder:    
     def __init__(self, bam_file, aligner, contig_fasta, genome_fasta, out_dir,
-                 genome=None, index_dir=None, num_procs=0, is_transcriptome=None,
+                 genome=None, index_dir=None, num_procs=0,
                  annot_file=None, skip_simple_repeats=False, cytobands_file=None, acen_buffer=0, debug=False):
 	self.bam = pysam.Samfile(bam_file, 'rb')
 	self.aligner = aligner
@@ -31,7 +30,6 @@ class SVFinder:
 	self.genome = genome
 	self.index_dir = index_dir
 	self.num_procs = num_procs
-	self.is_transcriptome = is_transcriptome
 	self.out_dir = out_dir
 	self.annot_file = annot_file
 	self.adjs = []
@@ -48,7 +46,7 @@ class SVFinder:
 	the respective modules to identify adjs"""
 	def find_events_in_single_align(align):
 	    """Implement as sub-function so that small-scale events can be found on split alignments too"""
-	    adjs = gapped_align.find_adjs(align, contig_seq, self.is_transcriptome, ins_as_ins=ins_as_ins)
+	    adjs = gapped_align.find_adjs(align, contig_seq, False, ins_as_ins=ins_as_ins)
 		
 	    repeats = Set()
 	    for i in range(len(adjs)):
@@ -91,6 +89,7 @@ class SVFinder:
 	    return False
 	
 	def create_set(list_file):
+	    """Creates set from items in a list"""
 	    subset = Set()
 	    for line in open(list_file, 'r'):
 		subset.add(line.strip('\n'))
@@ -151,13 +150,13 @@ class SVFinder:
 			#check if homol is simple repeat
 			if adj.homol_seq and adj.homol_seq[0] != '-' and self.is_homol_low_complexity(adj):
 			    if self.debug:
-				sys.stderr.write("homol_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.homol_seq[0]))
+				sys.stdout.write("homol_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.homol_seq[0]))
 			    bad.add(i)
 			
 			# check if event is simple repeat expansions
 			if self.skip_simple_repeats and self.is_novel_sequence_repeat(adj):
 			    if self.debug:
-				sys.stderr.write("novel_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.novel_seq))
+				sys.stdout.write("novel_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.novel_seq))
 			    bad.add(i)
 			    
 			if i > 0:
@@ -166,7 +165,7 @@ class SVFinder:
 			       adjs[i].orients == adjs[i].orients and\
 			       adjs[i].contig_breaks != adjs[i - 1].contig_breaks:
 				if self.debug:
-				    sys.stderr.write("%s has 2 contig_breaks for same event\n" % adj.contigs[0])
+				    sys.stdout.write("%s has 2 contig_breaks for same event\n" % adj.contigs[0])
 				bad.add(i - 1)
 				bad.add(i)
 		    
@@ -208,6 +207,7 @@ class SVFinder:
 	    return merged_adjs
     
     def create_variants(self, adjs):
+	"""Creates variants from adjacencies"""
 	self.variants = []
 	# special cases for imprecise insertions
 	ins_variants, ins_adjs = Adjacency.extract_imprecise_ins([adj for adj in adjs if adj.align_types[0] == 'split' and adj.rearrangement != 'inv'], debug=self.debug)
@@ -239,7 +239,14 @@ class SVFinder:
 		
 		
     def is_novel_sequence_repeat(self, adj, min_len=3):
-	"""Check to see if novel sequence is part of a tandem repeat"""
+	"""Check to see if novel sequence is part of a tandem repeat
+
+	Only check if length of novel sequence is least min_len in size
+	
+	Args:
+	    adj: (Adjacency)
+	    min_len: (int) minimum length of novel sequence before consideration
+	"""
 	contig_seq = self.contig_fasta.fetch(adj.contigs[0]).upper()	
 	contig_breaks = (adj.contig_breaks[0][0], adj.contig_breaks[0][1] - 2)
 
@@ -261,9 +268,22 @@ class SVFinder:
 	return len(copies) > 0
     
     def break_region_has_low_complexity(self, chrom, breaks, min_units=4, buf=1):
+	"""Determines if genomic region around deletion/insertion breakpoint has low-complexity sequences
+	
+	Window of search = 100bp on either side genomic breakpoint
+	True if there is at least "min_units" of repeats that reside in breakpoint region
+	
+	Args:
+	    chrom: (str) chromosome name
+	    breaks: (List/Tuple) genomic breakpoint (start, end)
+	    min_units: (int) minimum number of repeat units for returning 'True'
+	    buf: (int) buffer allowed for considering if repeats reside in breakpoint region
+	
+	Returns:
+	    True if yes, False if no
+	"""
 	r = re.compile(r"(.+?)\1+")
 	window = 100
-
 	for i in range(breaks[0] - window, breaks[1] + 1):
 	    try:
 		seq = self.ref_fasta.fetch(chrom, max(0,i), i + 100)
@@ -308,31 +328,50 @@ class SVFinder:
 				                                                                            repeats[0].upper(),
 				                                                                            num_units,
 				                                                                            ))
-			    
-			    
 			    return True
-			
 	return False
 	    
-    def extract_repeat(self, seq):
-	repeat = {'start':None, 'end':None}
-	if len(seq) == 1:
-	    repeat['start'] = seq
-	    repeat['end'] = seq
-	else:
-	    re_start = re.compile(r"^(.+?)\1+")
-	    re_end = re.compile(r"(.+?)\1+$")
-
-	    repeats = re_start.findall(seq)
-	    if repeats:
-		repeat['start'] = repeats[0]
-	    repeats = re_end.findall(seq)
-	    if repeats:
-		repeat['end'] = repeats[0]
-	
-	return repeat
-	
     def expand_contig_breaks(self, chrom, breaks, contig, contig_breaks, event, debug=False):
+	"""Expands contig_breaks if repeats reside in breakpoints
+	
+	Args:
+	    chrom: (str) chromosome name
+	    breaks: (tuple/list) genomic chromosome breaks
+	    contig: (str) contig ID
+	    contig_breaks: (tuple/list) contig breaks
+	    event: (str) 'del' or 'ins' 
+	    debug: (boolean) report debug statements
+	    
+	Returns:
+	    tuple of expanded contig breaks
+	"""
+	def extract_repeat(seq):
+	    """Extracts repeats from given sequence
+	    
+	    Args:
+	        seq: (str) sequence
+		
+	    Returns:
+	        (start, end) of repeat sequence
+	    """
+	    repeat = {'start':None, 'end':None}
+	    if len(seq) == 1:
+		repeat['start'] = seq
+		repeat['end'] = seq
+	    else:
+		re_start = re.compile(r"^(.+?)\1+")
+		re_end = re.compile(r"(.+?)\1+$")
+    
+		repeats = re_start.findall(seq)
+		if repeats:
+		    repeat['start'] = repeats[0]
+		repeats = re_end.findall(seq)
+		if repeats:
+		    repeat['end'] = repeats[0]
+	    
+	    return repeat
+
+	# extract repeats (if any) from 'del' or 'ins'
 	contig_breaks_sorted = sorted(contig_breaks)
 	pos_strand = True if contig_breaks[0] < contig_breaks[1] else False
 	contig_seq = self.contig_fasta.fetch(contig)
@@ -343,20 +382,17 @@ class SVFinder:
 	    seq = self.ref_fasta.fetch(chrom, breaks[0], breaks[1] - 1)
 	    if not pos_strand:
 		seq = reverse_complement(seq)
-		
 	elif event == 'ins':
 	    seq = contig_seq[contig_breaks_sorted[0] : contig_breaks_sorted[1] - 1]
-	        
 	if seq is None:
 	    print contig, event, 'cannot find seq', seq
 	    return None
 	
-	repeat = self.extract_repeat(seq)
-	
+	repeat = extract_repeat(seq)
+	# downstream
 	if repeat['end'] is not None:
 	    seq = repeat['end']
 	    size = len(seq)
-	    # downstream
 	    start = contig_breaks_sorted[1] - 1
 	    expand = 0
 	    while start + size <= len(contig_seq):
@@ -370,7 +406,6 @@ class SVFinder:
 		contig_breaks_expanded[1] += expand
 	    else:
 		contig_breaks_expanded[0] += expand
-	    
 	# upstream
 	if repeat['start'] is not None:
 	    seq = repeat['start']
@@ -407,6 +442,16 @@ class SVFinder:
 	    out.write('>%s%s%s%s%d\n%s\n' % (adj.contigs[0], name_sep, adj.key(), name_sep, i, subseqs[i]))
 	    
     def is_homol_low_complexity(self, adj, min_len=5):
+	"""Determine if the microhomology sequence of the adjacency is low-complexity
+	
+	Only determines if microhomology sequence is low-complexity if it's at least 
+	min_len in size
+	
+	Args:
+	    adj: (Adjacency)
+	    min_len: (int) minimum length of the microhomology sequence in order for
+	                   complexity to be considered
+	"""
 	if adj.homol_seq[0] is not None and len(adj.homol_seq[0]) >= min_len:
 	    if self.is_seq_low_complexity(adj.homol_seq[0]):
 		return True
@@ -414,6 +459,13 @@ class SVFinder:
 	return False
     
     def is_subseq_low_complexity(self, adj):
+	"""Determine if any of the 2 sub-sequences is low-complexity
+	
+	Args:
+	    adj: (Adjacency)
+	Returns:
+	    True if any of the 2 sub-sequences is low-complexity
+	"""
 	subseqs = adj.extract_subseqs(self.contig_fasta)
 	
 	for subseq in subseqs:
@@ -423,6 +475,18 @@ class SVFinder:
 	return False
     
     def is_seq_low_complexity(self, seq, threshold=0.9):
+	"""Determines if given sequence is low-complexity
+	
+	Low-complexity conditions:
+	1. total of any base / length of sequence > threshold
+	2. total of bases in same dimer / length of sequence > threshold
+	
+	Args:
+	    seq: (str) sequence
+	    threshold: (float) minimum fraction of sequence that are same base or dimers
+	Returns:
+	    True if yes, False if no
+	"""
 	bases = ('A', 'G', 'T', 'C')
 	
 	for base in bases:
@@ -442,56 +506,31 @@ class SVFinder:
 		
 	return False
 		
-    def write_probe(self, adj, out, name_sep):
-	"""Outputs the probe sequence to output file
-	
-	Args:
-	    adj: Variant object
-	    out: Filehandle of output file
-	    name_sep: (str) Character used to combined various info into query name
-	"""
-	out.write('>%s%s%s\n%s\n' % (adj.contigs[0], name_sep, adj.key(), adj.probes[0]))
-		        
-    
-    def realign(self, name_sep, use_realigns=False):
-	"""Aligns probe and subsequences against genome again
-	
-	Will generate a Fasta file in the output direcotyr called 'realign.fa' containing all the 
-	(subsequences + probe) sequences to be realigned
-	Will run the alignment on the command line and generate a BAM file in the output directory 
-	called 'realign.bam'
-	
-	Args:
-	    name_sep: (str) Character used to combined various info into query name
-	""" 
-	prefix = 'realign'
-	if not use_realigns:
-	    out_file = '%s/%s.fa' % (self.out_dir, prefix)
-	    out = open(out_file, 'w')
-	    for variant in self.variants:
-		for adj in variant.adjs:
-		    self.write_probe(adj, out, name_sep)	    
-		    #if adj.align_types[0] == 'split':
-			#self.write_subseq(adj, out, name_sep)
-	    out.close()
-	
-	# run aligner
-	realign_bam_file = '%s/%s.bam' % (self.out_dir, prefix)
-	if not use_realigns:
-	    if self.aligner == 'gmap':
-		return_code = gmap.run(out_file, realign_bam_file, self.genome, self.index_dir, self.num_procs)
-	    elif self.aligner == 'bwa_mem':
-		return_code = bwa_mem.run(out_file, realign_bam_file, self.genome, self.index_dir, self.num_procs)
-	
-	return realign_bam_file
-    
-    
     def screen_realigns(self, use_realigns=False):
+	"""Realign probe sequences of adjacencies and screen results
+
+	- aligner, genome, and index_dir must have been set when object is initialized
+	- output is always set to "realign.fa" and "realign.bam"
+	- will fail adjacency if probe sequence can align to single location
+	"""
 	if not self.aligner or not self.genome or not self.index_dir:
 	    return None
 	
 	name_sep = '.'
-	realign_bam_file = self.realign(name_sep, use_realigns=use_realigns)
+	all_adjs = []
+	for variant in self.variants:
+	    all_adjs.extend(variant.adjs)
+	realign_bam_file = Adjacency.realign(all_adjs,
+	                                     self.out_dir,
+	                                     self.aligner,
+	                                     probe=True,
+	                                     contigs_fasta=self.contig_fasta,
+	                                     name_sep=name_sep,
+	                                     genome=self.genome, 
+	                                     index_dir=self.index_dir,
+	                                     num_procs=self.num_procs,
+	                                     use_realigns=use_realigns,
+	                                     )
 	try:
 	    bam = pysam.Samfile(realign_bam_file, 'rb')
 	except:
@@ -535,82 +574,14 @@ class SVFinder:
 	for failed_var in failed_variants:
 	    self.variants.remove(failed_var)
 		        
-    def screen_adjs(self, ins_variants=None, ins_adjs=None):
-	"""Screens adjs using realignment results to get rid of non-specific sequences"""
-	# screens away potential transcriptome deletions that are actually introns
-	if self.is_transcriptome:
-	    self.screen_del()
-	
-	if not self.aligner or not self.genome or not self.index_dir:
-	    return None
-	
-	name_sep = '.'
-	realign_bam_file = self.realign(name_sep)
-	
-	try:
-	    bam = pysam.Samfile(realign_bam_file, 'rb')
-	except:
-	    sys.exit('Error parsing realignment BAM:%s' % realign_bam_file)
-        
-	adj_dict = dict((self.adjs[i].contigs[0] + name_sep + self.adjs[i].key(), i) for i in range(len(self.adjs)))
-	
-	# group subsequence alignments by contig name
-	# qname of the subsequence alignment is 'contig-index', so split qname and keep the 
-	# first element(contig) for grouping
-	bad = Set()
-	for key, group in groupby(bam.fetch(until_eof=True), lambda x: name_sep.join(x.qname.split(name_sep)[:2])):
-	    alns = list(group)
-	    adj_idx = adj_dict[key]
-	    adj = self.adjs[adj_idx]
-	    adj_aligns = adj.aligns[0]
-	    	    
-	    probe_alns = [aln for aln in alns if not aln.qname[-1].isdigit()]
-	    if not gapped_align.screen_probe_alns(adj_aligns, probe_alns):
-		if self.debug:
-		    sys.stdout.write('probe align completely to one location or not aligned with confidence: %s\n' % key)
-		bad.add(adj_idx)
-		continue
-	    
-	    split_alns = [aln for aln in alns if aln.qname[-1].isdigit()]
-	    if adj.align_types[0] == 'split' and split_alns:
-		if not split_align.screen_subseq_alns(adj_aligns, split_alns, bam, name_sep, debug=self.debug):
-		    if self.debug:
-			sys.stdout.write('getrid split %s\n' % key)
-		    bad.add(adj_idx)
-		    		    
-	for i in sorted(bad, reverse=True):
-	    del self.adjs[i]
-	    
-    def screen_del(self):
-	"""Checks to see if the deletions identified of a transcriptome assembly are actually introns
-	Will remove any deletion event if it is potentially an intron
-	"""
-	bad = Set()
-	for i in range(len(self.adjs)):
-	    adj = self.adjs[i]
-	    if adj.rearrangement != 'del':
-		continue
-	    	    
-	    splice_motif = ''
-	    if adj.orients[0] == 'L':
-		splice_motif = self.ref_fasta.fetch(adj.chroms[0], adj.breaks[0], adj.breaks[0] + 2)
-	    else:
-		splice_motif = self.ref_fasta.fetch(adj.chroms[0], adj.breaks[0] - 3, adj.breaks[0] - 1)
-
-	    if adj.orients[1] == 'L':
-		splice_motif += self.ref_fasta.fetch(adj.chroms[1], adj.breaks[1], adj.breaks[1] + 2)
-	    else:
-		splice_motif += self.ref_fasta.fetch(adj.chroms[1], adj.breaks[1] - 3, adj.breaks[1] - 1)
-		
-	    if splice_motif.upper() == 'GTAG' or reverse_complement(splice_motif).upper() == 'GTAG':
-		if self.debug:
-		    sys.stdout.write('filtering out deletion %s because it is bounded by splice motif %s\n' % (adj.key(), splice_motif))
-		bad.add(i)
-		
-	for i in sorted(bad, reverse=True):
-	    del self.adjs[i]
-	    
     def output(self, only_somatic=False, reference_url=None, assembly_url=None, insertion_as_breakends=None):
+	"""Wrapper function to output Variants and Adjacencies
+	Args:
+	    only_somatic: (boolean) Only outputs somatic variants/adjacencies
+	    reference_url: (str) reference url to be put in VCF header (optional)
+	    assembly_url: (str) assembly url to be put in VCF header (optional)
+	    insertion_as_breakends: (boolean) Output big insertion as breakends
+	"""
 	variants = [variant for variant in self.variants if not variant.filtered_out]
 	if only_somatic:
 	    variants = [variant for variant in self.variants if variant.somatic]
@@ -632,16 +603,23 @@ class SVFinder:
                                 format='tab')
 		                         	
     def output_variants(self, variants, out_file, reference_url=None, assembly_url=None, insertion_as_breakends=False):
-	"""Output variants in VCF format"""
+	"""Output variants in VCF format
+	Args:
+	    variants: (List) Variants
+	    out_file: (str) absolute path of output VCF file
+	    reference_url: (str) reference url to be put in VCF header (optional)
+	    assembly_url: (str) assembly url to be put in VCF header (optional)
+	    insertion_as_breakends: (boolean) Output big insertion as breakends
+	"""
 	records = []
 	for variant in variants:
-	    output = variant.as_vcf(self.ref_fasta, not self.is_transcriptome, insertion_as_sv=not insertion_as_breakends)
+	    output = variant.as_vcf(self.ref_fasta, insertion_as_sv=not insertion_as_breakends)
 	    
 	    if output is not None and output != '':
-		records.extend(output.split('\n'))
+		records.extend(output.split('\n'))	
 		
 	out = open(out_file, 'w')
-	out.write('%s\n' % VCF.header(source='%s_v%s' % (self.name, self.version), reference_url=reference_url, assembly_url=assembly_url))
+	out.write('%s\n' % VCF.header(source='pavfinder_v%s' % __version__, reference_url=reference_url, assembly_url=assembly_url))
 	# sort by chromosome and pos
 	records.sort(key=lambda record: (record.split('\t')[0], record.split('\t')[1]))
 	for record in records:
@@ -649,10 +627,11 @@ class SVFinder:
 	out.close()
 	
     def output_probes(self, adjs, out_file):
-	for adj in adjs:
-	    for i in range(len(adj.probes)):
-		print 'probe', adj.id, i, adj.probes[i]
-		
+	"""Output probe sequences in FASTA format
+	Args:
+	    adjs: (List) Adjacencies
+	    out_file: (str) absolute path of output FASTA file
+	"""
 	out = open(out_file, 'w')
 	for adj in adjs:
 	    if adj.probes[0] != 'NA':
@@ -660,7 +639,12 @@ class SVFinder:
 	out.close()
 	
     def output_adjacencies(self, adjs, out_file, format):
-	"""Output adjacencies in tsv format"""
+	"""Output adjacencies in tsv format
+	Args:
+	    adjs: (List) Adjacencies
+	    out_file: (str) absolute path of output file
+	    format: (str) either "tab" or "bedpe"
+	"""
 	fn = None
 	args = ()
 	if format == 'bedpe':
@@ -682,33 +666,6 @@ class SVFinder:
 		    
 	    out.close()
 	    	    
-    def merge_adjs(self):
-	"""Groups contigs bearing same adj together into single adj"""
-	self.adjs = Adjacency.merge(self.adjs)
-	
-    def annotate_adjs(self):
-	"""Annotates adjs: genes, transcripts, exons, introns"""
-	# output adjs as bedpe
-	adjs_bedpe = '%s/adjs.bedpe' % self.out_dir
-	self.output_adjs(adjs_bedpe, 'bedpe')
-	
-	# overlap adj coordinates against annotation file
-	overlap_result = '%s/adjs_annot.bed' % self.out_dir
-	overlap_pe(adjs_bedpe, self.annot_file, overlap_result)
-	
-	# update adjs with feature info
-	features_overlapped = parallel_parse_overlaps(overlap_result, [adj.key() for adj in self.adjs], self.num_procs)
-
-	for adj in self.adjs:
-	    key = adj.key()
-	    if not features_overlapped.has_key(key):
-		continue
-	    
-	    update_features(adj, features_overlapped[key])			    
-	    annotate_rna_event(adj)
-	    if adj.rna_event == 'gene_fusion':
-		annotate_gene_fusion(adj)
-		
     def find_support(self, tumor_bam=None, min_overlap=None, normal_bam=None, min_overlap_normal=None):
 	"""Extracts read support from reads-to-contigs BAM
 	
@@ -723,8 +680,7 @@ class SVFinder:
 	    for adj in variant.adjs:
 		for i in range(len(adj.contigs)):
 		    contig = adj.contigs[i]
-		    span = adj.contig_support_span(i)
-				    
+		    span = adj.get_contig_support_span(i)
 		    try:
 			coords[contig].append(span)
 		    except:
@@ -749,7 +705,7 @@ class SVFinder:
 				    
 		avg_tlen = None
 		tlens = []
-		# if fewer than 10000 adjs, use 'fetch' of Pysam
+		# if fewer than 1000 adjs, use 'fetch' of Pysam
 		if len(coords) < 1000:
 		    support, tlens = fetch_support(coords, bf, self.contig_fasta, overlap_buffer=overlap_buffer, perfect=perfect, debug=self.debug)
 		# otherwise use multi-process parsing of bam file
@@ -770,7 +726,7 @@ class SVFinder:
     
 			for i in range(len(adj.contigs)):
 			    contig = adj.contigs[i]
-			    span = adj.contig_support_span(i)
+			    span = adj.get_contig_support_span(i)
 			    coord = '%s-%s' % (span[0], span[1])
 						
 			    if support.has_key(contig) and support[contig].has_key(coord):
@@ -813,7 +769,7 @@ class SVFinder:
 	                                                                             support_total['spanning'],
 	                                                                             min_support))
 		
-	if len(adj.homol_seq[0]) > max_homol_len:
+	if adj.homol_seq and len(adj.homol_seq[0]) > max_homol_len:
 	    if support_total['flanking'] < min_flanking:
 		filtered_out = True
 		if self.debug:
@@ -837,15 +793,15 @@ class SVFinder:
 		if self.debug:
 		    message = 'no_tiling_for_long_novel' if not passed else 'long_novel rescued by tiling'
 		    sys.stdout.write('%s %s %s %s novel_seq:%s novel_len:%d %f tiling:%s spanning:%d frags:%d\n' % (message,
-		                                                                           adj.contigs, 
-		                                                                           adj.chroms, 
-		                                                                           adj.breaks, 
-		                                                                           adj.novel_seq,
-		                                                                           len(adj.novel_seq), 
-		                                                                           spannable_fraction_tlen * self.avg_tlen,
-		                                                                           support['tiling'], 
-		                                                                           support_total['spanning'],
-		                                                                           support_total['flanking']))
+		                                                                                                    adj.contigs, 
+		                                                                                                    adj.chroms, 
+		                                                                                                    adj.breaks, 
+		                                                                                                    adj.novel_seq,
+		                                                                                                    len(adj.novel_seq), 
+		                                                                                                    spannable_fraction_tlen * self.avg_tlen,
+		                                                                                                    support['tiling'], 
+		                                                                                                    support_total['spanning'],
+		                                                                                                    support_total['flanking']))
 	    	    	    	  
 	if not normal:
 	    adj.support_final = support_final
@@ -855,9 +811,15 @@ class SVFinder:
 	return filtered_out
     
     def screen_by_coordinate(self, adjs, bad_bed_file):
+	def create_bed(outfile):
+	    out = open(outfile, 'w')
+	    for adj in adjs:
+		out.write('%s\n' % adj.as_bed())
+	    out.close()
+	    
 	# creates bed file for all adjacencies
 	adjs_bed_file = '%s/adjs.bed' % self.out_dir
-	self.create_bed(adjs, adjs_bed_file)
+	create_bed(adjs_bed_file)
 	adjs_bed = BedTool(adjs_bed_file)
 	
 	# overlaps adjacencies with bad bed file, keeps breakpoints in Set
@@ -886,12 +848,6 @@ class SVFinder:
 	for i in sorted(bad_adj_indices, reverse=True):
 	    del adjs[i]
 	    
-    def create_bed(self, adjs, outfile):
-	out = open(outfile, 'w')
-	for adj in adjs:
-	    out.write('%s\n' % adj.as_bed())
-	out.close()
-	  
     def filter_variants(self, min_support, min_support_normal=None, max_homol=None, tumor_bam=False, normal_bam=False):
 	"""Filter out events that are believed to be false positive
 	
@@ -954,23 +910,25 @@ class SVFinder:
 				                                                             adj.support_total, 
 				                                                             adj.support_total_normal))
 
-	    for adj in variant.adjs:
-		if adj.filtered_out:
-		    variant.filtered_out = True
-		    break
-		
-	    if normal_bam:
+	    # don't filter out inversion variant if one breakpoint does not have enough read support
+	    if variant.event != 'INV':
 		for adj in variant.adjs:
-		    if not adj.somatic:
-			variant.somatic = False
+		    # don't filter out inversion variant if one breakpoint does not have enough read support
+		    if adj.filtered_out:
+			variant.filtered_out = True
 			break
+		    
+		if normal_bam:
+		    for adj in variant.adjs:
+			if not adj.somatic:
+			    variant.somatic = False
+			    break
 		    
 def main(args, options):
     sv_finder = SVFinder(*args, 
                          genome=options.genome, 
                          index_dir=options.index_dir, 
                          num_procs=options.num_threads, 
-                         is_transcriptome=options.is_transcriptome, 
                          annot_file=options.annot_file,
                          skip_simple_repeats=options.skip_simple_repeats,
                          cytobands_file=options.cytobands_file,
@@ -1016,7 +974,6 @@ if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contig_fasta(indexed) genome_file(indexed) out_dir"
     parser = OptionParser(usage=usage)
     
-    parser.add_option("-T", "--is_transcriptome", dest="is_transcriptome", help="is sample transcriptome", action="store_true", default=False)
     parser.add_option("-a", "--annot_file", dest="annot_file", help="annotation file")
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
     parser.add_option("-g", "--genome", dest="genome", help="genome")
