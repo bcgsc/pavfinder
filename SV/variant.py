@@ -939,29 +939,6 @@ class Adjacency:
 	adjs_merged = []
 	for key, adj in sorted(keys.iteritems()):
 	    adj.id = str(count)
-	    #if len(adj.contigs) > 1:
-		#if adj.homol_seq and adj.homol_coords:
-		    #adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types, adj.homol_seq, adj.homol_coords, adj.support['spanning'] =\
-		           #(list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
-		                                             #adj.contigs, 
-		                                             #adj.contig_breaks, 
-		                                             #adj.probes,
-		                                             #adj.aligns,
-		                                             #adj.align_types,
-		                                             #adj.homol_seq,
-		                                             #adj.homol_coords,
-		                                             #adj.support['spanning']), 
-		                                         #reverse=True)))
-		#else:
-		    #adj.contig_sizes, adj.contigs, adj.contig_breaks, adj.probes, adj.aligns, adj.align_types, adj.support['spanning'] =\
-		           #(list(t) for t in zip(*sorted(zip(adj.contig_sizes, 
-		                                             #adj.contigs, 
-		                                             #adj.contig_breaks, 
-		                                             #adj.probes,
-		                                             #adj.aligns,
-		                                             #adj.align_types,
-		                                             #adj.support['spanning']),
-		                                         #reverse=True)))	    	
 	    count += 1
 	    adjs_merged.append(adj)
 	    		
