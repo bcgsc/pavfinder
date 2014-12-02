@@ -150,13 +150,13 @@ class SVFinder:
 			#check if homol is simple repeat
 			if adj.homol_seq and adj.homol_seq[0] != '-' and self.is_homol_low_complexity(adj):
 			    if self.debug:
-				sys.stderr.write("homol_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.homol_seq[0]))
+				sys.stdout.write("homol_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.homol_seq[0]))
 			    bad.add(i)
 			
 			# check if event is simple repeat expansions
 			if self.skip_simple_repeats and self.is_novel_sequence_repeat(adj):
 			    if self.debug:
-				sys.stderr.write("novel_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.novel_seq))
+				sys.stdout.write("novel_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.novel_seq))
 			    bad.add(i)
 			    
 			if i > 0:
@@ -165,7 +165,7 @@ class SVFinder:
 			       adjs[i].orients == adjs[i].orients and\
 			       adjs[i].contig_breaks != adjs[i - 1].contig_breaks:
 				if self.debug:
-				    sys.stderr.write("%s has 2 contig_breaks for same event\n" % adj.contigs[0])
+				    sys.stdout.write("%s has 2 contig_breaks for same event\n" % adj.contigs[0])
 				bad.add(i - 1)
 				bad.add(i)
 		    
@@ -528,7 +528,8 @@ class SVFinder:
 	                                     name_sep=name_sep,
 	                                     genome=self.genome, 
 	                                     index_dir=self.index_dir,
-	                                     num_procs=self.num_procs
+	                                     num_procs=self.num_procs,
+	                                     use_realigns=use_realigns,
 	                                     )
 	try:
 	    bam = pysam.Samfile(realign_bam_file, 'rb')
@@ -704,7 +705,7 @@ class SVFinder:
 				    
 		avg_tlen = None
 		tlens = []
-		# if fewer than 10000 adjs, use 'fetch' of Pysam
+		# if fewer than 1000 adjs, use 'fetch' of Pysam
 		if len(coords) < 1000:
 		    support, tlens = fetch_support(coords, bf, self.contig_fasta, overlap_buffer=overlap_buffer, perfect=perfect, debug=self.debug)
 		# otherwise use multi-process parsing of bam file
@@ -792,15 +793,15 @@ class SVFinder:
 		if self.debug:
 		    message = 'no_tiling_for_long_novel' if not passed else 'long_novel rescued by tiling'
 		    sys.stdout.write('%s %s %s %s novel_seq:%s novel_len:%d %f tiling:%s spanning:%d frags:%d\n' % (message,
-		                                                                           adj.contigs, 
-		                                                                           adj.chroms, 
-		                                                                           adj.breaks, 
-		                                                                           adj.novel_seq,
-		                                                                           len(adj.novel_seq), 
-		                                                                           spannable_fraction_tlen * self.avg_tlen,
-		                                                                           support['tiling'], 
-		                                                                           support_total['spanning'],
-		                                                                           support_total['flanking']))
+		                                                                                                    adj.contigs, 
+		                                                                                                    adj.chroms, 
+		                                                                                                    adj.breaks, 
+		                                                                                                    adj.novel_seq,
+		                                                                                                    len(adj.novel_seq), 
+		                                                                                                    spannable_fraction_tlen * self.avg_tlen,
+		                                                                                                    support['tiling'], 
+		                                                                                                    support_total['spanning'],
+		                                                                                                    support_total['flanking']))
 	    	    	    	  
 	if not normal:
 	    adj.support_final = support_final
@@ -909,16 +910,19 @@ class SVFinder:
 				                                                             adj.support_total, 
 				                                                             adj.support_total_normal))
 
-	    for adj in variant.adjs:
-		if adj.filtered_out:
-		    variant.filtered_out = True
-		    break
-		
-	    if normal_bam:
+	    # don't filter out inversion variant if one breakpoint does not have enough read support
+	    if variant.event != 'INV':
 		for adj in variant.adjs:
-		    if not adj.somatic:
-			variant.somatic = False
+		    # don't filter out inversion variant if one breakpoint does not have enough read support
+		    if adj.filtered_out:
+			variant.filtered_out = True
 			break
+		    
+		if normal_bam:
+		    for adj in variant.adjs:
+			if not adj.somatic:
+			    variant.somatic = False
+			    break
 		    
 def main(args, options):
     sv_finder = SVFinder(*args, 
