@@ -7,13 +7,19 @@ Author: Readman Chiu
 * [BWA 0.7.4](http://sourceforge.net/projects/bio-bwa/files/)
 * [Samtools](http://sourceforge.net/projects/samtools/files/samtools/)
 * [Python 2.7.x](https://www.python.org/downloads/)
-* [Pysam](https://github.com/pysam-developers/pysam)
-* [pybedtools](http://pythonhosted.org/pybedtools/) (only if centromeric/segdup regions need to be filtered out)
+* [Pysam-0.7.7](https://github.com/pysam-developers/pysam)
+* [pybedtools-0.6.2](http://pythonhosted.org/pybedtools/) (only if centromeric/segdup regions need to be filtered out)
+* [blastn-2.2.29](ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.2.29/) (for transcriptome analysis)
 
-## Find structural variants
+## Find variants from genome assembly
 
 ```
-python SV/find_sv.py <contigs2genome.bam> bwa_mem <contig_sequence.fa> <reference_sequence.fa> <output_directory> -b <tumor_reads2contigs.bam> --normal_bam <normal_reads2contigs.bam> --min_size <minimum event size>
+pavfinder genome <contigs2genome.bam> bwa_mem <contig_sequence.fa> <reference_sequence.fa> <output_directory> -b <tumor_reads2contigs.bam> --normal_bam <normal_reads2contigs.bam> --min_size <minimum event size>
 ```
 
-More detailed documentation will come later.
+## Find variants from transcriptome assembly
+
+```
+pavfinder transcriptome <contigs2genome.bam> gmap <contig_sequence.fa> <tabix_sorted_annotation.gtf> <reference_sequence.fa> <output_directory> -b <reads2contigs.bam> 
+```
+
