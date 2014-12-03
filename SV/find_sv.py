@@ -21,7 +21,7 @@ execfile(os.path.dirname(os.path.realpath(__file__)) + "/../version.py")
 class SVFinder:    
     def __init__(self, bam_file, aligner, contig_fasta, genome_fasta, out_dir,
                  genome=None, index_dir=None, num_procs=0,
-                 annot_file=None, skip_simple_repeats=False, cytobands_file=None, acen_buffer=0, debug=False):
+                 skip_simple_repeats=False, cytobands_file=None, acen_buffer=0, debug=False):
 	self.bam = pysam.Samfile(bam_file, 'rb')
 	self.aligner = aligner
 	self.contig_fasta_file = contig_fasta
@@ -31,7 +31,6 @@ class SVFinder:
 	self.index_dir = index_dir
 	self.num_procs = num_procs
 	self.out_dir = out_dir
-	self.annot_file = annot_file
 	self.adjs = []
 	self.skip_simple_repeats = skip_simple_repeats
 	self.cytobands_file = cytobands_file
@@ -918,7 +917,17 @@ class SVFinder:
 			variant.filtered_out = True
 			break
 		    
-		if normal_bam:
+	    if normal_bam:
+		if len(variant.adjs) == 1:
+		    variant.somatic = variant.adjs[0].somatic
+		elif variant.event == 'INV':
+		    variant.somatic = False
+		    for adj in variant.adjs:
+			if adj.somatic:
+			    variant.somatic = True
+			    break
+		else:
+		    variant.somatic = True
 		    for adj in variant.adjs:
 			if not adj.somatic:
 			    variant.somatic = False
@@ -929,7 +938,6 @@ def main(args, options):
                          genome=options.genome, 
                          index_dir=options.index_dir, 
                          num_procs=options.num_threads, 
-                         annot_file=options.annot_file,
                          skip_simple_repeats=options.skip_simple_repeats,
                          cytobands_file=options.cytobands_file,
                          acen_buffer=options.acen_buffer,
@@ -974,7 +982,6 @@ if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contig_fasta(indexed) genome_file(indexed) out_dir"
     parser = OptionParser(usage=usage)
     
-    parser.add_option("-a", "--annot_file", dest="annot_file", help="annotation file")
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
     parser.add_option("-g", "--genome", dest="genome", help="genome")
     parser.add_option("-G", "--index_dir", dest="index_dir", help="genome index directory")
