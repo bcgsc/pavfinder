@@ -158,6 +158,13 @@ class SVFinder:
 				sys.stdout.write("novel_seq is simple-repeat %s:%s\n" % (adj.contigs[0], adj.novel_seq))
 			    bad.add(i)
 			    
+			# inversion with size of 1
+			if adj.rearrangement == 'inv' and adj.get_size() <= 1:
+			    if self.debug:
+				sys.stdout.write("inversion with unreasonable size %s:%d %s:%d-%d\n" % (adj.contigs[0], adj.get_size(), 
+				                                                                        adj.chroms[0], adj.breaks[0], adj.breaks[1]))
+				bad.add(i)
+			    
 			if i > 0:
 			    if adjs[i].chroms == adjs[i - 1].chroms and\
 			       adjs[i].breaks == adjs[i - 1].breaks and\
@@ -187,23 +194,33 @@ class SVFinder:
 	# screen out adjacencies that overlap segdups
 	if bad_coords is not None and os.path.exists(bad_coords):
 	    self.screen_by_coordinate(merged_adjs, bad_coords)
-	
-	if max_size is not None:
+	    
+	# size filtering
+	if max_size is not None or min_size is not None:
 	    selected = []
 	    for adj in merged_adjs:
 		size = adj.get_size()
-		if size is not None and size != 'NA' and size <= max_size:
-		    selected.append(adj)
-	    return selected
-	elif min_size is not None:
-	    selected = []
-	    for adj in merged_adjs:
-		size = adj.get_size()
-		if size is None or size == 'NA' or size >= min_size:
-		    selected.append(adj)
+		
+		if max_size is not None and\
+		   min_size is not None:
+		    if type(size) is int and\
+		       size >= min_size and size <= max_size:
+			selected.append(adj)
+
+		elif max_size is not None:
+		    if type(size) is int and\
+		       size <= max_size:
+			selected.append(adj)
+			
+		elif min_size is not None:
+		    if type(size) is not int or\
+		       size >= min_size:
+			selected.append(adj)			
+			
 	    return selected
 	else:
 	    return merged_adjs
+	
     
     def create_variants(self, adjs):
 	"""Creates variants from adjacencies"""
