@@ -1,0 +1,5 @@
+include README.rst
+include INSTALL.rst
+include MANIFEST.in
+include requirements.txt
+recursive-exclude * *.py[co]
