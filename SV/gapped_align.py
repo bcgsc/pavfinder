@@ -83,16 +83,16 @@ def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False):
 		if not ins_as_ins:
 		    event = 'dup'
 		
-		if duplicated[0] > 0:
-		    if align.strand == '+':
-			breaks = (breaks[0] - length_novel_seq, breaks[1] + 1)
+		    if duplicated[0] > 0:
+			if align.strand == '+':
+			    breaks = (breaks[0] - length_novel_seq, breaks[1] + 1)
+			else:
+			    breaks = (breaks[0], breaks[0] + length_novel_seq + 1)
 		    else:
-			breaks = (breaks[0], breaks[0] + length_novel_seq + 1)
-		else:
-		    if align.strand == '+':
-			breaks = (breaks[0], breaks[0] + length_novel_seq + 1)
-		    else:
-			breaks = (breaks[0] - length_novel_seq, breaks[1] + 1)
+			if align.strand == '+':
+			    breaks = (breaks[0], breaks[0] + length_novel_seq + 1)
+			else:
+			    breaks = (breaks[0] - length_novel_seq, breaks[1] + 1)
 		    
 		contig_breaks = (contig_breaks[0] - length_novel_seq * duplicated[0],
 	                         contig_breaks[1] + length_novel_seq * duplicated[1])
