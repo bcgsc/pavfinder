@@ -16,7 +16,7 @@ from vcf import VCF
 from pybedtools import BedTool
 
 # extract version from version.py
-execfile(os.path.dirname(os.path.realpath(__file__)) + "/../version.py")
+execfile(os.path.dirname(os.path.realpath(__file__)) + "/../../version.py")
 
 class SVFinder:    
     def __init__(self, bam_file, aligner, contig_fasta, genome_fasta, out_dir,
