@@ -1,6 +1,6 @@
 import os
 from setuptools import setup, find_packages
-execfile(os.path.dirname(os.path.realpath(__file__)) + "/version.py")
+execfile(os.path.dirname(os.path.realpath(__file__)) + "/scripts/version.py")
 setup(
     name='pavfinder',
     version=__version__,
