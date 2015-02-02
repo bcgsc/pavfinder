@@ -5,14 +5,15 @@ import sys
 import os
 import re
 import pysam
-from SV import gapped_align, split_align
-from shared import gmap, bwa_mem
+from pybedtools import BedTool
+from pavfinder import SV
+from pavfinder import shared
+
 from SV.variant import Adjacency, Variant
 from shared.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
 from shared.read_support import scan_all, fetch_support
 from shared.alignment import reverse_complement, target_non_canonical
 from SV.vcf import VCF
-from pybedtools import BedTool
 
 # extract version from version.py
 execfile(os.path.dirname(os.path.realpath(__file__)) + "/../version.py")
@@ -44,7 +45,7 @@ class SVFinder:
 	the respective modules to identify adjs"""
 	def find_events_in_single_align(align):
 	    """Implement as sub-function so that small-scale events can be found on split alignments too"""
-	    adjs = gapped_align.find_adjs(align, contig_seq, False, ins_as_ins=ins_as_ins)
+	    adjs = SV.gapped_align.find_adjs(align, contig_seq, False, ins_as_ins=ins_as_ins)
 		
 	    repeats = Set()
 	    for i in range(len(adjs)):
@@ -118,7 +119,7 @@ class SVFinder:
 		continue
 	    
 	    if len(alns) > 1:
-		chimeric_aligns, dubious = split_align.find_chimera(alns, 
+		chimeric_aligns, dubious = SV.split_align.find_chimera(alns, 
 		                                                    self.aligner, 
 		                                                    self.bam, 
 		                                                    min_coverage=min_ctg_cov, 
@@ -140,7 +141,7 @@ class SVFinder:
 			if skip:
 			    continue
 		
-		    adjs = split_align.find_adjs(chimeric_aligns, self.aligner, contig_seq, dubious=dubious, debug=self.debug)
+		    adjs = SV.split_align.find_adjs(chimeric_aligns, self.aligner, contig_seq, dubious=dubious, debug=self.debug)
 		    
 		    bad = Set()
 		    for i in range(len(adjs)):
@@ -184,7 +185,7 @@ class SVFinder:
 		    for align in chimeric_aligns:
 			all_adjs.extend(find_events_in_single_align(align))
 			
-	    best_align = gapped_align.find_single_unique(alns, self.aligner, self.bam, debug=self.debug)
+	    best_align = SV.gapped_align.find_single_unique(alns, self.aligner, self.bam, debug=self.debug)
 	    if best_align:
 		all_adjs.extend(find_events_in_single_align(best_align))
 		    
@@ -580,7 +581,7 @@ class SVFinder:
 		    indices_to_check = (index,)
 	    
 	    probe_alns = [aln for aln in alns if not aln.qname[-1].isdigit()]
-	    if not gapped_align.screen_probe_alns(adj_aligns, probe_alns, adj.align_types[0]):
+	    if not SV.gapped_align.screen_probe_alns(adj_aligns, probe_alns, adj.align_types[0]):
 		if self.debug:
 		    sys.stdout.write('probe align completely to one location or not aligned with confidence: %s\n' % key)
 		failed_variants.add(variant)
