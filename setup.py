@@ -22,4 +22,6 @@ setup(
         'pybedtools>=0.6.2',
         'intspan>=0.701',
         ],
+	scripts = ['pavfinder/scripts/pavfinder,
+		],
 )

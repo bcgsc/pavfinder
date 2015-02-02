@@ -3,13 +3,13 @@ set -euo pipefail
 
 script_dir=`dirname $0`
 script_name=`basename $0`
-if [ ! -s $script_dir/version.py ]
+if [ ! -s $script_dir/../version.py ]
 then
 	echo "Error: problem with package - version.py cannot be located in $script_dir"
 	exit 1
 fi
 
-version=$(grep version $script_dir/version.py | sed 's/[ \"]//g' | cut -f2 -d'=')
+version=$(grep version $script_dir/../version.py | sed 's/[ \"]//g' | cut -f2 -d'=')
 
 function usage {
 	echo Program: $script_name
