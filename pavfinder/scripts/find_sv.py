@@ -5,14 +5,13 @@ import sys
 import os
 import re
 import pysam
-import gapped_align
-import split_align
+from SV import gapped_align, split_align
 from shared import gmap, bwa_mem
-from variant import Adjacency, Variant
+from SV.variant import Adjacency, Variant
 from shared.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
 from shared.read_support import scan_all, fetch_support
 from shared.alignment import reverse_complement, target_non_canonical
-from vcf import VCF
+from SV.vcf import VCF
 from pybedtools import BedTool
 
 # extract version from version.py
@@ -997,7 +996,7 @@ def main(args, options):
 
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contig_fasta(indexed) genome_file(indexed) out_dir"
-    parser = OptionParser(usage=usage)
+    parser = OptionParser(usage=usage, version=__version__)
     
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
     parser.add_option("-g", "--genome", dest="genome", help="genome")

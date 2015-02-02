@@ -3,13 +3,8 @@ set -euo pipefail
 
 script_dir=`dirname $0`
 script_name=`basename $0`
-if [ ! -s $script_dir/../version.py ]
-then
-	echo "Error: problem with package - version.py cannot be located in $script_dir"
-	exit 1
-fi
 
-version=$(grep version $script_dir/../version.py | sed 's/[ \"]//g' | cut -f2 -d'=')
+version=$(python $script_dir/find_sv.py --version)
 
 function usage {
 	echo Program: $script_name
@@ -34,18 +29,18 @@ if [ $sample = "transcriptome" ]
 then
 	if [ $# -gt 0 ]
 	then
-		python $script_dir/splice/map_transcripts.py $@
+		python $script_dir/map_transcripts.py $@
 	else
-		msg=$(python $script_dir/splice/map_transcripts.py --help)
+		msg=$(python $script_dir/map_transcripts.py --help)
 		echo "$msg" | sed 's/map_transcripts.py/pavfinder transcriptome/'
 	fi
 elif [ $sample = "genome" ]
 then
 	if [ $# -gt 0 ]
 	then
-		python $script_dir/SV/find_sv.py $@
+		python $script_dir/find_sv.py $@
 	else
-		msg=$(python $script_dir/SV/find_sv.py --help)
+		msg=$(python $script_dir/find_sv.py --help)
 		echo "$msg" | sed 's/find_sv.py/pavfinder genome/'
 	fi
 else

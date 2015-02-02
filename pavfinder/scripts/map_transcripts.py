@@ -13,9 +13,9 @@ from shared.alignment import reverse_complement
 from sets import Set
 from intspan import intspan
 from SV.variant import Adjacency
-from itd_finder import ITD_Finder
-from fusion_finder import FusionFinder
-from novel_splice_finder import NovelSpliceFinder
+from splice.itd_finder import ITD_Finder
+from splice.fusion_finder import FusionFinder
+from splice.novel_splice_finder import NovelSpliceFinder
 from shared.read_support import scan_all, fetch_support, expand_contig_breaks
 
 class Transcript:
