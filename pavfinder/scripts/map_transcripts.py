@@ -9,6 +9,7 @@ import gzip
 from sets import Set
 from intspan import intspan
 from distutils.spawn import find_executable
+from pavfinder import __version__
 from pavfinder.shared import gmap
 from pavfinder.shared.alignment import reverse_complement
 from pavfinder.shared.adjacency import Adjacency
@@ -1254,7 +1255,7 @@ def main(args, options):
     
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contigs_fasta annotation_file genome_file(indexed) out_dir"
-    parser = OptionParser(usage=usage)
+    parser = OptionParser(usage=usage, version=__version__)
     
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
     parser.add_option("-t", "--num_threads", dest="num_threads", help="number of threads. Default:8", type='int', default=8) 
