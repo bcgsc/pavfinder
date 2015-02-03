@@ -6,14 +6,12 @@ import os
 import re
 import pysam
 from pybedtools import BedTool
-from pavfinder import SV
-from pavfinder import shared
-
-from SV.variant import Adjacency, Variant
-from shared.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
-from shared.read_support import scan_all, fetch_support
-from shared.alignment import reverse_complement, target_non_canonical
-from SV.vcf import VCF
+from pavfinder.shared.adjacency import Adjacency
+from pavfinder.shared.variant import Variant
+from pavfinder.shared.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
+from pavfinder.shared.read_support import scan_all, fetch_support
+from pavfinder.shared.alignment import reverse_complement, target_non_canonical
+from pavfinder.shared.vcf import VCF
 
 # extract version from version.py
 execfile(os.path.dirname(os.path.realpath(__file__)) + "/../version.py")
@@ -458,7 +456,7 @@ class SVFinder:
 	    out.write('>%s%s%s%s%d\n%s\n' % (adj.contigs[0], name_sep, adj.key(), name_sep, i, subseqs[i]))
 	    
     def is_homol_low_complexity(self, adj, min_len=5):
-	"""Determine if the microhomology sequence of the adjacency is low-complexity
+	"""Determine if the microhomology sequence of the Adjacency is low-complexity
 	
 	Only determines if microhomology sequence is low-complexity if it's at least 
 	min_len in size
@@ -527,7 +525,7 @@ class SVFinder:
 
 	- aligner, genome, and index_dir must have been set when object is initialized
 	- output is always set to "realign.fa" and "realign.bam"
-	- will fail adjacency if probe sequence can align to single location
+	- will fail Adjacency if probe sequence can align to single location
 	"""
 	if not self.aligner or not self.genome or not self.index_dir:
 	    return None
@@ -552,7 +550,7 @@ class SVFinder:
 	except:
 	    sys.exit('Error parsing realignment BAM:%s' % realign_bam_file)
 	    
-	# creates mapping from query to variant and adjacency
+	# creates mapping from query to variant and Adjacency
 	query_to_variant = {}
 	for i in range(len(self.variants)):
 	    for j in range(len(self.variants[i].adjs)):
@@ -678,7 +676,7 @@ class SVFinder:
 		try:
 		    out.write('%s\n' % output)
 		except:
-		    sys.stdout.write("can't output adjacency")
+		    sys.stdout.write("can't output Adjacency")
 		    
 	    out.close()
 	    	    

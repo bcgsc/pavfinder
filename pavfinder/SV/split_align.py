@@ -2,11 +2,11 @@ from optparse import OptionParser
 import pysam
 from intspan import intspan
 from sets import Set
-from shared import gmap, bwa_mem
 import sys
 import re
-from variant import Adjacency
-from shared.alignment import compare_chr, Alignment, target_non_canonical
+from pavfinder.shared import gmap, bwa_mem
+from pavfinder.shared.adjacency import Adjacency
+from pavfinder.shared.alignment import compare_chr, Alignment, target_non_canonical
 
 def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, max_splits=3, debug=False):
     """Finds primary_aligns alignments corresponding to chimera

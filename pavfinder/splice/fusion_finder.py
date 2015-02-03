@@ -3,9 +3,9 @@ from itertools import groupby
 import sys
 import re
 import pysam
-from SV.split_align import call_event
-from SV.variant import Adjacency
-from SV import gapped_align, split_align
+from pavfinder.SV.split_align import call_event
+from pavfinder.shared.adjacency import Adjacency
+from pavfinder.SV import gapped_align, split_align
 
 class FusionFinder:
     @classmethod

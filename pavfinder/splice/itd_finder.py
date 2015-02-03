@@ -2,7 +2,7 @@ import re
 import sys
 import os
 import subprocess
-from shared.alignment import reverse_complement
+from pavfinder.shared.alignment import reverse_complement
 
 class ITD_Finder: 
     @classmethod

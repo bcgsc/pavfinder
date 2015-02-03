@@ -2,9 +2,9 @@ from optparse import OptionParser
 import re
 from sets import Set
 import pysam
-from shared.alignment import Alignment, reverse_complement
-from variant import Adjacency
-from shared import gmap, bwa_mem
+from pavfinder.shared.alignment import Alignment, reverse_complement
+from pavfinder.shared.adjacency import Adjacency
+from pavfinder.shared import gmap, bwa_mem
 
 def find_single_unique(alns, aligner, bam, debug=False):
     return {

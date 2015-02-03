@@ -1,5 +1,5 @@
 from sets import Set
-from shared.alignment import reverse_complement
+from pavfinder.shared.alignment import reverse_complement
 
 class NovelSpliceFinder:    
     @classmethod
