@@ -6,15 +6,13 @@ import os
 import re
 import pysam
 from pybedtools import BedTool
+from pavfinder import __version__
 from pavfinder.shared.adjacency import Adjacency
 from pavfinder.shared.variant import Variant
 from pavfinder.shared.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
 from pavfinder.shared.read_support import scan_all, fetch_support
 from pavfinder.shared.alignment import reverse_complement, target_non_canonical
 from pavfinder.shared.vcf import VCF
-
-# extract version from version.py
-execfile(os.path.dirname(os.path.realpath(__file__)) + "/../version.py")
 
 class SVFinder:    
     def __init__(self, bam_file, aligner, contig_fasta, genome_fasta, out_dir,
