@@ -2,6 +2,7 @@ from sets import Set
 from vcf import VCF
 import sys
 import copy
+from variant import Variant
 
 class Adjacency:
     def __init__(self, chroms, breaks, rearrangement, novel_seq='-',
