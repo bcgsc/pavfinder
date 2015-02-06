@@ -3,6 +3,7 @@ from vcf import VCF
 import sys
 import copy
 from variant import Variant
+from alignment import reverse_complement
 
 class Adjacency:
     def __init__(self, chroms, breaks, rearrangement, novel_seq='-',
@@ -904,8 +905,8 @@ class Adjacency:
 	    for i in range(len(subseqs)):
 		out.write('>%s%s%s%s%d\n%s\n' % (adj.contigs[0], name_sep, adj.key(), name_sep, i, subseqs[i]))
 	    
-	from shared import gmap
-	from shared import bwa_mem
+	import gmap
+	import bwa_mem
 		
 	prefix = 'realign'
 	if not use_realigns:
