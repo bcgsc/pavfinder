@@ -13,9 +13,16 @@ class Variant:
 	    
 	self.chrom = chrom
 	self.pos = pos
-	self.filtered_out = False
-	self.somatic = True
-		
+	self.filtered_out = None
+	self.filtered_out_normal = None
+	self.somatic = False
+    
+	self.support = None
+	self.support_normal = None
+	# final integer counts of read support
+	self.final_support = None
+	self.final_support_normal = None
+	
     def as_vcf(self, ref_fasta, genomic=True, size_threshold=100, insertion_as_sv=True):
 	if len(self.adjs) == 2:
 	    if self.event == 'INV':
@@ -47,6 +54,11 @@ class Variant:
 	if self.adjs[1].homol_seq and self.adjs[1].homol_seq[0]  != '-':
 	    info['CIEND'] = '0,%d' % len(self.adjs[1].homol_seq[0])
 	    
+	info['READSUPPORT'] = self.final_support
+	
+	if self.somatic:
+	    info['SOMATIC'] = 'SOMATIC'
+	    
 	return self.adjs[0].as_sv(ref_fasta, id_ext=self.id, info_ext=info)
         
     def reciprocal_trl_as_vcf(self, ref_fasta):
@@ -54,10 +66,17 @@ class Variant:
 	          (self.adjs[0].id + 'a', self.adjs[0].id + 'b'))
 	
 	event_id = self.event.upper() + self.id
-	vcf_0 = self.adjs[0].as_breakends(ref_fasta, info_ext={'EVENT': (event_id, event_id),
-	                                                       'PARID': parids[0]})
-	vcf_1 = self.adjs[1].as_breakends(ref_fasta, info_ext={'EVENT': (event_id, event_id),
-	                                                       'PARID': parids[1]})
+	
+	info_0 = {'EVENT': (event_id, event_id),
+	          'PARID': parids[0]}
+	info_1 = {'EVENT': (event_id, event_id),
+	          'PARID': parids[1]}
+	if self.somatic:
+	    info_0['SOMATIC'] = 'SOMATIC'
+	    info_1['SOMATIC'] = 'SOMATIC'
+	
+	vcf_0 = self.adjs[0].as_breakends(ref_fasta, info_ext=info_0)
+	vcf_1 = self.adjs[1].as_breakends(ref_fasta, info_ext=info_1)
 	
 	return vcf_0 + '\n' + vcf_1
     
@@ -76,6 +95,11 @@ class Variant:
 	if self.pos[1] != self.pos[0]:
 	    info['CIPOS'] = '0,%d' % (self.pos[1] - self.pos[0])
 	    	
+	info['READSUPPORT'] = self.final_support
+	
+	if self.somatic:
+	    info['SOMATIC'] = 'SOMATIC'
+	
 	return self.adjs[0].as_sv(ref_fasta, chrom_ext=self.chrom, pos_ext=self.pos[0], id_ext=self.id, info_ext=info)
     
     def check_adjs(self, adjs_passed):
@@ -88,4 +112,5 @@ class Variant:
 	    return True
 	else:
 	    return False
+	
 	

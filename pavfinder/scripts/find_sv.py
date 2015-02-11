@@ -598,7 +598,7 @@ class SVFinder:
 	"""
 	variants = [variant for variant in self.variants if not variant.filtered_out]
 	if only_somatic:
-	    variants = [variant for variant in self.variants if variant.somatic]
+	    variants = [variant for variant in variants if variant.somatic]
 	    
 	#if variants:
 	self.output_variants(variants, 
@@ -689,8 +689,44 @@ class SVFinder:
 	Args:
 	    bam_file: (str) Path of reads-to-contigs BAM
 	"""
+	support_types = ('spanning', 'flanking')
+	
+	def initialize(obj, normal=False):
+	    if not normal:
+		obj.support = {}
+		support = obj.support
+	    else:
+		obj.support_normal = {}
+		support = obj.support_normal
+	    for support_type in support_types:
+		support[support_type] = 0
+	
+	def sum_support(obj, values, normal=False):
+	    """Add read support
+	    
+	    Args:
+	        obj: Adjacency or Variant
+	        support_types: (tuple of str) 'spanning', 'pairs' 
+	        values: (list of tuples)
+	    """
+	    for i in range(len(support_types)):
+		for support in values:
+		    if not normal:
+			obj.support[support_types[i]] += support[i]
+		    else:
+			obj.support_normal[support_types[i]] += support[i]
+			
+	def get_final_support(obj, normal=False):
+	    if not normal:
+		obj.final_support = obj.support['spanning']
+	    else:
+		obj.final_support_normal = obj.support_normal['spanning']
+	
 	coords = {}
 	for variant in self.variants:
+	    if variant.filtered_out:
+		continue
+
 	    for adj in variant.adjs:
 		for i in range(len(adj.contigs)):
 		    contig = adj.contigs[i]
@@ -699,7 +735,7 @@ class SVFinder:
 			coords[contig].append(span)
 		    except:
 			coords[contig] = [span]
-	
+			
 	if coords:
 	    bam_files = {'tumor':tumor_bam, 'normal':normal_bam}
 	    
@@ -712,10 +748,12 @@ class SVFinder:
 		    avg_tlen = self.avg_tlen
 		    overlap_buffer = min_overlap
 		    perfect = False
+		    normal = False
 		else:
 		    avg_tlen = self.avg_tlen_normal
 		    overlap_buffer = min_overlap_normal
 		    perfect = False
+		    normal = True
 				    
 		avg_tlen = None
 		tlens = []
@@ -729,26 +767,32 @@ class SVFinder:
 		print 'total tlens', len(tlens), sample_type
 		
 		for variant in self.variants:
+		    # initialize
+		    initialize(variant, normal=normal)
+		    # for summing adj support into variant
+		    support_adjs = []
 		    for adj in variant.adjs:
-			if sample_type == 'tumor':
-			    support_result = adj.support
-			    # for sum_support()
-			    normal = False
-			else:
-			    support_result = adj.support_normal
-			    normal = True
-    
+			# initialize
+			initialize(adj, normal=normal)
+			# for summing contig support into adj
+			support_contigs = []
 			for i in range(len(adj.contigs)):
 			    contig = adj.contigs[i]
 			    span = adj.get_contig_support_span(i)
 			    coord = '%s-%s' % (span[0], span[1])
 						
 			    if support.has_key(contig) and support[contig].has_key(coord):
-				support_result['spanning'].append(support[contig][coord][0])
-				support_result['flanking'].append(support[contig][coord][1])
-				support_result['tiling'].append(support[contig][coord][2])
-						    
-			adj.sum_support(normal=normal)	
+				support_contigs.append(support[contig][coord])
+								    
+			sum_support(adj, support_contigs, normal=normal)			    
+			get_final_support(adj, normal=normal)
+			if not normal:
+			    support_adjs.append([adj.support[support_type] for support_type in support_types])
+			else:
+			    support_adjs.append([adj.support_normal[support_type] for support_type in support_types])
+			
+		    sum_support(variant, support_adjs, normal=normal)
+		    get_final_support(variant, normal=normal)
 			 
 		if tlens:
 		    avg_tlen = float(sum(tlens)) / len(tlens)
@@ -757,70 +801,55 @@ class SVFinder:
 	if self.debug:
 	    for variant in self.variants:
 		for adj in variant.adjs:
-		    print 'tumor', adj.support, adj.support_total, adj.support_final
-		    print 'normal', adj.support_normal, adj.support_total_normal, adj.support_final_normal
-				
-    def filter_by_read_support(self, adj, min_support, normal=False):
-	small = 50
-	max_homol_len = 25
-	min_flanking = 2
-	adj_size = adj.get_size()
+		    print 'tumor support adj', adj.support, adj.final_support
+		    print 'normal support adj', adj.support_normal, adj.final_support_normal
+		print 'tumor support variant', variant.support, variant.final_support
+		print 'normal support variant', variant.support_normal, variant.final_support_normal
+		
+    def filter_by_read_support(self, variant, min_support, normal=False):
+	"""Filters out variant failing to have minimum read support
 	
-	if not normal:
-	    support_total, avg_tlen = adj.support_total, self.avg_tlen
-	else:
-	    support_total, avg_tlen = adj.support_total_normal, self.avg_tlen_normal
-	    
-	support_final = support_total['spanning'] + support_total['flanking']
+	final_support or find_support_normal (int) will be compared against min_support (int)
+		
+	Args:
+	    variant: Variant
+	    min_support: (int) minimum number of read support
+	    normal: (boolean) whether "support" or "support_normal" should be looked at
+	Returns:
+	    filtered_out
+	    True = final_support or find_support_normal < min_support
+	"""
+	#max_homol_len = 25
+	#min_flanking = 2	    
 	filtered_out = False
+		
+	if not normal:
+	    support = variant.support
+	    final_support = variant.final_support
+	else:
+	    support = variant.support_normal
+	    final_support = variant.final_support_normal
 	
-	if support_total['spanning'] < min_support:
+	if final_support < min_support:
 	    filtered_out = True
 	    if self.debug:
-		sys.stdout.write('%s %s %s filtered out spanning:%d minimum:%d\n' % (adj.contigs, 
-	                                                                             adj.rearrangement,
-	                                                                             adj_size,
-	                                                                             support_total['spanning'],
-	                                                                             min_support))
-		
-	if adj.homol_seq and len(adj.homol_seq[0]) > max_homol_len:
-	    if support_total['flanking'] < min_flanking:
-		filtered_out = True
-		if self.debug:
-		    sys.stdout.write('%s %s %s homol_len:%d filtered out frags:%d minimum:%d\n' % (adj.contigs, 
-		                                                                                   adj.rearrangement,
-		                                                                                   adj_size,
-		                                                                                   len(adj.homol_seq[0]),
-		                                                                                   support_total['flanking'],
-		                                                                                   min_flanking))	    
-	
-	if filtered_out and adj.novel_seq and adj.novel_seq != '-' and avg_tlen is not None:
-	    spannable_fraction_tlen = 0.4
-	    if len(adj.novel_seq) > spannable_fraction_tlen * avg_tlen:
-		passed = False
-		for tiling in support['tiling']:
-		    if tiling:
-			passed = True
-			break
-		filtered_out = True if not passed else False
-		    
-		if self.debug:
-		    message = 'no_tiling_for_long_novel' if not passed else 'long_novel rescued by tiling'
-		    sys.stdout.write('%s %s %s %s novel_seq:%s novel_len:%d %f tiling:%s spanning:%d frags:%d\n' % (message,
-		                                                                                                    adj.contigs, 
-		                                                                                                    adj.chroms, 
-		                                                                                                    adj.breaks, 
-		                                                                                                    adj.novel_seq,
-		                                                                                                    len(adj.novel_seq), 
-		                                                                                                    spannable_fraction_tlen * self.avg_tlen,
-		                                                                                                    support['tiling'], 
-		                                                                                                    support_total['spanning'],
-		                                                                                                    support_total['flanking']))
-	    	    	    	  
-	if not normal:
-	    adj.support_final = support_final
-	else:
-	    adj.support_final_normal = support_final
+		sys.stdout.write('%s %s filtered out spanning:%d minimum:%d\n' % (variant.chrom, 
+		                                                                  variant.pos,
+		                                                                  final_support,
+		                                                                  min_support))										     
+										    
+	#for adj in variant.adjs:
+	    #flanking = support['flanking']		
+	    #if adj.homol_seq and len(adj.homol_seq[0]) > max_homol_len:
+		#if flanking < min_flanking:
+		    #filtered_out = True
+		    #if self.debug:
+			#sys.stdout.write('%s %s %s homol_len:%d filtered out frags:%d minimum:%d\n' % (adj.contigs, 
+												       #adj.rearrangement,
+												       #adj_size,
+												       #len(adj.homol_seq[0]),
+												       #support['flanking'],
+												       #min_flanking))	    	    	    	    	  
 
 	return filtered_out
     
@@ -862,20 +891,21 @@ class SVFinder:
 	for i in sorted(bad_adj_indices, reverse=True):
 	    del adjs[i]
 	    
-    def filter_variants(self, min_support, min_support_normal=None, max_homol=None, tumor_bam=False, normal_bam=False):
+    def filter_variants(self, max_homol=None):
 	"""Filter out events that are believed to be false positive
 	
 	Filtering:
-	1. Must not have 'N' in probe sequence
-	2. Spanning reads must be >= minimum (default=4)
-	3. If homology sequence > maximum (default=25), must have flanking read pair support
+	1. Probe sequence doesn't have 'N'
+	2. Novel sequence doesn't have non-AGTC sequence
+	3. Will not consider haplotype contigs in assembly
+	4. Homology sequence > max_homol
 	
 	Args:
 	    min_spanning: (int) minimum number of spanning reads
 	    min_flanking: (int) minimum number of flanking pairs when homlogous sequence > max_homol_len
-	    max_homol_len: (int) maximum length of homology, over which flanking pairs have to be check
 	"""
-	for variant in self.variants:
+
+	for variant in self.variants:    
 	    for adj in variant.adjs:
 		if 'N' in adj.probes[0].upper():
 		    adj.filtered_out = True
@@ -898,56 +928,57 @@ class SVFinder:
 			adj.filtered_out = True
 			if self.debug:
 			    sys.stdout.write('homolgous sequence length %s too long (>%s)\n' % (len(adj.homol_seq[0]), max_homol))
-			
-		if not adj.filtered_out and (tumor_bam or normal_bam):
-		    if tumor_bam:
-			adj.filtered_out = self.filter_by_read_support(adj, min_support)
-			
-		    if normal_bam:
-			adj.filtered_out_normal = self.filter_by_read_support(adj, min_support_normal, normal=True)
-		    
-			if adj.filtered_out is not None:
-			    if not adj.filtered_out:
-				adj.somatic = True
-			    if adj.filtered_out_normal is not None and not adj.filtered_out_normal:
-				adj.somatic = False
-				
-			elif adj.filtered_out_normal is not None:
-			    if adj.filtered_out_normal:
-				adj.somatic = True
-							   
-			if self.debug:
-			    if not adj.somatic:
-				sys.stdout.write('germline %s %s %s tumor:%s normal:%s\n' % (adj.contigs, 
-				                                                             adj.chroms, 
-				                                                             adj.breaks, 
-				                                                             adj.support_total, 
-				                                                             adj.support_total_normal))
+			    
+		if adj.filtered_out:
+		    variant.filtered_out = True
 
-	    # don't filter out inversion variant if one breakpoint does not have enough read support
-	    if variant.event != 'INV':
-		for adj in variant.adjs:
-		    # don't filter out inversion variant if one breakpoint does not have enough read support
-		    if adj.filtered_out:
-			variant.filtered_out = True
-			break
-		    
-	    if normal_bam:
-		if len(variant.adjs) == 1:
-		    variant.somatic = variant.adjs[0].somatic
-		elif variant.event == 'INV':
-		    variant.somatic = False
-		    for adj in variant.adjs:
-			if adj.somatic:
-			    variant.somatic = True
-			    break
-		else:
-		    variant.somatic = True
-		    for adj in variant.adjs:
-			if not adj.somatic:
+    def filter_and_classify(self, min_support, min_support_normal):
+	"""Filters out all variants based on read support and assign somatic status
+	
+	somatic is True if
+	1. tumor and normal r2c provided,
+	   support_final >= min_support, support_final_normal < min_support_normal
+	2. only normal r2c provided
+	   support_final_normal < min_support_normal
+		
+	Args:
+	    min_support: (int) minimum read support number
+	    min_support_normal: (int) minimum read support number for normal
+	"""
+	for variant in self.variants:
+	    if variant.filtered_out:
+		continue
+	    
+	    if variant.support is not None:
+		variant.filtered_out = self.filter_by_read_support(variant, min_support)
+	    
+	    if variant.support_normal is not None:
+		variant.filtered_out_normal = self.filter_by_read_support(variant, min_support_normal, normal=True)
+		    	
+	    if variant.filtered_out is not None:
+		if not variant.filtered_out:
+		    if variant.filtered_out_normal is not None:
+			variant.somatic = True
+			if not variant.filtered_out_normal:
 			    variant.somatic = False
-			    break
-		    
+			    
+	    elif variant.filtered_out_normal is not None:
+		variant.somatic = True
+		if not variant.filtered_out_normal:
+		    variant.somatic = False
+		
+	    # assign somatic status to adjacencies
+	    if variant.somatic:
+		for adj in variant.adjs:
+		    adj.somatic = True
+						   
+	    if self.debug:
+		if not variant.somatic:
+		    sys.stdout.write('germline %s %s tumor:%s normal:%s\n' % (variant.adjs[0].chroms[0], 
+		                                                              variant.adjs[0].breaks[0], 
+		                                                              variant.final_support, 
+		                                                              variant.final_support_normal))
+					    
 def main(args, options):
     sv_finder = SVFinder(*args, 
                          genome=options.genome, 
@@ -958,6 +989,7 @@ def main(args, options):
                          acen_buffer=options.acen_buffer,
                          debug=options.debug)
         
+    # discover adjacencies from alignments
     adjs = sv_finder.find_adjs(min_ctg_cov=options.min_ctg_cov, 
                                max_size=options.max_size, 
                                min_size=options.min_size, 
@@ -968,24 +1000,25 @@ def main(args, options):
                                bad_coords=options.bad_coords,
                                skip_contigs_file=options.skip_contigs)
     
+    # create variants from adjacencies
     sv_finder.create_variants(adjs)
+    # filter out variants based on alignments, etc
+    sv_finder.filter_variants(max_homol=options.max_homol)
         
+    # realign to increase specificity
     if options.genome and options.index_dir and sv_finder.variants:
 	sv_finder.screen_realigns(use_realigns=options.use_realigns)
 	
+    # r2c bam files given, find read support
     if options.r2c_bam_file or options.normal_bam:
 	sv_finder.find_support(tumor_bam=options.r2c_bam_file, 
 	                       min_overlap=options.min_overlap, 
 	                       normal_bam=options.normal_bam, 
 	                       min_overlap_normal=options.min_overlap_normal)
-	    
-    sv_finder.filter_variants(options.min_support, 
-                              options.min_support_normal,
-                              options.max_homol,
-                              options.r2c_bam_file,
-                              options.normal_bam)
-    
-	
+	# filter and assign somatic status    
+	sv_finder.filter_and_classify(options.min_support, options.min_support_normal)
+            
+    # output
     sv_finder.output(options.normal_bam is not None,
                      reference_url=options.reference_url,
                      assembly_url=options.assembly_url,

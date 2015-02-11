@@ -61,14 +61,11 @@ class Adjacency:
 	
         # small-scale events may not have this information
         self.orients = orients
-        			
-	self.support = {'spanning':[], 'flanking':[], 'tiling':[]}
-	self.support_total = {'flanking':'NA', 'spanning':'NA'}
-	self.support_final = None
 	
-	self.support_normal = {'spanning':[], 'flanking':[], 'tiling':[]}
-	self.support_total_normal = {'flanking':'NA', 'spanning':'NA'}
-	self.support_final_normal = None
+	self.support = None
+	self.support_normal = None
+	self.final_support = None
+	self.final_support_normal = None
 	
 	self.filtered_out = None
 	self.filtered_out_normal = None
@@ -84,7 +81,13 @@ class Adjacency:
 		
     def debug(self):
         print '%s %s %s %s %s %s' % (self.rearrangement, self.chroms, self.breaks, self.get_size(), ','.join(self.contigs), self.orients)
-        
+	
+    #def sum_support(self, normal=False):
+	#if not normal:
+	    #return self.support['spanning'] + self.support['flanking']
+	#else:
+	    #return self.support_normal['spanning'] + self.support_normal['flanking']
+	
     def get_size(self):
         size = 0
         if self.align_types[0] == 'gapped' and self.rearrangement in ('ins', 'dup'):
@@ -171,9 +174,9 @@ class Adjacency:
 	    infos[1]['HOMSEQ'] = homol_seq
 	    
 	# read support
-	if self.support_final is not None:
-	    infos[0]['READSUPPORT'] = self.support_final
-	    infos[1]['READSUPPORT'] = self.support_final
+	if self.final_support is not None:
+	    infos[0]['READSUPPORT'] = self.final_support
+	    infos[1]['READSUPPORT'] = self.final_support
 	    
 	adj_size = self.get_size()
 	if type(adj_size) is int:
@@ -254,8 +257,8 @@ class Adjacency:
 	        }
 	
 	# read support
-	if self.support_final is not None:
-	    info['READSUPPORT'] = self.support_final
+	if self.final_support is not None:
+	    info['READSUPPORT'] = self.final_support
 	    
 	# somatic
 	if self.somatic:
@@ -311,8 +314,8 @@ class Adjacency:
 	    info['SVLEN'] = sv_len
 	
 	# read support
-	if self.support_final is not None:
-	    info['READSUPPORT'] = self.support_final
+	if self.final_support is not None:
+	    info['READSUPPORT'] = self.final_support
 	    
 	# somatic
 	if self.somatic:
@@ -377,82 +380,45 @@ class Adjacency:
                    )
         return '\t'.join(headers)
     
-    def as_tab(self, expand_contigs=False):        
+    def as_tab(self):        
         outputs = []
 	
-	if not expand_contigs:
-	    data = []
-	    data.append(self.id)
-	    data.append(self.rearrangement)
-	    for j in range(2):
-		data.append(self.chroms[j])
-		data.append(str(self.breaks[j]))
-		data.append(self.orients[j])
-	    data.append(str(self.get_size()))
-	    data.append(','.join(self.contigs))
-	    data.append(','.join([str(b[0]) for b in self.contig_breaks]))
-	    data.append(','.join([str(b[1]) for b in self.contig_breaks]))
-	    	    
-	    if self.homol_seq:
-		data.append(','.join(self.homol_seq))
-	    else:
-		data.append('-')
+	data = []
+	data.append(self.id)
+	data.append(self.rearrangement)
+	for j in range(2):
+	    data.append(self.chroms[j])
+	    data.append(str(self.breaks[j]))
+	    data.append(self.orients[j])
+	data.append(str(self.get_size()))
+	data.append(','.join(self.contigs))
+	data.append(','.join([str(b[0]) for b in self.contig_breaks]))
+	data.append(','.join([str(b[1]) for b in self.contig_breaks]))
 		
-	    if self.homol_coords:
-		data.append(','.join([str(b[0]) for b in self.homol_coords]))
-		data.append(','.join([str(b[1]) for b in self.homol_coords]))
-	    else:
-		data.append('-')
-		data.append('-')
-		
-	    data.append(self.novel_seq)
-	    
-	    try:
-		data.append(self.probes[0])
-	    except:
-		data.append('-')
-	    data.append(str(self.support_total['spanning']))
-	    outputs.append('\t'.join(map(str, data)))
-	    
+	if self.homol_seq:
+	    data.append(','.join(self.homol_seq))
 	else:
-	    for i in range(len(self.contigs)):
-		data = []
-		data.append(self.id)
-		data.append(self.rearrangement)
-		for j in range(2):
-		    data.append(self.chroms[j])
-		    data.append(str(self.breaks[j]))
-		    data.append(self.orients[j])
-		data.append(str(self.get_size()))
-		data.append(self.contigs[i])
-		data.append(str(self.contig_breaks[i][0]))
-		data.append(str(self.contig_breaks[i][1]))
-		data.append(str(self.homol_seqs[i]))
-		data.append(str(self.homol_coords[i][0]))
-		data.append(str(self.homol_coords[i][1]))
-		data.append(self.novel_seq)  
-		data.append(self.probes[i])
-		data.append(self.genes[0])
-		data.append(self.genes[1])
-		data.append(self.transcripts[0])
-		data.append(self.transcripts[1])
-		data.append(str(self.exons[0]))
-		data.append(str(self.exons[1]))
-		data.append(str(self.introns[0]))
-		data.append(str(self.introns[1]))
-		data.append(str(self.exon_bounds[0]))
-		data.append(str(self.exon_bounds[1]))
-		data.append(self.rna_event)
-		data.append(self.fusion_type)
-		data.append(self.gene5)
-		data.append(self.gene3)
-		data.append(str(self.frames))
-		if len(self.read_supports) == len(self.contigs):
-		    data.append(str(self.support['spanning'][i]))
-		    data.append(str(self.support['flanking'][i]))
-		    data.append(str(self.support['tiling'][i]))
-		outputs.append('\t'.join(map(str, data)))
-            
+	    data.append('-')
+	    
+	if self.homol_coords:
+	    data.append(','.join([str(b[0]) for b in self.homol_coords]))
+	    data.append(','.join([str(b[1]) for b in self.homol_coords]))
+	else:
+	    data.append('-')
+	    data.append('-')
+	    
+	data.append(self.novel_seq)
+	
+	try:
+	    data.append(self.probes[0])
+	except:
+	    data.append('-')
+	if self.support is not None:
+	    data.append(str(self.support['spanning']))
+	else:
+	    data.append('-')
+	outputs.append('\t'.join(map(str, data)))
+	                
         return '\n'.join(outputs)
     
     def as_bed(self):
@@ -503,13 +469,13 @@ class Adjacency:
 	    return (self.contig_breaks[contig_index][0], self.contig_breaks[contig_index][1])
     
 	    
-    def sum_support(self, normal=False):
-	(support, support_total) = (self.support, self.support_total) if not normal else (self.support_normal, self.support_total_normal)
-	for kind, nums in support.iteritems():
-	    if kind == 'tiling':
-		continue
+    #def sum_support(self, normal=False):
+	#(support, support_total) = (self.support, self.support_total) if not normal else (self.support_normal, self.support_total_normal)
+	#for kind, nums in support.iteritems():
+	    #if kind == 'tiling':
+		#continue
 	    
-	    support_total[kind] = sum(nums)
+	    #support_total[kind] = sum(nums)
 	            
     def key(self, transcriptome=False, include_novel_seq=False):
 	"""Constructs a unique key for grouping adjacencies
@@ -811,7 +777,7 @@ class Adjacency:
 	return insertions, used_adjs    	
 		        
     @classmethod
-    def merge(cls, adjs, transcriptome=False):
+    def merge(cls, adjs, transcriptome=False, multimapping=False):
 	"""Merge adjacencies that have the same breakpoint (and same event type) together
 	Args:
 	    adjs: (list) Adjacency
@@ -842,9 +808,11 @@ class Adjacency:
 		    first_adj.homol_seq.append(adj.homol_seq[0])
 		if adj.homol_coords:
 		    first_adj.homol_coords.append(adj.homol_coords[0])
-		for support_type in ('spanning', 'tiling', 'flanking'):
-		    if adj.support[support_type]:
-			first_adj.support[support_type].append(adj.support[support_type][0])
+		for support_type in ('spanning', 'flanking'):
+		    #if adj.support[support_type]:
+			#first_adj.support[support_type].append(adj.support[support_type][0])
+		    if first_adj.support is not None and adj.support is not None:
+			first_adj.support[support_type] += adj.support[support_type]
 	
 	# for generating ID
 	count = 1
