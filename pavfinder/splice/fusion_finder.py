@@ -26,22 +26,29 @@ class FusionFinder:
 	"""
 	assert len(chimera_block_matches) == len(aligns), 'number of block matches(%d) != number of aligns(%d)' % \
 	       (len(chimera_block_matches), len(aligns))
-	for (matches1_by_txt, matches2_by_txt) in zip(chimera_block_matches, chimera_block_matches[1:]):	    
+	for (matches1_by_txt, matches2_by_txt) in zip(chimera_block_matches, chimera_block_matches[1:]):
+	    # create adjacency first to establish L/R orientations
+	    # necessary for choosing block_matches(start or end) and picking best transcripts
+	    fusion = call_event(aligns[0], aligns[1], no_sort=True, contig_seq=contig_seq, probe_side_len=50)
+
 	    genes1 = Set([transcripts[txt].gene for txt in matches1_by_txt.keys()])
 	    genes2 = Set([transcripts[txt].gene for txt in matches2_by_txt.keys()])
 	    	    	    
 	    junc_matches1 = {}
 	    num_blocks = len(aligns[0].blocks)
 	    for transcript in chimera_block_matches[0].keys():
-		junc_matches1[transcript] = chimera_block_matches[0][transcript][num_blocks - 1]
-	
+		if fusion.orients[0] == 'L':
+		    junc_matches1[transcript] = chimera_block_matches[0][transcript][-1]
+		else:
+		    junc_matches1[transcript] = chimera_block_matches[0][transcript][0]
+
 	    junc_matches2 = {}
 	    for transcript in chimera_block_matches[1].keys():
-		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
-    
-	    # create adjacency first to establish L/R orientations, which is necessary to pick best transcripts
-	    fusion = call_event(aligns[0], aligns[1], no_sort=True, contig_seq=contig_seq, probe_side_len=50)
-	    	    	    	    
+		if fusion.orients[0] == 'L':
+		    junc_matches2[transcript] = chimera_block_matches[1][transcript][-1]
+		else:
+		    junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
+
 	    junc1, junc2 = cls.identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
 	    if junc1 and junc2 and junc1[1] is not None and junc2[1] is not None:
 		cls.annotate_fusion(fusion, junc1, junc2, transcripts)
@@ -196,11 +203,12 @@ class FusionFinder:
 	    best_score = max(scores.values())
 	    best_txt = sorted([t for t in matches.keys() if scores[t] == best_score], 
 		               key=lambda t: transcripts[t].length(), reverse=True)[0]
+
 	    return best_txt, best_score > exon_bound_score
-	    	
+
 	best_txt1, exon_bound1 = pick_best(matches1, orients[0])
 	best_txt2, exon_bound2 = pick_best(matches2, orients[1])
-	
+
 	return (best_txt1, matches1[best_txt1], exon_bound1), (best_txt2, matches2[best_txt2], exon_bound2)
 
     @classmethod
