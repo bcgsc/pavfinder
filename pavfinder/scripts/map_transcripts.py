@@ -341,10 +341,10 @@ class Event:
 	data.append(event.gene3)
 	
 	# support
-	if not event.support['spanning']:
+	if not event.support or not event.support['spanning']:
 	    data.append('-')
 	else:
-	    data.append(max(event.support['spanning']))
+	    data.append(event.support['spanning'])
 	
 	return '\t'.join(map(str, data))
     
@@ -410,10 +410,10 @@ class Event:
 	data.append('-')
 
 	#support
-	if not event.support['spanning']:
+	if not event.support or not event.support['spanning']:
 	    data.append('-')
 	else:
-	    data.append(max(event.support['spanning']))
+	    data.append(event.support['spanning'])
 
 	return '\t'.join(map(str, data))
 	
@@ -506,7 +506,7 @@ class Event:
 	"""
 	out_indices = []
 	for i in reversed(range(len(events))):
-	    if not events[i].support['spanning'] or max(events[i].support['spanning']) < min_support:
+	    if not events[i].support['spanning'] or events[i].support['spanning'] < min_support:
 		out_indices.append(i)
 		
 	for i in out_indices:
@@ -1165,13 +1165,16 @@ class ExonMapper:
 	    print 'total tlens', len(tlens)
 		
 	    for event in self.events:
+		# initialize support
+		event.support = {'spanning': 0, 'flanking': 0}
+		support_contigs = []
 		for i in range(len(event.contigs)):
 		    contig = event.contigs[i]
 		    span = event.contig_support_span[i][0], event.contig_support_span[i][1]
 		    coord = '%s-%s' % (span[0], span[1])
 					
 		    if support.has_key(contig) and support[contig].has_key(coord):
-			event.support['spanning'].append(support[contig][coord][0])
+			support_contigs.append(support[contig][coord][0])
 			
 			# if reads are to be extracted
 			if get_seq:
@@ -1184,7 +1187,9 @@ class ExonMapper:
 					support_reads[key] = Set([read])
 			
 		if not multi_mapped:
-		    event.sum_support()	
+		    event.support['spanning'] = sum(support_contigs)
+		else:
+		    event.support['spanning'] = max(support_contigs)
 		    		     
 	    if tlens:
 		#avg_tlen = float(sum(tlens)) / len(tlens)
@@ -1192,7 +1197,7 @@ class ExonMapper:
 		    	
 	if self.debug:
 	    for event in self.events:
-		print 'support', event.support, event.support_total, event.support_final
+		print 'support', event.support
 		
 	return support_reads
 
