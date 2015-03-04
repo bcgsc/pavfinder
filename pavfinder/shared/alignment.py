@@ -1,7 +1,11 @@
 import re
 import sys
 from intspan import intspan
-from optparse import OptionParser
+import argparse
+from itertools import groupby
+import pysam
+import sys
+from operator import itemgetter
 
 class Alignment:
     def __init__(self, query=None, qstart=None, qend=None, 
@@ -59,7 +63,7 @@ class Alignment:
 	        int(self.tend),
 	        self.query,
 	        0,
-	        '+',
+	        self.strand,
 	        int(self.tstart) - 1,
 	        int(self.tend),
 	        0,
@@ -173,59 +177,61 @@ def compare_chr(chr1, chr2):
 	    return 1
 	else:
 	    return 0
-	
-def bam2track(in_file, out_file, track_name, desc=None):
-    """Given a BAM file, output unique alignments in UCSC bed track
     
-    Args:
-        in_file: (Str) Path of BAM file
-	out_file: (Str) Path of output file
-	track_name: (Str) Name of track
-	desc (optional): (Str) Description for track
-	                 If not given, description will be same as name     
-    
-    Raises:
-        IOError: when BAM file or output file is not valid
-    """
-    from itertools import groupby
-    import pysam
-    import sys
-    
-    try:
-	bam = pysam.Samfile(in_file, 'rb')
-    except IOError:
-	sys.exit("can't open BAM:%s" % in_file)
-	
-    if desc is None:
-	desc = track_name
-	
-    try:
-	out = open(out_file, 'w')
-    except IOError:
-	sys.exit("can't open output file for writing:%s" % out_file)
-	
-    out.write('track name=%s description="%s"\n' % (track_name, desc))
-    for query, group in groupby(bam.fetch(until_eof=True), lambda x: x.qname):
-	alns = list(group)
-	
-	if len(alns) == 1 and not alns[0].is_unmapped:
+def bam2bed(bam, out, name_sorted=True, header=None, min_size=None, no_chimera=True):
+    if header is not None:
+	out.write(header + '\n')
+    if name_sorted:
+	aligns = []
+	outputs = []
+	for query, group in groupby(bam.fetch(until_eof=True), lambda x: x.qname):
+	    alns = list(group)
+
+	    if alns[0].is_unmapped:
+		continue
+
+	    if len(alns) == 1:
+		align = Alignment.from_alignedRead(alns[0], bam)
+
+		# size filtering
+		if min_size is not None and align.query_len < min_size:
+		    continue
+
+		try:
+		    output = align.as_bed()
+		except:
+		    sys.stderr.write("can't convert alignment of contig %s to bed\n" % query)
+
+		outputs.append((align.target, align.tstart, align.tend, output))
+
+	for output in sorted(outputs, key=itemgetter(0, 1, 2)):
+	    out.write(output[-1] + '\n')
+
+    else:
+	for aln in groupby(bam.fetch(until_eof=True), lambda x: x.qname):
 	    align = Alignment.from_alignedRead(alns[0], bam)
+	    if min_size is not None and align.query_len < min_size:
+		continue
+
 	    try:
 		out.write(align.as_bed() + '\n')
 	    except:
 		sys.stderr.write("can't convert alignment of contig %s to bed\n" % query)
+
     out.close()
     
+def open_bam(bamfile):
+    return pysam.AlignmentFile(bamfile, 'rb')
+
 if __name__ == '__main__':
-    usage = "Usage: %prog"
-    parser = OptionParser(usage=usage)
+    parser = argparse.ArgumentParser(description="Module dealing with alignments")
+    parser.add_argument_group("bam2bed", "converts BAM file to BED")
+    parser.add_argument("--bam2bed", action='store_true', help="convert bam to bed")
+    parser.add_argument("--bam", type=open_bam, help="alignment bam output")
+    parser.add_argument("--output", type=argparse.FileType('w'), help="output file")
+    parser.add_argument("--header", type=str, help="header for UCSC track e.g. 'track header=\"abc\" color=255,255,255'")
+    parser.add_argument("--min_size", type=int, help="minimum query size")
+    args = parser.parse_args()
     
-    parser.add_option("-b", "--bam", dest="bam", help="alignment bam output")
-    parser.add_option("-o", "--out_file", dest="out_file", help="output file")
-    parser.add_option("-t", "--create_track", dest="create_track", help="create BED format UCSC track", action="store_true", default=False)
-    parser.add_option("--name", dest="name", help="track name")
-    parser.add_option("--desc", dest="desc", help="track description")
-    
-    (options, args) = parser.parse_args()
-    if options.create_track:
-        bam2track(options.bam, options.out_file, options.name, options.desc)
+    if args.bam2bed:
+	bam2bed(args.bam, args.output, header=args.header, min_size=args.min_size)
