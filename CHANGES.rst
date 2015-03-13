@@ -13,3 +13,4 @@ v0.1.2
   + minimum size (``--min_size``) can be specified so that small contig alignments can be skipped
 
 - Fixed bug in mis-labelling reciprocal translocations as insertions
+- Don't use Pysam AlignedRead.rlen for checking if sequence is chimeric as BWA versions later than 0.7.4 outputs only chimeric portion of sequence other than entire sequence
