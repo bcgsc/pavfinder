@@ -9,7 +9,7 @@ def find_chimera(alns, bam, debug=False):
     primary_alns = []
     secondary_alns = []
     for aln in alns:
-        if aln.alen != aln.rlen and not aln.is_secondary:
+        if re.search('[HS]', aln.cigarstring) and not aln.is_secondary:
             primary_alns.append(aln)
         else:
             secondary_alns.append(aln)
