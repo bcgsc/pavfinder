@@ -674,7 +674,7 @@ class Adjacency:
 	variants = []
 	i = 0
 	if len(trls) > 1:
-	    while i <= len(trls) - 1:
+	    while i < len(trls) - 1:
 		if trls[i].chroms[0] == trls[i + 1].chroms[0] and\
 		   trls[i].chroms[1] == trls[i + 1].chroms[1] and\
 		   abs(trls[i + 1].breaks[0] - trls[i].breaks[0]) <= neighborhood and\
@@ -689,6 +689,8 @@ class Adjacency:
 		    grouped_trl_ids.add(trls[i].id)
 		    grouped_trl_ids.add(trls[i + 1].id)
 		    i += 2
+		else:
+		    i += 1
 
 	trls_remained = [trl for trl in trls if trl.id not in grouped_trl_ids]
 
