@@ -223,6 +223,7 @@ class SVFinder:
     def create_variants(self, adjs):
 	"""Creates variants from adjacencies"""
 	self.variants = []
+
 	# special cases for imprecise insertions
 	ins_variants, ins_adjs = Adjacency.extract_imprecise_ins([adj for adj in adjs if adj.align_types[0] == 'split' and adj.rearrangement != 'inv'], debug=self.debug)
 	if ins_variants:
@@ -235,23 +236,29 @@ class SVFinder:
 	invs = [adj for adj in adjs if adj.rearrangement == 'inv']
 	if invs:
 	    self.variants.extend(Adjacency.group_inversions(invs))
-	    	    
-	# convert translocations to insertions
+
+	# group reciprocal transcloations
 	trls = [adj for adj in adjs if adj.rearrangement == 'trl']
 	trls_remained = None
 	if trls:
-	    ins_variants, trls_remained = Adjacency.extract_interchrom_ins(trls)
-	    self.variants.extend(ins_variants)
-	    	    
-	# group reciprocal transcloations
+	    reciprocal_trls, trls_remained = Adjacency.group_trls(trls)
+	    self.variants.extend(reciprocal_trls)
+
+	# convert translocations to insertions
 	if trls_remained:
-	    self.variants.extend(Adjacency.group_trls(trls_remained))
-	    	    
+	    ins_variants, trls_remained = Adjacency.extract_interchrom_ins(trls_remained)
+	    self.variants.extend(ins_variants)
+
+	# append remaining non-dubious translocations
+	if trls_remained:
+	    for trl in trls_remained:
+		if not trl.dubious:
+		    self.variants.append(Variant('TRL', [trl]))
+
 	for adj in adjs_no_grouping:
 	    if not adj.dubious:
 		self.variants.append(Variant(adj.rearrangement.upper(), [adj]))
-		
-		
+
     def is_novel_sequence_repeat(self, adj, min_len=3):
 	"""Check to see if novel sequence is part of a tandem repeat
 

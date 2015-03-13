@@ -651,6 +651,7 @@ class Adjacency:
 	    return insertions, unused
 	
 	variants = []
+	trls_remained = trls
 	
 	# if insertion is at first chromosome
 	insertions, trls_remained = pair_up(trls)
@@ -660,7 +661,7 @@ class Adjacency:
 	if trls_remained:
 	    insertions, trls_remained = pair_up(trls_remained, ins_at_first=False)
 	    variants.extend(insertions)
-			
+
 	return variants, trls_remained
     
     @classmethod
@@ -668,16 +669,13 @@ class Adjacency:
 	"""Group 2 translocation adjacencies into single reciprocal event"""
 	trls = sorted([adj for adj in adjs if not adj.dubious], key=lambda adj: (adj.chroms[0], adj.breaks[0]))
 	
+	grouped_trl_ids = Set()
 	neighborhood = 10000
 	variants = []
 	i = 0
 	if len(trls) > 1:
 	    while i <= len(trls) - 1:
-		if i == len(trls) - 1:
-		    variants.append(Variant('TRL', [trls[i]]))
-		    break
-		
-		elif trls[i].chroms[0] == trls[i + 1].chroms[0] and\
+		if trls[i].chroms[0] == trls[i + 1].chroms[0] and\
 		   trls[i].chroms[1] == trls[i + 1].chroms[1] and\
 		   abs(trls[i + 1].breaks[0] - trls[i].breaks[0]) <= neighborhood and\
 		   abs(trls[i + 1].breaks[1] - trls[i].breaks[1]) <= neighborhood and\
@@ -688,17 +686,13 @@ class Adjacency:
 		    ):
 		    
 		    variants.append(Variant('TRL', [trls[i], trls[i + 1]]))
+		    grouped_trl_ids.add(trls[i].id)
+		    grouped_trl_ids.add(trls[i + 1].id)
 		    i += 2
-		    
-		else:
-		    if not trls[i].dubious:
-			variants.append(Variant('TRL', [trls[i]]))
-		    i += 1
-		    
-	elif len(trls) == 1 and not trls[0].dubious:
-	    variants.append(Variant('TRL', [trls[0]]))
-		
-	return variants
+
+	trls_remained = [trl for trl in trls if trl.id not in grouped_trl_ids]
+
+	return variants, trls_remained
     
     @classmethod
     def extract_imprecise_ins(cls, adjs, debug=False):
