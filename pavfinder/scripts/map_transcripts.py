@@ -308,23 +308,7 @@ class Event:
 	    data.append(len(event.homol_seq[0]))
 	else:
 	    data.append('-')
-	
-	#homol_seq = event.homol_seq[0]
-	#homol_coords = event.homol_coords[0]
-	#if homol_seq:
-	    #data.append(homol_seq)
-	
-	    #if homol_seq != '-':
-		#data.append('-'.join(map(str, homol_coords)))
-		#data.append(homol_coords[1] - homol_coords[0] + 1)
-	    #else:
-		#data.append('-')
-		#data.append('-')
-	#else:
-	    #data.append('-')
-	    #data.append('-')
-	    #data.append('-')
-	    
+		    
 	# novel_seq
 	if hasattr(event, 'novel_seq') and event.novel_seq is not None:
 	    data.append(event.novel_seq)
