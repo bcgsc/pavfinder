@@ -11,7 +11,7 @@ from intspan import intspan
 from distutils.spawn import find_executable
 from pavfinder import __version__
 from pavfinder.shared import gmap
-from pavfinder.shared.alignment import reverse_complement
+from pavfinder.shared.alignment import Alignment, reverse_complement
 from pavfinder.shared.adjacency import Adjacency
 from pavfinder.splice.itd_finder import ITD_Finder
 from pavfinder.splice.fusion_finder import FusionFinder
@@ -754,8 +754,156 @@ class ExonMapper:
 	self.fusion_conditions = {'exon_bound_only': exon_bound_fusion_only,
 	                          'coding_only': coding_fusion_only,
 	                          'sense_only': sense_fusion_only}
-					
+
     def map_contigs_to_transcripts(self):
+	"""Maps contig alignments to transcripts, discovering variants at the same time"""
+	# extract all transcripts info in dictionary
+	transcripts = Transcript.extract_transcripts(self.annotation_file)
+
+	chimeras = {}
+	for aln in self.bam.fetch(until_eof=True):
+	    if aln.is_unmapped:
+		continue
+
+	    contig = aln.query_name
+	    contig_seq = self.contigs_fasta.fetch(contig)
+
+	    align = Alignment.from_alignedRead(aln, self.bam)
+	    if align is None:
+		sys.stdout.write('bad alignment: %s\n' % contig)
+		continue
+
+	    if re.search('[._Mm]', align.target):
+		sys.stdout.write('skip target:%s %s\n' % (contig, align.target))
+		continue
+
+	    if self.debug:
+		sys.stdout.write('contig:%s genome_blocks:%s contig_blocks:%s\n' % (align.query,
+		                                                                    align.blocks,
+		                                                                    align.query_blocks
+		                                                                    ))
+
+	    # entire contig align within single exon or intron
+	    within_intron = []
+	    within_exon = []
+
+	    transcripts_mapped = Set()
+	    events = []
+	    # each gtf record corresponds to a feature
+	    for gtf in self.annot.fetch(align.target, align.tstart, align.tend):
+		# collect all the transcripts that have exon overlapping alignment
+		if gtf.feature == 'exon' or gmap.is_chimera(aln):
+		    transcripts_mapped.add(gtf.transcript_id)
+		# contigs within single intron
+		elif gtf.feature == 'intron' and\
+	             align.tstart >= gtf.start and align.tend <= gtf.end:
+		    match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end))
+		    within_intron.append((gtf, match))
+
+	    if transcripts_mapped:
+		mappings = []
+
+		# key = transcript name, value = "matches"
+		all_block_matches = {}
+
+		# Transcript objects that are fully matched
+		full_matched_transcripts = []
+		for txt in transcripts_mapped:
+		    block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
+		    all_block_matches[txt] = block_matches
+		    mappings.append((transcripts[txt], block_matches))
+
+		    if self.is_full_match(block_matches):
+			full_matched_transcripts.append(transcripts[txt])
+
+		# report mapping
+		best_mapping = Mapping.pick_best(mappings, align, debug=self.debug)
+		self.mappings.append(best_mapping)
+
+		if not full_matched_transcripts:
+		    # find events only for best transcript
+		    best_transcript = best_mapping.transcripts[0]
+		    events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]},
+		                              align,
+		                              {best_transcript.id:best_transcript})
+		    for event in events:
+			event.contig_sizes.append(len(contig_seq))
+		    if events:
+			self.events.extend(events)
+		    elif self.debug:
+			sys.stdout.write('%s - partial but no events\n' % align.query)
+
+		if gmap.is_chimera(aln):
+		    try:
+			chimeras[contig].append((align, all_block_matches))
+		    except:
+			chimeras[contig] = [(align, all_block_matches)]
+
+	    else:
+		if within_exon:
+		    sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s\n" % (contig,
+		                                                                             align.target,
+		                                                                             align.tstart,
+		                                                                             align.tend,
+		                                                                             within_exon[0]
+		                                                                             ))
+
+		elif within_intron:
+		    sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s\n" % (contig,
+		                                                                               align.target,
+		                                                                               align.tstart,
+		                                                                               align.tend,
+		                                                                               within_intron[0]
+	                                                                               ))
+	if chimeras:
+	    for contig in sorted(chimeras.keys()):
+		# in case a chimeric alignment is entirely within intron
+		# and introns are not features in given gtf, it will be not captured
+		# and there will not be two chimeras
+		if len(chimeras[contig]) < 2:
+		    continue
+
+		contig_seq = self.contigs_fasta.fetch(contig)
+		aligns = [chimeras[contig][0][0], chimeras[contig][1][0]]
+		chimera_block_matches = [chimeras[contig][0][1], chimeras[contig][1][1]]
+		# order is required to be correct
+		if aligns[0].qstart > aligns[1].qstart:
+		    aligns.reverse()
+		    chimera_block_matches.reverse()
+
+		fusion = FusionFinder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq,
+		                                   exon_bound_only=self.fusion_conditions['exon_bound_only'],
+		                                   coding_only=self.fusion_conditions['coding_only'],
+		                                   sense_only=self.fusion_conditions['sense_only'])
+		if fusion:
+		    homol_seq, homol_coords = None, None
+		    if self.aligner.lower() == 'gmap':
+			homol_seq, homol_coords = gmap.find_microhomology(aligns[0].sam, contig_seq)
+		    if homol_seq is not None:
+			fusion.homol_seq.append(homol_seq)
+			fusion.homol_coords.append(homol_coords)
+		    fusion.contig_sizes.append(len(contig_seq))
+		    self.events.append(fusion)
+
+	# expand contig span
+	for event in self.events:
+	    # if contig_support_span is not defined (it can be pre-defined in ITD)
+	    # then set it
+	    if not event.contig_support_span:
+		event.contig_support_span = event.contig_breaks
+		if event.rearrangement == 'ins' or event.rearrangement == 'dup':
+		    expanded_contig_breaks = expand_contig_breaks(event.chroms[0],
+			                                          event.breaks,
+			                                          event.contigs[0],
+			                                          [event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1],
+			                                          event.rearrangement,
+			                                          self.ref_fasta,
+			                                          self.contigs_fasta,
+			                                          self.debug)
+		    if expanded_contig_breaks is not None:
+			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
+
+    def map_contigs_to_transcripts_old(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
 	# extract all transcripts info in dictionary
 	transcripts = Transcript.extract_transcripts(self.annotation_file)
