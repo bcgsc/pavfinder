@@ -20,7 +20,7 @@ class FusionFinder:
 							     i.e.
 							     [(exon_id, '=='), (exon_id, '==')] 
 	    transcripts: (dict) key=transcript_name value=Transcript object
-	    aligns: (list) Alignments involved in chimera
+	    aligns: (list) ORDERED alignments involved in chimera
 	Returns:
 	    Adjacency with genes, transcripts, exons annotated
 	"""
