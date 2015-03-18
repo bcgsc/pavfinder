@@ -70,11 +70,13 @@ def find_microhomology(aln, contig_seq):
     
     try:
         end_base1, end_base2 = aln.opt('XT').split(',')[-1].split('..')
-        if end_base1 != end_base2:
+        if end_base1 != end_base2 and end_base1.isdigit() and end_base2.isdigit():
             homol_coords = (int(end_base1) + 1, int(end_base2))
             homol_seq = contig_seq[int(end_base1):int(end_base2)]
     except:
         print 'XT tag empty for contig %s' % aln.qname
         
     return homol_seq, homol_coords
-    
+
+def is_chimera(aln):
+    return aln.has_tag('XT')
