@@ -35,7 +35,6 @@ class FusionFinder:
 	    genes2 = Set([transcripts[txt].gene for txt in matches2_by_txt.keys()])
 	    	    	    
 	    junc_matches1 = {}
-	    num_blocks = len(aligns[0].blocks)
 	    for transcript in chimera_block_matches[0].keys():
 		if fusion.orients[0] == 'L':
 		    junc_matches1[transcript] = chimera_block_matches[0][transcript][-1]
@@ -44,7 +43,7 @@ class FusionFinder:
 
 	    junc_matches2 = {}
 	    for transcript in chimera_block_matches[1].keys():
-		if fusion.orients[0] == 'L':
+		if fusion.orients[1] == 'L':
 		    junc_matches2[transcript] = chimera_block_matches[1][transcript][-1]
 		else:
 		    junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
@@ -100,7 +99,7 @@ class FusionFinder:
 	                       '-',
 	                       orients=('L', 'R'),
 	                       contig_breaks = contig_breaks
-	                       )  
+	                       )
 	    
 	    if exon_bound_only and not (fusion.exon_bound[0] and fusion.exon_bound[1]):
 		return None
