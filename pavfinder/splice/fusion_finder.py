@@ -234,6 +234,10 @@ class FusionFinder:
 	    fusion.gene5, fusion.gene3 = sense_fusion[0].gene, sense_fusion[1].gene
 	
 	cls.is_ptd(fusion)
+
+	# chimera within same gene but not PTD, change event label to rearrangement instead of 'fusion'
+	if fusion.genes[0] == fusion.genes[1] and fusion.rna_event != 'PTD':
+	    fusion.rna_event = fusion.rearrangement
 	    
     @classmethod
     def is_sense(cls, fusion, transcript1, transcript2, orient1, orient2):
