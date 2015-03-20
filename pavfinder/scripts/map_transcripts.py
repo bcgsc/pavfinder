@@ -438,7 +438,8 @@ class ExonMapper:
 		    novel_seq = self.extract_novel_seq(adj)
 		    adj.novel_seq = novel_seq if align.strand == '+' else reverse_complement(novel_seq)
 		    
-		    if len(novel_seq) >= self.itd_conditions['min_len']:
+		    # will not call ITD on homopolymer expansion
+		    if len(novel_seq) >= self.itd_conditions['min_len'] and len(Set(list(novel_seq.upper()))) > 1:
 			itd_finder.detect_itd(adj, align, self.contigs_fasta.fetch(adj.contigs[0]), self.outdir, 
 			                      self.itd_conditions['min_len'],
 			                      self.itd_conditions['max_apart'],
