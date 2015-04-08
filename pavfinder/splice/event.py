@@ -1,5 +1,6 @@
 from sets import Set
 import re
+import gzip
 from pavfinder.shared.adjacency import Adjacency
 #from pavfinder.splice.fusion_finder import screen_realigns
 
@@ -32,11 +33,17 @@ class Event(Adjacency):
                'sense_fusion',
                "5'gene",
                "3'gene",
-               'spanning_reads',
+               'support_reads',
+               'jn_depth',
+               'ref5_jn_coord',
+               'ref5_jn_depth',
+               'ref3_jn_coord',
+               'ref3_jn_depth',
                ]
     
     def __init__(self, *args, **kwargs):
 	Adjacency.__init__(self, *args, **kwargs)
+	self.read_depth = 0
     
     @classmethod
     def output(cls, events, outdir, sort_by_event_type=False):
@@ -178,6 +185,17 @@ class Event(Adjacency):
 	    data.append('-')
 	else:
 	    data.append(self.support['spanning'])
+
+	# ref and alt depths
+	for attr in ('read_depth', 'ref5_coord', 'ref5_depth', 'ref3_coord', 'ref3_depth'):
+	    value = None
+	    if hasattr(self, attr):
+		value = getattr(self, attr)
+
+	    if value is not None:
+		data.append(getattr(self, attr))
+	    else:
+		data.append('-')
 	
 	return '\t'.join(map(str, data))
 
@@ -217,7 +235,7 @@ class Event(Adjacency):
 	    data.append(self.novel_seq)
 	else:
 	    data.append('-')
-	
+
 	# gene, transcripts, exons, exon_bounds
 	genes = (self.genes[0], self.genes[0])
 	transcripts = (self.transcripts[0], self.transcripts[0])
@@ -246,6 +264,17 @@ class Event(Adjacency):
 	    data.append('-')
 	else:
 	    data.append(self.support['spanning'])
+
+	# ref and alt depths
+	for attr in ('read_depth', 'ref5_coord', 'ref5_depth', 'ref3_coord', 'ref3_depth'):
+	    value = None
+	    if hasattr(self, attr):
+		value = getattr(self, attr)
+
+	    if value is not None:
+		data.append(getattr(self, attr))
+	    else:
+		data.append('-')
 
 	return '\t'.join(map(str, data))
 	
