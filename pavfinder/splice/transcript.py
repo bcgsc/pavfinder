@@ -17,8 +17,10 @@ class Transcript:
     def exon(self, num):
 	assert type(num) is int, 'exon number %s not given in int' % num
 	assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: %s %s' % (self.id, self.strand)
-	assert num >= 1 and num <= len(self.exons), 'exon number out of range:%s (1-%d)' % (num, len(self.exons))
 	
+	if num < 1 or num > len(self.exons):
+	    print 'exon number out of range:%s (1-%d)' % (num, len(self.exons))
+	    return None
 	if self.strand == '+':
 	    return self.exons[num - 1]
 	else:
