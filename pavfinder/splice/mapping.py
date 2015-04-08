@@ -2,6 +2,7 @@ import sys
 from sets import Set
 from intspan import intspan
 from itertools import groupby, chain
+from pavfinder.splice.novel_splice_finder import check_splice_motif
 
 class Mapping:
 
@@ -189,19 +190,26 @@ class Mapping:
 	    out.write('%s\n' % mapping.as_tab())
 	out.close()
 
-    def map_junctions(self, align):
+    def map_junctions(self, align, ref_fasta):
 	"""Map genome junction coordinates to contig junction coordinates
 
-	This is for reporting read depth of all mapped junctions
+	This is for reporting read depth of all "valid"(GTAG) mapped junctions
 	"""
+	strand = self.transcripts[0].strand
 	for i in range(len(align.blocks) - 1):
 	    genome_jn = ('%s:%d' % (align.target, align.blocks[i][1]), 
 	                 '%s:%d' % (align.target, align.blocks[i + 1][0]))
 	    contig_jn = (align.query_blocks[i][1], align.query_blocks[i + 1][0])
 
-	    self.junction_mappings.append((genome_jn, contig_jn))
-	    # initialize junction depth
-	    self.junction_depth[genome_jn] = 0
+	    intron_bounds = [align.blocks[i][1] + 1, align.blocks[i + 1][0] - 2]
+	    if strand == '-':
+		intron_bounds.reverse()
+
+	    # only capture GT-AG junctions (other gaps are assumed deletions)
+	    if check_splice_motif(align.target, intron_bounds[0], intron_bounds[1], strand, ref_fasta):
+		self.junction_mappings.append((genome_jn, contig_jn))
+		# initialize junction depth
+		self.junction_depth[genome_jn] = 0
 
     @classmethod
     def pool_junction_depths(cls, mappings):
