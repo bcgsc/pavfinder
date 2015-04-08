@@ -805,10 +805,15 @@ class Adjacency:
 		if adj.homol_coords:
 		    first_adj.homol_coords.append(adj.homol_coords[0])
 		for support_type in ('spanning', 'flanking'):
-		    #if adj.support[support_type]:
-			#first_adj.support[support_type].append(adj.support[support_type][0])
 		    if first_adj.support is not None and adj.support is not None:
 			first_adj.support[support_type] += adj.support[support_type]
+
+		# add up read depth
+		attr = 'read_depth'
+		if hasattr(first_adj, attr) and hasattr(first_adj, attr) and\
+	           getattr(first_adj, attr) is not None and\
+	           getattr(adj, attr) is not None:
+		    setattr(first_adj, attr, getattr(first_adj, attr) + getattr(adj, attr))
 	
 	# for generating ID
 	count = 1
