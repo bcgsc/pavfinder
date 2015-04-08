@@ -30,6 +30,7 @@ def find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, exon_bo
 	# necessary for choosing block_matches(start or end) and picking best transcripts
 	fusion = call_event(aligns[0], aligns[1], no_sort=True, contig_seq=contig_seq, probe_side_len=50)
 	fusion.__class__ = Event
+	fusion.read_depth = 0
 
 	genes1 = Set([transcripts[txt].gene for txt in matches1_by_txt.keys()])
 	genes2 = Set([transcripts[txt].gene for txt in matches2_by_txt.keys()])
@@ -219,6 +220,7 @@ def annotate_fusion(fusion, junc1, junc2, transcripts):
     fusion.exons = transcripts[junc1[0]].exon_num(junc1[1][0][0]), transcripts[junc2[0]].exon_num(junc2[1][0][0])
     fusion.exon_bound = junc1[2], junc2[2]
     fusion.in_frame = True if (fusion.exon_bound[0] and fusion.exon_bound[1]) else False
+    fusion.ref5_depth = fusion.ref3_depth = fusion.ref5_coord = fusion.ref3_coord = None
 	    
     sense_fusion = is_sense(fusion, transcripts[junc1[0]], transcripts[junc2[0]], fusion.orients[0], fusion.orients[1])
     if not sense_fusion:
@@ -311,3 +313,41 @@ def screen_realigns(fusions, outdir, align_info, contigs_fasta=None, name_sep='-
 	    continue
 
     return failed_contigs
+
+def annotate_ref_junctions(fusions, junction_depths, transcripts):
+    """Annotate 5' and 3' gene reference junction depth/coverage
+
+    Arguments:
+        fusions: (list) of fusions (Event)
+        juncton_depths: (dict) {chrom[(start, end)] = depth}
+        transcripts: (dict) transcript ID to object mapping (for extracting exon coordinates)
+    """
+    def update_depth(fusion, depth, gene, coord):
+	"""Report the highest-expressed reference junction"""
+	if gene == fusion.gene5:
+	    if fusion.ref5_depth is None or depth > fusion.ref5_depth:
+		fusion.ref5_depth = depth
+		fusion.ref5_coord = coord
+	elif gene == fusion.gene3:
+	    if fusion.ref3_depth is None or depth > fusion.ref3_depth:
+		fusion.ref3_depth = depth
+		fusion.ref3_coord = coord
+
+    for fusion in fusions:
+	txts = (transcripts[fusion.transcripts[0]], transcripts[fusion.transcripts[1]])
+	for i in (0,1):
+	    # exon coordinates
+	    jn_exon = txts[i].exon(fusion.exons[i])
+	    if jn_exon is None:
+		print 'cannot find junction', fusion.contigs, fusion.exons[i]
+		continue
+	    if fusion.orients[i] == 'L':
+		jn_pos = jn_exon[1]
+	    else:
+		jn_pos = jn_exon[0]
+	    for chrom, depths in junction_depths.iteritems():
+		for pos, depth in depths.iteritems():
+		    if fusion.orients[i] == 'L' and int(pos[0]) == int(jn_pos):
+			update_depth(fusion, depth, fusion.genes[i], '%s:%s-%s' % (chrom, pos[0], pos[1]))
+		    elif fusion.orients[i] == 'R' and int(pos[1]) == int(jn_pos):
+			update_depth(fusion, depth, fusion.genes[i], '%s:%s-%s' % (chrom, pos[0], pos[1]))
