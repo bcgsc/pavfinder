@@ -4,7 +4,6 @@ import pysam
 import sys
 import re
 import os
-import gzip
 from sets import Set
 from distutils.spawn import find_executable
 from pavfinder import __version__
@@ -55,7 +54,7 @@ class ExonMapper:
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
 	# extract all transcripts info in dictionary
-	transcripts = Transcript.extract_transcripts(self.annotation_file)
+	self.transcripts = Transcript.extract_transcripts(self.annotation_file)
 
 	chimeras = {}
 	for aln in self.bam.fetch(until_eof=True):
@@ -106,15 +105,16 @@ class ExonMapper:
 		# Transcript objects that are fully matched
 		full_matched_transcripts = []
 		for txt in transcripts_mapped:
-		    block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
+		    block_matches = self.map_exons(align.blocks, self.transcripts[txt].exons)
 		    all_block_matches[txt] = block_matches
-		    mappings.append((transcripts[txt], block_matches))
+		    mappings.append((self.transcripts[txt], block_matches))
 
 		    if self.is_full_match(block_matches):
-			full_matched_transcripts.append(transcripts[txt])
+			full_matched_transcripts.append(self.transcripts[txt])
 
 		# report mapping
 		best_mapping = Mapping.pick_best(mappings, align, debug=self.debug)
+		best_mapping.map_junctions(align, self.ref_fasta)
 		self.mappings.append(best_mapping)
 
 		if not full_matched_transcripts:
@@ -168,7 +168,7 @@ class ExonMapper:
 		    aligns.reverse()
 		    chimera_block_matches.reverse()
 
-		fusion = fusion_finder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq,
+		fusion = fusion_finder.find_chimera(chimera_block_matches, self.transcripts, aligns, contig_seq,
 		                                   exon_bound_only=self.fusion_conditions['exon_bound_only'],
 		                                   coding_only=self.fusion_conditions['coding_only'],
 		                                   sense_only=self.fusion_conditions['sense_only'])
@@ -200,143 +200,143 @@ class ExonMapper:
 		    if expanded_contig_breaks is not None:
 			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
 
-    def map_contigs_to_transcripts_old(self):
-	"""Maps contig alignments to transcripts, discovering variants at the same time"""
-	# extract all transcripts info in dictionary
-	transcripts = Transcript.extract_transcripts(self.annotation_file)
+    #def map_contigs_to_transcripts_old(self):
+	#"""Maps contig alignments to transcripts, discovering variants at the same time"""
+	## extract all transcripts info in dictionary
+	#transcripts = Transcript.extract_transcripts(self.annotation_file)
 	
-	aligns = []
-	for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
-	    sys.stdout.write('analyzing %s\n' % contig)
-            alns = list(group)	    
-	    aligns = self.extract_aligns(alns)
-	    if aligns is None:
-		sys.stdout.write('no valid alignment: %s\n' % contig)
-		continue
+	#aligns = []
+	#for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
+	    #sys.stdout.write('analyzing %s\n' % contig)
+            #alns = list(group)	    
+	    #aligns = self.extract_aligns(alns)
+	    #if aligns is None:
+		#sys.stdout.write('no valid alignment: %s\n' % contig)
+		#continue
 	    	    
-	    # for finding microhomolgy sequence and generating probe in fusion
-	    contig_seq = self.contigs_fasta.fetch(contig)
+	    ## for finding microhomolgy sequence and generating probe in fusion
+	    #contig_seq = self.contigs_fasta.fetch(contig)
 	    
-	    chimera = True if len(aligns) > 1 else False
-	    chimera_block_matches = []
-	    for align in aligns:
-		if align is None:
-		    sys.stdout.write('bad alignment: %s\n' % contig)
-		    continue
+	    #chimera = True if len(aligns) > 1 else False
+	    #chimera_block_matches = []
+	    #for align in aligns:
+		#if align is None:
+		    #sys.stdout.write('bad alignment: %s\n' % contig)
+		    #continue
 		
-		if re.search('[._Mm]', align.target):
-		    sys.stdout.write('skip target:%s %s\n' % (contig, align.target))
-		    continue
+		#if re.search('[._Mm]', align.target):
+		    #sys.stdout.write('skip target:%s %s\n' % (contig, align.target))
+		    #continue
 		
-		if self.debug:
-		    sys.stdout.write('contig:%s genome_blocks:%s contig_blocks:%s\n' % (align.query, 
-		                                                                        align.blocks, 
-		                                                                        align.query_blocks
-		                                                                        ))
+		#if self.debug:
+		    #sys.stdout.write('contig:%s genome_blocks:%s contig_blocks:%s\n' % (align.query, 
+		                                                                        #align.blocks, 
+		                                                                        #align.query_blocks
+		                                                                        #))
 		
-		# entire contig align within single exon or intron
-		within_intron = []
-		within_exon = []
+		## entire contig align within single exon or intron
+		#within_intron = []
+		#within_exon = []
 		
-		transcripts_mapped = Set()
-		events = []
-		# each gtf record corresponds to a feature
-		for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
-		    # collect all the transcripts that have exon overlapping alignment
-		    if gtf.feature == 'exon':
-			transcripts_mapped.add(gtf.transcript_id)
-		    # contigs within single intron 
-		    elif gtf.feature == 'intron' and\
-		         not chimera and\
-		         align.tstart >= gtf.start and align.tend <= gtf.end:
-			match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
-			within_intron.append((gtf, match))		
+		#transcripts_mapped = Set()
+		#events = []
+		## each gtf record corresponds to a feature
+		#for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
+		    ## collect all the transcripts that have exon overlapping alignment
+		    #if gtf.feature == 'exon':
+			#transcripts_mapped.add(gtf.transcript_id)
+		    ## contigs within single intron 
+		    #elif gtf.feature == 'intron' and\
+		         #not chimera and\
+		         #align.tstart >= gtf.start and align.tend <= gtf.end:
+			#match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
+			#within_intron.append((gtf, match))		
 			    	
-		if transcripts_mapped:
-		    mappings = []
-		    # key = transcript name, value = "matches"
-		    all_block_matches = {}
-		    # Transcript objects that are fully matched
-		    full_matched_transcripts = []
-		    for txt in transcripts_mapped:
-			block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
-			all_block_matches[txt] = block_matches
-			mappings.append((transcripts[txt], block_matches))
+		#if transcripts_mapped:
+		    #mappings = []
+		    ## key = transcript name, value = "matches"
+		    #all_block_matches = {}
+		    ## Transcript objects that are fully matched
+		    #full_matched_transcripts = []
+		    #for txt in transcripts_mapped:
+			#block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
+			#all_block_matches[txt] = block_matches
+			#mappings.append((transcripts[txt], block_matches))
 			
-			if not chimera and self.is_full_match(block_matches):
-			    full_matched_transcripts.append(transcripts[txt])
+			#if not chimera and self.is_full_match(block_matches):
+			    #full_matched_transcripts.append(transcripts[txt])
 			    
-		    # report mapping
-		    best_mapping = Mapping.pick_best(mappings, align, debug=self.debug)
-		    self.mappings.append(best_mapping)
+		    ## report mapping
+		    #best_mapping = Mapping.pick_best(mappings, align, debug=self.debug)
+		    #self.mappings.append(best_mapping)
 		    	
-		    if not full_matched_transcripts:	
-			# find events only for best transcript
-			best_transcript = best_mapping.transcripts[0]
-			events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]}, 
-			                          align, 
-			                          {best_transcript.id:best_transcript})
-			for event in events:
-			    event.contig_sizes.append(len(contig_seq))
-			if events:
-			    self.events.extend(events)
-			elif self.debug:
-			    sys.stdout.write('%s - partial but no events\n' % align.query)	
+		    #if not full_matched_transcripts:	
+			## find events only for best transcript
+			#best_transcript = best_mapping.transcripts[0]
+			#events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]}, 
+			                          #align, 
+			                          #{best_transcript.id:best_transcript})
+			#for event in events:
+			    #event.contig_sizes.append(len(contig_seq))
+			#if events:
+			    #self.events.extend(events)
+			#elif self.debug:
+			    #sys.stdout.write('%s - partial but no events\n' % align.query)	
 		    
-		    if chimera:
-			chimera_block_matches.append(all_block_matches)
+		    #if chimera:
+			#chimera_block_matches.append(all_block_matches)
 		    
-		elif not chimera:
-		    if within_exon:
-			sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s\n" % (contig, 
-			                                                                         align.target, 
-			                                                                         align.tstart, 
-			                                                                         align.tend, 
-			                                                                         within_exon[0]
-			                                                                         ))
+		#elif not chimera:
+		    #if within_exon:
+			#sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s\n" % (contig, 
+			                                                                         #align.target, 
+			                                                                         #align.tstart, 
+			                                                                         #align.tend, 
+			                                                                         #within_exon[0]
+			                                                                         #))
 		    
-		    elif within_intron:
-			sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s\n" % (contig, 
-			                                                                           align.target, 
-			                                                                           align.tstart, 
-			                                                                           align.tend, 
-			                                                                           within_intron[0]
-			                                                                           ))
+		    #elif within_intron:
+			#sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s\n" % (contig, 
+			                                                                           #align.target, 
+			                                                                           #align.tstart, 
+			                                                                           #align.tend, 
+			                                                                           #within_intron[0]
+			                                                                           #))
 		
-	    # split aligns, try to find gene fusion
-	    if chimera and chimera_block_matches:
-		if len(chimera_block_matches) == len(aligns):
-		    fusion = fusion_finder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, 
-		                                        exon_bound_only=self.fusion_conditions['exon_bound_only'],
-		                                        coding_only=self.fusion_conditions['coding_only'],
-		                                        sense_only=self.fusion_conditions['sense_only'])
-		    if fusion:
-			homol_seq, homol_coords = None, None
-			if self.aligner.lower() == 'gmap':
-			    homol_seq, homol_coords = gmap.find_microhomology(alns[0], contig_seq)
-			if homol_seq is not None:
-			    fusion.homol_seq.append(homol_seq)
-			    fusion.homol_coords.append(homol_coords)
-			fusion.contig_sizes.append(len(contig_seq))
-			self.events.append(fusion)
+	    ## split aligns, try to find gene fusion
+	    #if chimera and chimera_block_matches:
+		#if len(chimera_block_matches) == len(aligns):
+		    #fusion = fusion_finder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, 
+		                                        #exon_bound_only=self.fusion_conditions['exon_bound_only'],
+		                                        #coding_only=self.fusion_conditions['coding_only'],
+		                                        #sense_only=self.fusion_conditions['sense_only'])
+		    #if fusion:
+			#homol_seq, homol_coords = None, None
+			#if self.aligner.lower() == 'gmap':
+			    #homol_seq, homol_coords = gmap.find_microhomology(alns[0], contig_seq)
+			#if homol_seq is not None:
+			    #fusion.homol_seq.append(homol_seq)
+			    #fusion.homol_coords.append(homol_coords)
+			#fusion.contig_sizes.append(len(contig_seq))
+			#self.events.append(fusion)
 		
-	# expand contig span
-	for event in self.events:
-	    # if contig_support_span is not defined (it can be pre-defined in ITD)
-	    # then set it
-	    if not event.contig_support_span:
-		event.contig_support_span = event.contig_breaks
-		if event.rearrangement == 'ins' or event.rearrangement == 'dup':
-		    expanded_contig_breaks = expand_contig_breaks(event.chroms[0], 
-			                                          event.breaks, 
-			                                          event.contigs[0], 
-			                                          [event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1], 
-			                                          event.rearrangement, 
-			                                          self.ref_fasta,
-			                                          self.contigs_fasta,
-			                                          self.debug)
-		    if expanded_contig_breaks is not None:
-			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
+	## expand contig span
+	#for event in self.events:
+	    ## if contig_support_span is not defined (it can be pre-defined in ITD)
+	    ## then set it
+	    #if not event.contig_support_span:
+		#event.contig_support_span = event.contig_breaks
+		#if event.rearrangement == 'ins' or event.rearrangement == 'dup':
+		    #expanded_contig_breaks = expand_contig_breaks(event.chroms[0], 
+			                                          #event.breaks, 
+			                                          #event.contigs[0], 
+			                                          #[event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1], 
+			                                          #event.rearrangement, 
+			                                          #self.ref_fasta,
+			                                          #self.contigs_fasta,
+			                                          #self.debug)
+		    #if expanded_contig_breaks is not None:
+			#event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
 					
     def map_exons(self, blocks, exons):
 	"""Maps alignment blocks to exons
@@ -553,7 +553,7 @@ class ExonMapper:
 		
 	return False
     
-    def find_support(self, r2c_bam_file=None, min_overlap=None, multi_mapped=False, perfect=True, get_seq=False, num_procs=1):
+    def find_support(self, r2c_bam_file=None, min_overlap=0, multi_mapped=False, perfect=True, get_seq=False, num_procs=1):
 	"""Extracts read support from reads-to-contigs BAM
 	
 	Assumes reads-to-contigs is NOT multi-mapped 
@@ -563,15 +563,29 @@ class ExonMapper:
 	    bam_file: (str) Path of reads-to-contigs BAM
 	"""
 	coords = {}
+	# all event junctions
 	for event in self.events:
 	    for i in range(len(event.contigs)):
 		contig = event.contigs[i]
-		#span = event.contig_breaks[i][0], event.contig_breaks[i][1]
-		span = event.contig_support_span[i][0], event.contig_support_span[i][1]
+		# for support reads
+		span_support = event.contig_support_span[i][0] - min_overlap, event.contig_support_span[i][1] + min_overlap
 		try:
-		    coords[contig].append(span)
+		    coords[contig].append(span_support)
 		except:
-		    coords[contig] = [span]
+		    coords[contig] = [span_support]
+
+		# for junction read depth
+		span_jn = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		coords[contig].append(span_jn)
+	
+	# all exon-exon junctions
+	for mapping in self.mappings:
+	    for jn in mapping.junction_mappings:
+		span_jn = jn[1][0], jn[1][1]
+		try:
+		    coords[mapping.contig].append(span_jn)
+		except:
+		    coords[mapping.contig] = [span_jn]
 		    
 	support_reads = {}
 	if coords:	    
@@ -579,15 +593,20 @@ class ExonMapper:
 	    tlens = []
 	    # if fewer than 10000 adjs, use 'fetch' of Pysam
 	    if len(coords) < 1000 or num_procs == 1:
-		support, tlens = fetch_support(coords, r2c_bam_file, self.contigs_fasta, 
-		                               overlap_buffer=min_overlap, 
+		support, tlens = fetch_support(coords,
+		                               r2c_bam_file,
+		                               self.contigs_fasta, 
+		                               overlap_buffer=0, 
 		                               perfect=perfect, 
 		                               get_seq=get_seq, 
 		                               debug=self.debug)
 	    # otherwise use multi-process parsing of bam file
 	    else:
-		support, tlens = scan_all(coords, r2c_bam_file, self.contigs_fasta_file, num_procs, 
-		                          overlap_buffer=min_overlap, 
+		support, tlens = scan_all(coords,
+		                          r2c_bam_file,
+		                          self.contigs_fasta_file,
+		                          num_procs, 
+		                          overlap_buffer=0, 
 		                          perfect=perfect, 
 		                          get_seq=get_seq, 
 		                          debug=self.debug)
@@ -598,14 +617,15 @@ class ExonMapper:
 		# initialize support
 		event.support = {'spanning': 0, 'flanking': 0}
 		support_contigs = []
+		depth_contigs = []
 		for i in range(len(event.contigs)):
 		    contig = event.contigs[i]
-		    span = event.contig_support_span[i][0], event.contig_support_span[i][1]
+		    span = event.contig_support_span[i][0] - min_overlap, event.contig_support_span[i][1] + min_overlap
 		    coord = '%s-%s' % (span[0], span[1])
-					
+			
+		    # support reads
 		    if support.has_key(contig) and support[contig].has_key(coord):
 			support_contigs.append(support[contig][coord][0])
-			
 			# if reads are to be extracted
 			if get_seq:
 			    if support[contig][coord][-1]:
@@ -616,13 +636,27 @@ class ExonMapper:
 				    except:
 					support_reads[key] = Set([read])
 			
+		    # junction depth
+		    span = event.contig_breaks[i][0], event.contig_breaks[i][1]
+		    coord = '%s-%s' % (span[0], span[1])
+		    if support.has_key(contig) and support[contig].has_key(coord):
+			depth_contigs.append(support[contig][coord][0])
+			
 		if not multi_mapped:
 		    event.support['spanning'] = sum(support_contigs)
+		    event.read_depth += sum(depth_contigs)
 		else:
 		    event.support['spanning'] = max(support_contigs)
-		    		     
+		    event.read_depth = max(depth_contigs)
+		    
+	    # for mapping
+	    for mapping in self.mappings:
+		for (genome_jn, contig_jn) in mapping.junction_mappings:
+		    coord = '%s-%s' % (contig_jn[0], contig_jn[1])
+		    if support.has_key(mapping.contig) and support[mapping.contig].has_key(coord):
+		    	mapping.junction_depth[genome_jn] = support[mapping.contig][coord][0]
+	    
 	    if tlens:
-		#avg_tlen = float(sum(tlens)) / len(tlens)
 		print 'avg tlen', tlens[:10]
 		    	
 	if self.debug:
@@ -704,10 +738,15 @@ def main(args, options):
     em.screen_events(outdir, align_info=align_info, max_homol_allowed=options.max_homol_allowed)
     
     # added support
+    support_reads = None
+    junction_depths = None
     if options.r2c_bam_file:
 	support_reads = em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, 
 	                                num_procs=options.num_threads, 
 	                                get_seq=options.output_support_reads)
+	junction_depths = Mapping.pool_junction_depths(em.mappings)
+	if junction_depths:
+	    fusion_finder.annotate_ref_junctions([e for e in em.events if e.rna_event == 'fusion'], junction_depths, em.transcripts)
 	
     # merge events captured by different contigs into single events
     events_merged = Adjacency.merge(em.events, transcriptome=True)
@@ -727,6 +766,8 @@ def main(args, options):
     Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
     gene_mappings = Mapping.group(em.mappings)
     Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
+    if junction_depths:
+	Mapping.output_junctions(junction_depths, '%s/junctions.bed' % outdir)
     
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contigs_fasta annotation_file genome_file(indexed) out_dir"
