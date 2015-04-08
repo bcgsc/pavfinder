@@ -19,6 +19,8 @@ class Mapping:
 	self.align_blocks = align_blocks
 	# coverage for each transcript in self.transcripts
 	self.coverages = []
+	self.junction_mappings = []
+	self.junction_depth = {}
 	
     def overlap(self):
 	"""Overlaps alignment spans with exon-spans of each matching transcripts
@@ -185,4 +187,61 @@ class Mapping:
 	out.write('%s\n' % '\t'.join(cls.header))
 	for mapping in mappings:
 	    out.write('%s\n' % mapping.as_tab())
+	out.close()
+
+    def map_junctions(self, align):
+	"""Map genome junction coordinates to contig junction coordinates
+
+	This is for reporting read depth of all mapped junctions
+	"""
+	for i in range(len(align.blocks) - 1):
+	    genome_jn = ('%s:%d' % (align.target, align.blocks[i][1]), 
+	                 '%s:%d' % (align.target, align.blocks[i + 1][0]))
+	    contig_jn = (align.query_blocks[i][1], align.query_blocks[i + 1][0])
+
+	    self.junction_mappings.append((genome_jn, contig_jn))
+	    # initialize junction depth
+	    self.junction_depth[genome_jn] = 0
+
+    @classmethod
+    def pool_junction_depths(cls, mappings):
+	"""Group junction coverage from each mapping(per alignment) and sum them
+
+	Assumption: read-to-contig alignment is not multi-mappped
+	"""
+	all_depths = {}
+	for mapping in mappings:
+	    for (genome_jn, depth) in mapping.junction_depth.iteritems():
+		chrom, start = genome_jn[0].split(':')
+		if not all_depths.has_key(chrom):
+		    all_depths[chrom] = {}
+		end = genome_jn[1].split(':')[1]
+		try:
+		    all_depths[chrom][(start, end)] += depth
+		except:
+		    all_depths[chrom][(start, end)] = depth
+
+	return all_depths
+
+    @classmethod
+    def output_junctions(cls, junction_depths, out_file):
+	"""Output junction coverages in BED format"""
+	out = open(out_file, 'w')
+	for chrom in sorted(junction_depths.keys()):
+	    for (start, end) in junction_depths[chrom].keys():
+		depth = junction_depths[chrom][(start, end)]
+		data = []
+		data.append(chrom)
+		data.append(int(start) - 1)
+		data.append(end)
+		data.append(depth)
+		data.append(depth)
+		data.append('.')
+		data.append(int(start) - 1)
+		data.append(end)
+		data.append(0)
+		data.append(2)
+		data.append('1,1')
+		data.append('%s,%s' % (0, int(end) - 1 - (int(start) - 1)))
+		out.write('%s\n' % '\t'.join(map(str, data)))
 	out.close()
