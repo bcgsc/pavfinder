@@ -225,9 +225,9 @@ class Mapping:
 		    all_depths[chrom] = {}
 		end = genome_jn[1].split(':')[1]
 		try:
-		    all_depths[chrom][(start, end)] += depth
+		    all_depths[chrom][(int(start), int(end))] += depth
 		except:
-		    all_depths[chrom][(start, end)] = depth
+		    all_depths[chrom][(int(start), int(end))] = depth
 
 	return all_depths
 
