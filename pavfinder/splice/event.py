@@ -40,10 +40,21 @@ class Event(Adjacency):
                'ref3_jn_coord',
                'ref3_jn_depth',
                ]
+
+    event_types = ('novel_donor',
+                   'novel_acceptor',
+                   'novel_exon',
+                   'skipped_exon',
+                   'novel_intron',
+                   'retained_intron')
     
     def __init__(self, *args, **kwargs):
 	Adjacency.__init__(self, *args, **kwargs)
 	self.read_depth = 0
+	self.ref5_coord = None
+	self.ref5_depth = None
+	self.ref3_coord = None
+	self.ref3_depth = None
     
     @classmethod
     def output(cls, events, outdir, sort_by_event_type=False):
@@ -270,6 +281,7 @@ class Event(Adjacency):
 	    value = None
 	    if hasattr(self, attr):
 		value = getattr(self, attr)
+	    print 'abcdgg', value, attr
 
 	    if value is not None:
 		data.append(getattr(self, attr))
@@ -369,3 +381,6 @@ class Event(Adjacency):
 		    return 1
 		else:
 		    return 0
+
+    def is_splicing_event(self):
+	return self.rna_event in self.event_types
