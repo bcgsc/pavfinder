@@ -747,6 +747,9 @@ def main(args, options):
 	junction_depths = Mapping.pool_junction_depths(em.mappings)
 	if junction_depths:
 	    fusion_finder.annotate_ref_junctions([e for e in em.events if e.rna_event == 'fusion'], junction_depths, em.transcripts)
+	    novel_splice_finder.annotate_ref_junctions([e for e in em.events if e.is_splicing_event()],
+	                                               junction_depths,
+	                                               em.transcripts)
 	
     # merge events captured by different contigs into single events
     events_merged = Adjacency.merge(em.events, transcriptome=True)
