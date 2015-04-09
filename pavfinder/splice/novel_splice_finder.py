@@ -321,3 +321,78 @@ def is_junction_annotated(match1, match2):
 	return True
     
     return False
+
+def annotate_ref_junctions(events, junction_depths, transcripts):
+    """Annotate 5' and 3' gene reference junction depth/coverage
+
+    Arguments:
+        events: (list) of events (Event)
+        juncton_depths: (dict) {chrom[(start, end)] = depth}
+        transcripts: (dict) transcript ID to object mapping (for extracting exon coordinates)
+    """
+    for event in events:
+	txt = transcripts[event.transcripts[0]]
+	jn5 = None
+	jn3 = None
+	if event.rna_event == 'novel_donor':
+	    jn5 = txt.exon(event.exons[0])[1], txt.exon(event.exons[1])[0]
+
+	elif event.rna_event == 'novel_acceptor':
+	    jn5 = txt.exon(event.exons[0])[1], txt.exon(event.exons[1])[0]
+
+	elif event.rna_event == 'skipped_exon':
+	    exon5 = min(event.exons) - 1
+	    exon3 = max(event.exons) + 1
+	    exon5_coord = txt.exon(exon5)
+	    exon3_coord = txt.exon(exon3)
+	    if exon5_coord is not None:
+		exon_coord = txt.exon(min(event.exons))
+		if txt.strand == '+':
+		    jn5 = exon5_coord[1], exon_coord[0]
+		else:
+		    jn5 = exon_coord[1], exon5_coord[0]
+
+	    if exon3_coord is not None:
+		exon_coord = txt.exon(max(event.exons))
+		if txt.strand == '+':
+		    jn3 = exon_coord[1], exon3_coord[0]
+		else:
+		    jn3 = exon3_coord[1], exon_coord[0]
+
+	elif event.rna_event == 'retained_intron':
+	    jn5 = txt.exon(event.exons[0])[1], txt.exon(event.exons[1])[0]
+
+	elif event.rna_event == 'novel_exon':
+	    for i in range(len(txt.exons) - 1):
+		intron = txt.exons[i][1] + 1, txt.exons[i + 1][0] - 1
+		if event.breaks[0] > intron[0] and event.breaks[1] < intron[1]:
+		    jn5 = txt.exons[i][1], txt.exons[i + 1][0]
+		    break
+
+	elif event.rna_event == 'novel_intron':
+	    exon = event.exons[0]
+	    exon_coord = txt.exon(exon)
+	    exon5 = exon - 1
+	    exon3 = exon + 1
+	    exon5_coord = txt.exon(exon5)
+	    exon3_coord = txt.exon(exon3)
+	    if exon5_coord is not None:
+		if txt.strand == '+':
+		    jn5 = exon5_coord[1], exon_coord[0]
+		else:
+		    jn5 = exon_coord[1], exon5_coord[0]
+
+	    if exon3_coord is not None:
+		if txt.strand == '+':
+		    jn3 = exon_coord[1], exon3_coord[0]
+		else:
+		    jn3 = exon3_coord[1], exon_coord[0]
+
+	if jn5 is not None or jn3 is not None:
+	    if junction_depths.has_key(event.chroms[0]):
+		if jn5 is not None and junction_depths[event.chroms[0]].has_key(jn5):
+		    event.ref5_depth = junction_depths[event.chroms[0]][jn5]
+		    event.ref5_coord = '%s:%s-%s' % (event.chroms[0], jn5[0], jn5[1])
+		if jn3 is not None and junction_depths[event.chroms[0]].has_key(jn3):
+		    event.ref3_depth = junction_depths[event.chroms[0]][jn3]
+		    event.ref3_coord = '%s:%s-%s' % (event.chroms[0], jn3[0], jn3[1])
