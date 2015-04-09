@@ -281,7 +281,6 @@ class Event(Adjacency):
 	    value = None
 	    if hasattr(self, attr):
 		value = getattr(self, attr)
-	    print 'abcdgg', value, attr
 
 	    if value is not None:
 		data.append(getattr(self, attr))
