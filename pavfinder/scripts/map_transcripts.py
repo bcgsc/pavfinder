@@ -1,4 +1,4 @@
-from optparse import OptionParser
+import argparse
 from itertools import groupby
 import pysam
 import sys
@@ -199,144 +199,6 @@ class ExonMapper:
 			                                          self.debug)
 		    if expanded_contig_breaks is not None:
 			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
-
-    #def map_contigs_to_transcripts_old(self):
-	#"""Maps contig alignments to transcripts, discovering variants at the same time"""
-	## extract all transcripts info in dictionary
-	#transcripts = Transcript.extract_transcripts(self.annotation_file)
-	
-	#aligns = []
-	#for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
-	    #sys.stdout.write('analyzing %s\n' % contig)
-            #alns = list(group)	    
-	    #aligns = self.extract_aligns(alns)
-	    #if aligns is None:
-		#sys.stdout.write('no valid alignment: %s\n' % contig)
-		#continue
-	    	    
-	    ## for finding microhomolgy sequence and generating probe in fusion
-	    #contig_seq = self.contigs_fasta.fetch(contig)
-	    
-	    #chimera = True if len(aligns) > 1 else False
-	    #chimera_block_matches = []
-	    #for align in aligns:
-		#if align is None:
-		    #sys.stdout.write('bad alignment: %s\n' % contig)
-		    #continue
-		
-		#if re.search('[._Mm]', align.target):
-		    #sys.stdout.write('skip target:%s %s\n' % (contig, align.target))
-		    #continue
-		
-		#if self.debug:
-		    #sys.stdout.write('contig:%s genome_blocks:%s contig_blocks:%s\n' % (align.query, 
-		                                                                        #align.blocks, 
-		                                                                        #align.query_blocks
-		                                                                        #))
-		
-		## entire contig align within single exon or intron
-		#within_intron = []
-		#within_exon = []
-		
-		#transcripts_mapped = Set()
-		#events = []
-		## each gtf record corresponds to a feature
-		#for gtf in self.annot.fetch(align.target, align.tstart, align.tend):	
-		    ## collect all the transcripts that have exon overlapping alignment
-		    #if gtf.feature == 'exon':
-			#transcripts_mapped.add(gtf.transcript_id)
-		    ## contigs within single intron 
-		    #elif gtf.feature == 'intron' and\
-		         #not chimera and\
-		         #align.tstart >= gtf.start and align.tend <= gtf.end:
-			#match = self.match_exon((align.tstart, align.tend), (gtf.start, gtf.end)) 
-			#within_intron.append((gtf, match))		
-			    	
-		#if transcripts_mapped:
-		    #mappings = []
-		    ## key = transcript name, value = "matches"
-		    #all_block_matches = {}
-		    ## Transcript objects that are fully matched
-		    #full_matched_transcripts = []
-		    #for txt in transcripts_mapped:
-			#block_matches = self.map_exons(align.blocks, transcripts[txt].exons)
-			#all_block_matches[txt] = block_matches
-			#mappings.append((transcripts[txt], block_matches))
-			
-			#if not chimera and self.is_full_match(block_matches):
-			    #full_matched_transcripts.append(transcripts[txt])
-			    
-		    ## report mapping
-		    #best_mapping = Mapping.pick_best(mappings, align, debug=self.debug)
-		    #self.mappings.append(best_mapping)
-		    	
-		    #if not full_matched_transcripts:	
-			## find events only for best transcript
-			#best_transcript = best_mapping.transcripts[0]
-			#events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]}, 
-			                          #align, 
-			                          #{best_transcript.id:best_transcript})
-			#for event in events:
-			    #event.contig_sizes.append(len(contig_seq))
-			#if events:
-			    #self.events.extend(events)
-			#elif self.debug:
-			    #sys.stdout.write('%s - partial but no events\n' % align.query)	
-		    
-		    #if chimera:
-			#chimera_block_matches.append(all_block_matches)
-		    
-		#elif not chimera:
-		    #if within_exon:
-			#sys.stdout.write("contig mapped within single exon: %s %s:%s-%s %s\n" % (contig, 
-			                                                                         #align.target, 
-			                                                                         #align.tstart, 
-			                                                                         #align.tend, 
-			                                                                         #within_exon[0]
-			                                                                         #))
-		    
-		    #elif within_intron:
-			#sys.stdout.write("contig mapped within single intron: %s %s:%s-%s %s\n" % (contig, 
-			                                                                           #align.target, 
-			                                                                           #align.tstart, 
-			                                                                           #align.tend, 
-			                                                                           #within_intron[0]
-			                                                                           #))
-		
-	    ## split aligns, try to find gene fusion
-	    #if chimera and chimera_block_matches:
-		#if len(chimera_block_matches) == len(aligns):
-		    #fusion = fusion_finder.find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, 
-		                                        #exon_bound_only=self.fusion_conditions['exon_bound_only'],
-		                                        #coding_only=self.fusion_conditions['coding_only'],
-		                                        #sense_only=self.fusion_conditions['sense_only'])
-		    #if fusion:
-			#homol_seq, homol_coords = None, None
-			#if self.aligner.lower() == 'gmap':
-			    #homol_seq, homol_coords = gmap.find_microhomology(alns[0], contig_seq)
-			#if homol_seq is not None:
-			    #fusion.homol_seq.append(homol_seq)
-			    #fusion.homol_coords.append(homol_coords)
-			#fusion.contig_sizes.append(len(contig_seq))
-			#self.events.append(fusion)
-		
-	## expand contig span
-	#for event in self.events:
-	    ## if contig_support_span is not defined (it can be pre-defined in ITD)
-	    ## then set it
-	    #if not event.contig_support_span:
-		#event.contig_support_span = event.contig_breaks
-		#if event.rearrangement == 'ins' or event.rearrangement == 'dup':
-		    #expanded_contig_breaks = expand_contig_breaks(event.chroms[0], 
-			                                          #event.breaks, 
-			                                          #event.contigs[0], 
-			                                          #[event.contig_breaks[0][0] + 1, event.contig_breaks[0][1] - 1], 
-			                                          #event.rearrangement, 
-			                                          #self.ref_fasta,
-			                                          #self.contigs_fasta,
-			                                          #self.debug)
-		    #if expanded_contig_breaks is not None:
-			#event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
 					
     def map_exons(self, blocks, exons):
 	"""Maps alignment blocks to exons
@@ -706,8 +568,7 @@ class ExonMapper:
 	for e in bad_event_indices:
 	    del self.events[e]
     
-def main(args, options):
-    outdir = args[-1]
+def main(args):
     # check executables
     required_binaries = ('gmap', 'blastn')
     for binary in required_binaries:
@@ -716,34 +577,42 @@ def main(args, options):
 	    sys.exit('"%s" not in PATH - abort' % binary)
 	        
     # find events
-    em = ExonMapper(*args, 
-                    itd_min_len=options.itd_min_len,
-                    itd_min_pid=options.itd_min_pid,
-                    itd_max_apart=options.itd_max_apart,
-                    exon_bound_fusion_only=not options.include_non_exon_bound_fusion,
-                    coding_fusion_only=not options.include_noncoding_fusion,
-                    sense_fusion_only=not options.include_antisense_fusion,
-                    debug=options.debug)
+    em = ExonMapper(args.c2g_bam,
+                    args.aligner,
+                    args.contigs_fasta,
+                    args.annotation_file,
+                    args.genome_fasta,
+                    args.out_dir,
+                    itd_min_len = args.itd_min_len,
+                    itd_min_pid = args.itd_min_pid,
+                    itd_max_apart = args.itd_max_apart,
+                    exon_bound_fusion_only = not args.include_non_exon_bound_fusion,
+                    coding_fusion_only = not args.include_noncoding_fusion,
+                    sense_fusion_only = not args.include_antisense_fusion,
+                    debug = args.debug)
     em.map_contigs_to_transcripts()
 	
     align_info = None
-    if options.genome and options.index_dir and os.path.exists(options.index_dir):
+    if args.genome and args.index_dir and os.path.exists(args.index_dir):
 	align_info = {
 	    'aligner': em.aligner,
-	    'genome': options.genome,
-	    'index_dir': options.index_dir,
-	    'num_procs': options.num_threads,
+	    'genome': args.genome,
+	    'index_dir': args.index_dir,
+	    'num_procs': args.num_threads,
 	}
     # screen events based on realignments
-    em.screen_events(outdir, align_info=align_info, max_homol_allowed=options.max_homol_allowed)
+    em.screen_events(args.out_dir, align_info=align_info, max_homol_allowed=args.max_homol_allowed)
     
     # added support
     support_reads = None
     junction_depths = None
-    if options.r2c_bam_file:
-	support_reads = em.find_support(options.r2c_bam_file, options.min_overlap, options.multimapped, 
-	                                num_procs=options.num_threads, 
-	                                get_seq=options.output_support_reads)
+    if args.r2c_bam:
+	support_reads = em.find_support(args.r2c_bam,
+	                                args.min_overlap,
+	                                args.multimapped, 
+	                                num_procs=args.num_threads, 
+	                                get_seq=args.output_support_reads)
+
 	junction_depths = Mapping.pool_junction_depths(em.mappings)
 	if junction_depths:
 	    fusion_finder.annotate_ref_junctions([e for e in em.events if e.rna_event == 'fusion'], junction_depths, em.transcripts)
@@ -755,47 +624,46 @@ def main(args, options):
     events_merged = Adjacency.merge(em.events, transcriptome=True)
     
     # filter read support after merging
-    if options.r2c_bam_file:
-	Event.filter_by_support(events_merged, options.min_support)
+    if args.r2c_bam:
+	Event.filter_by_support(events_merged, args.min_support)
 	
     # output events
-    Event.output(events_merged, outdir, sort_by_event_type=options.sort_by_event_type)
+    Event.output(events_merged, args.out_dir, sort_by_event_type=args.sort_by_event_type)
     
     # output support reads
-    if options.output_support_reads and support_reads:
-	Event.output_reads(events_merged, support_reads, '%s/support_reads.fa' % outdir)
+    if args.output_support_reads and support_reads:
+	Event.output_reads(events_merged, support_reads, '%s/support_reads.fa' % args.out_dir)
     
     # output mappings
-    Mapping.output(em.mappings, '%s/contig_mappings.tsv' % outdir)
+    Mapping.output(em.mappings, '%s/contig_mappings.tsv' % args.out_dir)
     gene_mappings = Mapping.group(em.mappings)
-    Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % outdir)
+    Mapping.output(gene_mappings, '%s/gene_mappings.tsv' % args.out_dir)
     if junction_depths:
-	Mapping.output_junctions(junction_depths, '%s/junctions.bed' % outdir)
+	Mapping.output_junctions(junction_depths, '%s/junctions.bed' % args.out_dir)
     
 if __name__ == '__main__':
-    usage = "Usage: %prog c2g_bam aligner contigs_fasta annotation_file genome_file(indexed) out_dir"
-    parser = OptionParser(usage=usage, version=__version__)
-    
-    parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
-    parser.add_option("-t", "--num_threads", dest="num_threads", help="number of threads. Default:8", type='int', default=8) 
-    parser.add_option("-g", "--genome", dest="genome", help="genome")
-    parser.add_option("-G", "--index_dir", dest="index_dir", help="genome index directory")
-    parser.add_option("--junctions", dest="junctions", help="output junctions", action="store_true", default=False)
-    parser.add_option("--itd_min_len", dest="itd_min_len", help="minimum ITD length. Default: 10", default=10, type=int)
-    parser.add_option("--itd_min_pid", dest="itd_min_pid", help="minimum ITD percentage of identity. Default: 0.95", default=0.95, type=float)
-    parser.add_option("--itd_max_apart", dest="itd_max_apart", help="maximum distance apart of ITD. Default: 10", default=10, type=int)
-    parser.add_option("--multimapped", dest="multimapped", help="reads-to-contigs alignment is multi-mapped", action="store_true", default=False)
-    parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
-    parser.add_option("--min_support", dest="min_support", help="minimum read support. Default:2", type='int', default=2)
-    parser.add_option("--include_non_exon_bound_fusion", dest="include_non_exon_bound_fusion", help="include fusions where breakpoints are not at exon boundaries", 
-                      action="store_true", default=False)
-    parser.add_option("--include_noncoding_fusion", dest="include_noncoding_fusion", help="include non-coding genes in detecting fusions", action="store_true", default=False)
-    parser.add_option("--include_antisense_fusion", dest="include_antisense_fusion", help="include antisense fusions", action="store_true", default=False)
-    parser.add_option("--sort_by_event_type", dest="sort_by_event_type", help="sort output by event type", action="store_true", default=False)
-    parser.add_option("--output_support_reads", dest="output_support_reads", help="output support reads", action="store_true", default=False)
-    parser.add_option("--max_homol_allowed", dest="max_homol_allowed", help="maximun amount of microhomology allowed. Default:10", type="int", default=10)
-    parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
-    
-    (options, args) = parser.parse_args()
-    if len(args) == 6:
-        main(args, options)     
+    parser = argparse.ArgumentParser(description="Map contigs to transcripts and identify novel events")
+    parser.add_argument('c2g_bam', type=str, help="contigs-to-genome alignment BAM")
+    parser.add_argument('aligner', type=str, help="name of aligner e.g.gmap")
+    parser.add_argument('contigs_fasta', type=str, help="name of aligner e.g.gmap")
+    parser.add_argument('annotation_file', type=str, help="sorted annotation file indexed by tabix")
+    parser.add_argument('genome_fasta', type=str, help="reference genome FASTA (indexed with samtools)")
+    parser.add_argument('out_dir', type=str, help="output directory")
+    parser.add_argument("-b", "--r2c_bam", metavar="r2c_BAM", type=str, help="reads-to-contigs bam file")
+    parser.add_argument("-t", "--num_threads", type=int, default=8, help="number of threads. Default:8") 
+    parser.add_argument("-g", "--genome", type=str, help="genome prefix")
+    parser.add_argument("-G", "--index_dir", type=str, help="genome index directory")
+    parser.add_argument("--min_overlap", type=int, default=4, help="minimum breakpoint overlap for identifying read support. Default:4")
+    parser.add_argument("--min_support", type=int, default=2, help="minimum read support. Default:2")
+    parser.add_argument("--include_non_exon_bound_fusion", action="store_true", help="include fusions where breakpoints are not at exon boundaries")
+    parser.add_argument("--include_noncoding_fusion", action="store_true", help="include non-coding genes in detecting fusions")
+    parser.add_argument("--include_antisense_fusion", action="store_true", help="include antisense fusions")
+    parser.add_argument("--itd_min_len", default=10, type=int, help="minimum ITD length. Default: 10")
+    parser.add_argument("--itd_min_pid", default=0.95, type=float, help="minimum ITD percentage of identity. Default: 0.95")
+    parser.add_argument("--itd_max_apart", default=10, type=int, help="maximum distance apart of ITD. Default: 10")
+    parser.add_argument("--max_homol_allowed", type=int, default=10, help="maximun amount of microhomology allowed. Default:10")
+    parser.add_argument("--sort_by_event_type", action="store_true", help="sort output by event type")
+    parser.add_argument("--output_support_reads", action="store_true", help="output support reads")
+    parser.add_argument("--debug", dest="debug", action="store_true", help="debug mode")
+    args = parser.parse_args()
+    main(args)
