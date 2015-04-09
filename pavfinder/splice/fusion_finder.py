@@ -345,9 +345,9 @@ def annotate_ref_junctions(fusions, junction_depths, transcripts):
 		jn_pos = jn_exon[1]
 	    else:
 		jn_pos = jn_exon[0]
-	    for chrom, depths in junction_depths.iteritems():
-		for pos, depth in depths.iteritems():
-		    if fusion.orients[i] == 'L' and int(pos[0]) == int(jn_pos):
-			update_depth(fusion, depth, fusion.genes[i], '%s:%s-%s' % (chrom, pos[0], pos[1]))
-		    elif fusion.orients[i] == 'R' and int(pos[1]) == int(jn_pos):
-			update_depth(fusion, depth, fusion.genes[i], '%s:%s-%s' % (chrom, pos[0], pos[1]))
+
+	    for pos, depth in junction_depths[fusion.chroms[i]].iteritems():
+		if fusion.orients[i] == 'L' and int(pos[0]) == int(jn_pos):
+		    update_depth(fusion, depth, fusion.genes[i], '%s:%s-%s' % (fusion.chroms[i], pos[0], pos[1]))
+		elif fusion.orients[i] == 'R' and int(pos[1]) == int(jn_pos):
+		    update_depth(fusion, depth, fusion.genes[i], '%s:%s-%s' % (fusion.chroms[i], pos[0], pos[1]))
