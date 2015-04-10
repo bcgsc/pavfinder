@@ -1,7 +1,7 @@
 from sets import Set
 from pavfinder.shared.alignment import reverse_complement
 
-def find_novel_junctions(block_matches, align, transcripts, ref_fasta):
+def find_novel_junctions(block_matches, align, transcripts, ref_fasta, accessory_known_features):
     """Find novel junctions within a single gene/transcript
     
     Args:
@@ -37,11 +37,14 @@ def find_novel_junctions(block_matches, align, transcripts, ref_fasta):
 		annotated.add((i, j))
 		continue
 	    
+    known_exons = known_jns = None
+    if accessory_known_features is not None:
+	known_exons = accessory_known_features['exon']
+	known_jns = accessory_known_features['junction']
+
     all_events = []
     for transcript in block_matches.keys():
 	matches = block_matches[transcript]
-	#print 'mmm', matches
-	#print 'eee', transcript, transcripts[transcript].exons
 	for i in range(len(matches) - 1):
 	    j = i + 1
 		    
@@ -53,7 +56,9 @@ def find_novel_junctions(block_matches, align, transcripts, ref_fasta):
 		                                     align.target, 
 		                                     align.blocks[i:j+1], 
 		                                     transcripts[transcript],
-		                                     ref_fasta
+		                                     ref_fasta,
+		                                     known_jns = known_jns,
+		                                     known_exons = known_exons,
 		                                     )
 		    for e in events:
 			e['blocks'] = (i, j)
@@ -69,7 +74,9 @@ def find_novel_junctions(block_matches, align, transcripts, ref_fasta):
 		                                 align.target, 
 		                                 align.blocks[i], 
 		                                 transcripts[transcript],
-		                                 ref_fasta
+		                                 ref_fasta,
+		                                 known_jns = known_jns,
+		                                 known_exons = known_exons,
 		                                 )
 		if events:
 		    for e in events:
@@ -96,7 +103,9 @@ def find_novel_junctions(block_matches, align, transcripts, ref_fasta):
 		                                 align.target, 
 		                                 align.blocks[i:j+1], 
 		                                 transcripts[transcript],
-		                                 ref_fasta
+		                                 ref_fasta,
+		                                 known_jns = known_jns,
+		                                 known_exons = known_exons,
 		                                 )
 		if events:
 			for e in events:
@@ -136,7 +145,7 @@ def find_novel_junctions(block_matches, align, transcripts, ref_fasta):
 		
 	return uniq_events
     
-def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta, min_intron_size=20):
+def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta, min_intron_size=20, known_jns=None, known_exons=None):
     """Classify given junction into different splicing events or indel
     
     Args:
@@ -154,9 +163,13 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
     # set default values for 'pos'
     if type(blocks[0]) is int:
 	pos = (blocks[0], blocks[1])
+	if known_exons and (chrom, pos[0], pos[1]) in known_exons:
+	    return events
     else:
 	pos = (blocks[0][1], blocks[1][0])
-    
+	if known_jns and (chrom, pos[0], pos[1]) in known_jns:
+	    return events
+
     if match2 is None:
 	if len(match1) == 2:
 	    exons = [m[0] for m in match1]
