@@ -22,6 +22,7 @@ class ExonMapper:
     def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
                  itd_min_len=None, itd_min_pid=None, itd_max_apart=None, 
                  exon_bound_fusion_only=False, coding_fusion_only=False, sense_fusion_only=False,
+                 accessory_annots=None,
                  debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
 	self.contigs_fasta_file = contigs_fasta_file
@@ -51,10 +52,20 @@ class ExonMapper:
 	                          'coding_only': coding_fusion_only,
 	                          'sense_only': sense_fusion_only}
 
+	self.accessory_annots = accessory_annots
+
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
 	# extract all transcripts info in dictionary
 	self.transcripts = Transcript.extract_transcripts(self.annotation_file)
+
+	# additional annotations to determine novelty of splicing events
+	accessory_known_features = {'exon': Set(), 'junction': Set()}
+	if self.accessory_annots:
+	    for gtf in self.accessory_annots:
+		features = Transcript.extract_features(gtf)
+		for feature in ('exon', 'junction'):
+		    accessory_known_features[feature] = accessory_known_features[feature].union(features[feature])
 
 	chimeras = {}
 	for aln in self.bam.fetch(until_eof=True):
@@ -122,7 +133,8 @@ class ExonMapper:
 		    best_transcript = best_mapping.transcripts[0]
 		    events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]},
 		                              align,
-		                              {best_transcript.id:best_transcript})
+		                              {best_transcript.id:best_transcript},
+		                              accessory_known_features = accessory_known_features)
 		    for event in events:
 			event.contig_sizes.append(len(contig_seq))
 		    if events:
@@ -242,7 +254,7 @@ class ExonMapper:
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
 	return novel_seq
 	    
-    def find_events(self, matches_by_transcript, align, transcripts, small=20):
+    def find_events(self, matches_by_transcript, align, transcripts, small=20, accessory_known_features=None):
 	"""Find events from single alignment
 	
 	Wrapper for finding events within a single alignment
@@ -278,7 +290,7 @@ class ExonMapper:
 		events.append(fusion)
 	    	    	
 	# events within a gene
-	local_events = novel_splice_finder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta)
+	local_events = novel_splice_finder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta, accessory_known_features)
 	if local_events:
 	    for event in local_events:
 		adj = Event((align.target, align.target), event['pos'], '-', contig=align.query)
@@ -527,7 +539,7 @@ class ExonMapper:
 		
 	return support_reads
 
-    def screen_events(self, outdir, align_info=None, max_homol_allowed=None):
+    def screen_events(self, outdir, align_info=None, max_homol_allowed=None, debug=False):
 	"""Screen events identified and filter out bad ones
 	
 	Right now it just screens out fusion whose probe sequence can align to one single location
@@ -589,6 +601,7 @@ def main(args):
                     exon_bound_fusion_only = not args.include_non_exon_bound_fusion,
                     coding_fusion_only = not args.include_noncoding_fusion,
                     sense_fusion_only = not args.include_antisense_fusion,
+                    accessory_annots = args.annot,
                     debug = args.debug)
     em.map_contigs_to_transcripts()
 	
@@ -601,7 +614,7 @@ def main(args):
 	    'num_procs': args.num_threads,
 	}
     # screen events based on realignments
-    em.screen_events(args.out_dir, align_info=align_info, max_homol_allowed=args.max_homol_allowed)
+    em.screen_events(args.out_dir, align_info=align_info, max_homol_allowed=args.max_homol_allowed, debug=args.debug)
     
     # added support
     support_reads = None
@@ -653,6 +666,7 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--num_threads", type=int, default=8, help="number of threads. Default:8") 
     parser.add_argument("-g", "--genome", type=str, help="genome prefix")
     parser.add_argument("-G", "--index_dir", type=str, help="genome index directory")
+    parser.add_argument("--annot", type=str, nargs="+", help="accessory annotation file(s) for checking novel splice events")
     parser.add_argument("--min_overlap", type=int, default=4, help="minimum breakpoint overlap for identifying read support. Default:4")
     parser.add_argument("--min_support", type=int, default=2, help="minimum read support. Default:2")
     parser.add_argument("--include_non_exon_bound_fusion", action="store_true", help="include fusions where breakpoints are not at exon boundaries")
@@ -662,6 +676,7 @@ if __name__ == '__main__':
     parser.add_argument("--itd_min_pid", default=0.95, type=float, help="minimum ITD percentage of identity. Default: 0.95")
     parser.add_argument("--itd_max_apart", default=10, type=int, help="maximum distance apart of ITD. Default: 10")
     parser.add_argument("--max_homol_allowed", type=int, default=10, help="maximun amount of microhomology allowed. Default:10")
+    parser.add_argument("--multimapped", action="store_true", help="if r2c alignments are multimapped")
     parser.add_argument("--sort_by_event_type", action="store_true", help="sort output by event type")
     parser.add_argument("--output_support_reads", action="store_true", help="output support reads")
     parser.add_argument("--debug", dest="debug", action="store_true", help="debug mode")
