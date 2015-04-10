@@ -1,4 +1,5 @@
 from pybedtools import BedTool
+from sets import Set
 
 class Transcript:
     def __init__(self, id, gene=None, strand=None, coding=False):
@@ -130,3 +131,34 @@ class Transcript:
 		transcript.coding = True
 		
 	return transcripts
+
+    @staticmethod
+    def extract_features(annotation_file):
+	"""Extracts all exons and exon-junctions from given gtf file
+
+	Arguments:
+	    annotation_file: gtf file
+	Returns:
+	    {'exon': {('chr', start, end), ('chr', start, end)}
+	     'junction': {('chr', start, end), ('chr', start, end)}
+	"""
+	features = {'exon': Set(), 'junction': Set()}
+
+	transcripts = {}
+	for exon in BedTool(annotation_file).filter(lambda f: f[2] == 'exon'):
+	    coords = int(exon.start) + 1, int(exon.stop)
+	    pos = exon.chrom, coords[0], coords[1]
+	    features['exon'].add(pos)
+	    try:
+		exons = transcripts[exon.attrs['transcript_id']]
+	    except:
+		transcripts[exon.attrs['transcript_id']] = []
+		exons = transcripts[exon.attrs['transcript_id']]
+	    exons.append(pos)
+
+	for exons in transcripts.values():
+	    for i in range(len(exons) - 1):
+		jn = (exons[i][0], exons[i][2], exons[i + 1][1])
+		features['junction'].add(jn)
+
+	return features
