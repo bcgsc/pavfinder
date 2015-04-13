@@ -22,7 +22,7 @@ class ExonMapper:
     def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
                  itd_min_len=None, itd_min_pid=None, itd_max_apart=None, 
                  exon_bound_fusion_only=False, coding_fusion_only=False, sense_fusion_only=False,
-                 accessory_annots=None,
+                 suppl_annots=None,
                  debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
 	self.contigs_fasta_file = contigs_fasta_file
@@ -52,7 +52,7 @@ class ExonMapper:
 	                          'coding_only': coding_fusion_only,
 	                          'sense_only': sense_fusion_only}
 
-	self.accessory_annots = accessory_annots
+	self.suppl_annots = suppl_annots
 
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
@@ -60,12 +60,12 @@ class ExonMapper:
 	self.transcripts = Transcript.extract_transcripts(self.annotation_file)
 
 	# additional annotations to determine novelty of splicing events
-	accessory_known_features = {'exon': Set(), 'junction': Set()}
-	if self.accessory_annots:
-	    for gtf in self.accessory_annots:
+	suppl_known_features = {'exon': Set(), 'junction': Set()}
+	if self.suppl_annots:
+	    for gtf in self.suppl_annots:
 		features = Transcript.extract_features(gtf)
 		for feature in ('exon', 'junction'):
-		    accessory_known_features[feature] = accessory_known_features[feature].union(features[feature])
+		    suppl_known_features[feature] = suppl_known_features[feature].union(features[feature])
 
 	chimeras = {}
 	for aln in self.bam.fetch(until_eof=True):
@@ -134,7 +134,7 @@ class ExonMapper:
 		    events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]},
 		                              align,
 		                              {best_transcript.id:best_transcript},
-		                              accessory_known_features = accessory_known_features)
+		                              suppl_known_features = suppl_known_features)
 		    for event in events:
 			event.contig_sizes.append(len(contig_seq))
 		    if events:
@@ -254,7 +254,7 @@ class ExonMapper:
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
 	return novel_seq
 	    
-    def find_events(self, matches_by_transcript, align, transcripts, small=20, accessory_known_features=None):
+    def find_events(self, matches_by_transcript, align, transcripts, small=20, suppl_known_features=None):
 	"""Find events from single alignment
 	
 	Wrapper for finding events within a single alignment
@@ -290,7 +290,7 @@ class ExonMapper:
 		events.append(fusion)
 	    	    	
 	# events within a gene
-	local_events = novel_splice_finder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta, accessory_known_features)
+	local_events = novel_splice_finder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta, suppl_known_features)
 	if local_events:
 	    for event in local_events:
 		adj = Event((align.target, align.target), event['pos'], '-', contig=align.query)
@@ -601,7 +601,7 @@ def main(args):
                     exon_bound_fusion_only = not args.include_non_exon_bound_fusion,
                     coding_fusion_only = not args.include_noncoding_fusion,
                     sense_fusion_only = not args.include_antisense_fusion,
-                    accessory_annots = args.annot,
+                    suppl_annots = args.suppl_annot,
                     debug = args.debug)
     em.map_contigs_to_transcripts()
 	
@@ -666,7 +666,7 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--num_threads", type=int, default=8, help="number of threads. Default:8") 
     parser.add_argument("-g", "--genome", type=str, help="genome prefix")
     parser.add_argument("-G", "--index_dir", type=str, help="genome index directory")
-    parser.add_argument("--annot", type=str, nargs="+", help="accessory annotation file(s) for checking novel splice events")
+    parser.add_argument("--suppl_annot", type=str, nargs="+", help="supplementary annotation file(s) for checking novel splice events")
     parser.add_argument("--min_overlap", type=int, default=4, help="minimum breakpoint overlap for identifying read support. Default:4")
     parser.add_argument("--min_support", type=int, default=2, help="minimum read support. Default:2")
     parser.add_argument("--include_non_exon_bound_fusion", action="store_true", help="include fusions where breakpoints are not at exon boundaries")
