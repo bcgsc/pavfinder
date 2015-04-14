@@ -18,7 +18,7 @@ setup(
         ],
     packages=find_packages(),
     install_requires = [
-        'pysam>=0.7.7,<0.8.1',
+        'pysam>=0.8.1',
         'pybedtools>=0.6.2',
         'intspan>=0.701',
         ],
