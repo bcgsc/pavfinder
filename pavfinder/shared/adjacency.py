@@ -463,9 +463,13 @@ class Adjacency:
 	return '\t'.join(data)
     
     def get_contig_support_span(self, contig_index):
-	if self.homol_coords and self.homol_coords[contig_index][0] is int and self.homol_coords[contig_index][1] is int:
+	#if self.homol_coords and self.homol_coords[contig_index][0] is int and self.homol_coords[contig_index][1] is int:
+	    #return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
+	#else:
+	    #return (self.contig_breaks[contig_index][0], self.contig_breaks[contig_index][1])
+	try:
 	    return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
-	else:
+	except:
 	    return (self.contig_breaks[contig_index][0], self.contig_breaks[contig_index][1])
     
 	    
@@ -711,12 +715,32 @@ class Adjacency:
 		       abs(adj1.breaks[t1] - adj2.breaks[t2]) <= neighborhood and\
 		       adj1.orients[t1] != adj2.orients[t2]:
 			if adj1.chroms[s1] == adj2.chroms[s2]:
-			    if abs(adj1.breaks[s1] - adj2.breaks[s2]) > neighborhood and\
-			       adj1.orients[s1] != adj2.orients[s2] and\
-			       adj1.orients[s1] != adj1.orients[t1] and\
-			       adj2.orients[s2] != adj2.orients[t2]:
-				return (s1, s2, t1, t2)
-			    
+			    if abs(adj1.breaks[s1] - adj2.breaks[s2]) > neighborhood:
+				if (int(adj1.aligns[0][t1].tstart) < int(adj2.aligns[0][t2].tstart) and\
+				    adj1.orients[t1] == 'L' and\
+				    adj2.orients[t2] == 'R' and\
+				    ((adj1.breaks[s1] < adj2.breaks[s2] and\
+				      adj1.orients[s1] == 'R' and\
+				      adj2.orients[s2] == 'L')\
+				     or\
+				     (adj1.breaks[s1] > adj2.breaks[s2] and\
+				      adj1.orients[s1] == 'L' and\
+				      adj2.orients[s2] == 'R'))
+				    )\
+				   or\
+				   (int(adj2.aligns[0][t2].tstart) < int(adj1.aligns[0][t1].tstart) and\
+				    adj2.orients[t2] == 'L' and\
+				    adj1.orients[t1] == 'R' and\
+				    ((adj2.breaks[s2] < adj1.breaks[s1] and\
+				      adj2.orients[s2] == 'R' and\
+				      adj1.orients[s1] == 'L')\
+				     or\
+				     (adj2.breaks[s2] > adj1.breaks[s1] and\
+				      adj2.orients[s2] == 'L' and\
+				      adj1.orients[s1] == 'R'))
+				    ):
+				    return (s1, s2, t1, t2)
+				    
 			# source coming from different chromosomes or other genomes
 			# can only just check the target	
 			else:
