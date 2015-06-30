@@ -1,8 +1,9 @@
 from pybedtools import BedTool
 from sets import Set
+from pavfinder.shared.alignment import reverse_complement
 
 class Transcript:
-    def __init__(self, id, gene=None, strand=None, coding=False):
+    def __init__(self, id, gene=None, strand=None, coding=False, chrom=None):
 	self.id = id
 	self.gene = gene
 	self.strand = strand
@@ -10,6 +11,7 @@ class Transcript:
 	self.coding = coding
 	self.cds_start = None
 	self.cds_end = None
+	self.chrom = chrom
 	
     def add_exon(self, exon):
 	self.exons.append(exon)
@@ -63,6 +65,59 @@ class Transcript:
 	else:
 	    return len(self.exons) - index
 	
+    def get_sequence(self, fasta, cds_only=False):
+	"""Extract transcript sequence using CDS coordinate info
+
+	if "cds_only", sequence will begin with start codon ATG and
+	end with nucleotide before stop codon
+
+	Args:
+	    fasta - Pysam FastaFile
+	    cds_only(optional) - coding sequence only
+	Returns:
+	    sequence will be same strand of transcript
+	    i.e. reverse_complemented if strand of transcript is negative
+	    None if cds asked but transcript object doesn't have cds start and end coordinates
+	"""
+	seq = ''
+	inside_cds = False
+
+	exons = self.exons
+	if self.strand == '-':
+	    exons = reversed(exons)
+
+	if cds_only and (self.cds_start is None or self.cds_end is None):
+	    return None
+
+	for exon in exons:
+	    span = None
+	    if not cds_only:
+		span = exon[0] - 1, exon[1]
+	    else:
+		if not inside_cds and self.cds_start >= exon[0] and self.cds_start <= exon[1]:
+		    if self.strand == '+':
+			span = self.cds_start - 1, exon[1]
+		    else:
+			span = exon[0] - 1, self.cds_start
+		    inside_cds = True
+		elif inside_cds and self.cds_end >= exon[0] and self.cds_end <= exon[1]:
+		    if self.strand == '+':
+			span = exon[0] - 1, self.cds_end
+		    else:
+			span = self.cds_end - 1, exon[1]
+		    inside_cds = True
+		elif cds_only and inside_cds:
+		    span = exon[0] - 1, exon[1]
+
+	    if span is not None:
+		if span is not None:
+		    exon_seq = fasta.fetch(self.chrom, span[0], span[1])
+		if self.strand == '-':
+		    exon_seq = reverse_complement(exon_seq)
+		seq += exon_seq.upper()
+
+	return seq
+
     @staticmethod
     def extract_transcripts(annotation_file):
 	"""Extracts all exon info into transcript objects
@@ -95,7 +150,7 @@ class Transcript:
 		try:
 		    transcript = transcripts[transcript_id]
 		except:
-		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding, chrom=feature.chrom)
 		    transcripts[transcript_id] = transcript
 		    
 		transcript.add_exon(exon)
@@ -108,7 +163,7 @@ class Transcript:
 		try:
 		    transcript = transcripts[transcript_id]
 		except:
-		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding)
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding, chrom=feature.chrom)
 		    transcripts[transcript_id] = transcript
 		    
 		
