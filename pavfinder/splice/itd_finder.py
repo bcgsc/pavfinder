@@ -32,6 +32,33 @@ def detect_itd(adj, align, contig_seq, outdir, min_len, max_apart, min_pid, debu
 	if dup:
 	    update_attrs(adj, align, dup, contig_seq)
 	    
+def call_from_chimera(adj, junc_matches1, junc_matches2, transcripts):
+    """Call ITD from split alignments
+
+    Will update adj with ITD attributes if it is affirmed
+
+    Args:
+        adj: (Adjacency) Adjacent object of chimera
+	junc_matches1: (dict) key=transcript_id, value=list of tuple(exon_index, match_operator) e.g. {'NM_004119': [(10, '=<')]}
+	junc_matches2: (dict) key=transcript_id, value=list of tuple(exon_index, match_operator) e.g. {'NM_004119': [(10, '=<')]}
+	transcripts: (dict) key=transcript_name value=Transcript object
+    """
+    txt_id1 = junc_matches1.keys()[0]
+    txt_id2 = junc_matches2.keys()[0]
+    exon_idx1 = junc_matches1[txt_id1][0][0]
+    exon_idx2 = junc_matches2[txt_id2][0][0]
+    # breaks in same exon
+    if txt_id1 == txt_id2 and exon_idx1 == exon_idx2:
+	txt = transcripts[txt_id1]
+	exon = txt.exon_num(exon_idx1)
+
+	adj.rna_event = 'ITD'
+	adj.genes = (txt.gene, txt.gene)
+	adj.transcripts = (txt.id, txt.id)
+	adj.exons = (exon, exon)
+	adj.size = abs(adj.get_size())
+	# novel seq not reported
+
 def update_attrs(adj, align, dup, contig_seq=None):
     """Updates attributes of original insertion adjacency to become ITD
     1. rna_event -> 'ITD'

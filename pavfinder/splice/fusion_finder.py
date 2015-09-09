@@ -7,6 +7,7 @@ from pavfinder.SV.split_align import call_event
 from pavfinder.shared.adjacency import Adjacency
 from pavfinder.SV import gapped_align, split_align
 from pavfinder.splice.event import Event
+import pavfinder.splice.itd_finder
 
 def find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, exon_bound_only=False, coding_only=False, sense_only=False):
     """Identify gene fusion between split alignments
@@ -48,6 +49,15 @@ def find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, exon_bo
 		junc_matches2[transcript] = chimera_block_matches[1][transcript][-1]
 	    else:
 		junc_matches2[transcript] = chimera_block_matches[1][transcript][0]
+
+	# chimera is ITD
+	if len(genes1) == len(genes2) and\
+	   len(genes1) == 1 and\
+	   list(genes1)[0] == list(genes2)[0]:
+	    if fusion.rearrangement == 'dup':
+		pavfinder.splice.itd_finder.call_from_chimera(fusion, junc_matches1, junc_matches2, transcripts)
+		if fusion.rna_event == 'ITD':
+		    return fusion
 
 	junc1, junc2 = identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
 	if junc1 and junc2 and junc1[1] is not None and junc2[1] is not None:
