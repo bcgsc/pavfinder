@@ -9,7 +9,7 @@ from pavfinder.SV import gapped_align, split_align
 from pavfinder.splice.event import Event
 import pavfinder.splice.itd_finder
 
-def find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, exon_bound_only=False, coding_only=False, sense_only=False):
+def find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, exon_bound_only=False, coding_only=False, sense_only=False, ref_fasta=None, outdir=None, debug=False):
     """Identify gene fusion between split alignments
 	
     Args:
@@ -21,6 +21,13 @@ def find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, exon_bo
                                                          [(exon_id, '=='), (exon_id, '==')]
         transcripts: (dict) key=transcript_name value=Transcript object
         aligns: (list) ORDERED alignments involved in chimera
+	contig_seq: (str) contig sequence
+	exon_bound_only: (Boolean) keep fusions only at exon boundaries
+	coding_only: (Boolean) keep fusions that are from coding transcripts only
+	sense_only: (Boolean) keep fusions that are sense only (both transcripts translate in the same direction)
+	ref_fasta: (FastaFile) Pysam FastaFile handle to genome reference for determining ITD sequence
+	outdir: (str) for ITD_finder (run self-vs-self BLAST alignment
+	debug: (Boolean) for ITD_finder
     Returns:
         Adjacency with genes, transcripts, exons annotated
     """
@@ -55,8 +62,15 @@ def find_chimera(chimera_block_matches, transcripts, aligns, contig_seq, exon_bo
 	   len(genes1) == 1 and\
 	   list(genes1)[0] == list(genes2)[0]:
 	    if fusion.rearrangement == 'dup':
-		pavfinder.splice.itd_finder.call_from_chimera(fusion, junc_matches1, junc_matches2, transcripts)
-		if fusion.rna_event == 'ITD':
+		pavfinder.splice.itd_finder.call_from_chimera(fusion,
+		                                              junc_matches1,
+		                                              junc_matches2,
+		                                              transcripts,
+		                                              contig_seq,
+		                                              ref_fasta,
+		                                              outdir=outdir,
+		                                              debug=debug)
+		if hasattr(fusion, 'rna_event') and fusion.rna_event == 'ITD':
 		    return fusion
 
 	junc1, junc2 = identify_fusion(junc_matches1, junc_matches2, transcripts, fusion.orients)
