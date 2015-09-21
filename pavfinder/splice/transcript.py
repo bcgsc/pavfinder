@@ -118,6 +118,48 @@ class Transcript:
 
 	return seq
 
+    def get_exon_size(self, index):
+	"""Returns exon size given exon index (not exon number)
+
+	index = {0,1,...,len(exons)-1}, already from left to right coordinates
+	"""
+	if index >= 0 and index < len(self.exons):
+	    return self.exons[index][1] - self.exons[index][0] + 1
+	return None
+
+    def txt_coord_to_exon(self, coord):
+	"""Given genomic coordinate, return exon number
+
+	Motivation: For converting contig to transrcipt alignment back to
+	            genomic coordinate reporting
+	"""
+	exon_start = 1
+	indexes = range(len(self.exons))
+	if self.strand == '-':
+	    indexes.reverse()
+	for i in range(len(indexes)):
+	    if i > 0:
+		exon_start += self.get_exon_size(indexes[i - 1])
+	    if coord >= exon_start and coord <= exon_start + self.get_exon_size(indexes[i]) - 1:
+		return self.exon_num(indexes[i])
+	return None
+
+    def txt_coord_to_genome_coord(self, coord):
+	"""Given transcript coordinate, returns corresponding genomic coordinate"""
+	exon_start = 1
+	indexes = range(len(self.exons))
+	if self.strand == '-':
+	    indexes.reverse()
+	for i in range(len(indexes)):
+	    if i > 0:
+		exon_start += self.get_exon_size(indexes[i - 1])
+	    if coord >= exon_start and coord <= exon_start + self.get_exon_size(indexes[i]) - 1:
+		if self.strand == '+':
+		    return self.exons[indexes[i]][0] + (coord - exon_start)
+		else:
+		    return self.exons[indexes[i]][1] - (coord - exon_start)
+	return None
+
     @staticmethod
     def extract_transcripts(annotation_file):
 	"""Extracts all exon info into transcript objects
