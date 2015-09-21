@@ -8,7 +8,7 @@ from pavfinder.shared import gmap, bwa_mem
 from pavfinder.shared.adjacency import Adjacency
 from pavfinder.shared.alignment import compare_chr, Alignment, target_non_canonical
 
-def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, max_splits=3, debug=False):
+def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, max_splits=3, check_haplotype=True, debug=False):
     """Finds primary_aligns alignments corresponding to chimera
     
     Args:
@@ -58,12 +58,10 @@ def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, m
 	    
 	return None
 		
-
-    
     primary_aligns, secondary_aligns = {
         #'gmap': gmap.find_chimera,
         'bwa_mem': bwa_mem.find_chimera,
-        }[aligner](alns, bam, debug=debug)
+        }[aligner](alns, bam, check_haplotype=check_haplotype, debug=debug)
     		    
     if primary_aligns:
 	if len(primary_aligns) > max_splits:
@@ -86,8 +84,7 @@ def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, m
 			                                                                                                          align.sam.cigarstring
 			                                                                                                          ))
 		    return None, None
-		    
-	    
+
 	    primary_chimera = [primary_aligns[i] for i in primary_paths]
 	    primary_chroms = Set([align.target for align in primary_chimera])
 	    for align in primary_chimera:
@@ -293,8 +290,7 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False, ma
 	    return new_aligns
 	
 	return None
-		    
-    
+
     def _construct_graph(max_links=100, max_olap=0.2, max_gap=0.2):
 	"""
 	Alignments must be like to be an edge

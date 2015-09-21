@@ -5,7 +5,16 @@ import sys
 from intspan import intspan
 from sets import Set
 
-def find_chimera(alns, bam, debug=False):
+def find_chimera(alns, bam, debug=False, check_haplotype=True):
+    """Determine if given alignments are chimeric
+
+    Args:
+        alns: (List) List of Pysam AlignedRead objects
+        bam: (AlignmentFile) Pysam handle to BAM file - for getting reference info
+        debug: (Boolean) debug mode - will output debugging statements
+        check_haplotype: (Boolean) whether to screen out alignments to references
+                                   containing '_'
+    """
     primary_alns = []
     secondary_alns = []
     for aln in alns:
@@ -14,12 +23,11 @@ def find_chimera(alns, bam, debug=False):
         else:
             secondary_alns.append(aln)
     
-    if len(primary_alns) > 1:
+    if check_haplotype and len(primary_alns) > 1:
         replace_haplotype(primary_alns, secondary_alns, bam)
         
     if len(primary_alns) > 1:
         aligns = [Alignment.from_alignedRead(aln, bam) for aln in primary_alns]
-        
         bad_aligns = [align for align in aligns if not align.is_valid()]
         if bad_aligns:
             if debug:
