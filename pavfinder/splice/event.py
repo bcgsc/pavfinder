@@ -221,7 +221,10 @@ class Event(Adjacency):
 	data = [self.id, self.rna_event]
 	
 	chroms = (self.chroms[0], self.chroms[0])
-	orients = ('L', 'R')
+	if not self.orients:
+	    orients = ('L', 'R')
+	else:
+	    orients = self.orients
 	for values in zip(chroms, self.breaks, orients):
 	    data.extend(values)
 	    
@@ -237,9 +240,21 @@ class Event(Adjacency):
 	data.append(Event.to_string(self.contig_support_span))
 	
 	# homol_seq and coords
-	data.append('-')
-	data.append('-')
-	data.append('-')
+	if self.homol_seq:
+	    data.append(self.homol_seq[0])
+	else:
+	    data.append('-')
+	if self.homol_coords:
+	    homol_coords = []
+	    for coords in self.homol_coords:
+		homol_coords.append('-'.join(map(str, coords)))
+	    data.append(';'.join(homol_coords))
+	else:
+	    data.append('-')
+	if self.homol_seq:
+	    data.append(len(self.homol_seq[0]))
+	else:
+	    data.append('-')
 	
 	# novel seq
 	if hasattr(self, 'novel_seq') and self.novel_seq is not None:
