@@ -73,6 +73,17 @@ class Alignment:
 	        ]
 	        
 	return '\t'.join([str(col) for col in cols])
+
+    def qpos_to_tpos(self, qpos):
+	"""Converts query position to target position"""
+	for i in range(len(self.query_blocks)):
+	    qblock = self.query_blocks[i]
+	    tblock = self.blocks[i]
+	    if qblock[0] < qblock[1] and qpos >= qblock[0] and qpos <= qblock[1]:
+		return tblock[0] + qpos - qblock[0]
+
+	    elif qblock[0] > qblock[1] and qpos <= qblock[0] and qpos >= qblock[1]:
+		return tblock[0] + qblock[0] - qpos
         
 def cigar_to_blocks(cigar, tstart, strand):
     query_len = get_query_len_from_cigar(cigar)
