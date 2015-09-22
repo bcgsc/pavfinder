@@ -127,8 +127,14 @@ class Transcript:
 	    return self.exons[index][1] - self.exons[index][0] + 1
 	return None
 
+    def coord_to_exon(self, coord):
+	"""Given genomic coordinate, return exon number"""
+	for i in range(len(self.exons)):
+	    if coord >= self.exons[i][0] and coord <= self.exons[i][1]:
+		return self.exon_num(i)
+
     def txt_coord_to_exon(self, coord):
-	"""Given genomic coordinate, return exon number
+	"""Given transcript coordinate, return exon number
 
 	Motivation: For converting contig to transrcipt alignment back to
 	            genomic coordinate reporting
