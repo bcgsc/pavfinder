@@ -22,7 +22,7 @@ class ExonMapper:
     def __init__(self, bam_file, aligner, contigs_fasta_file, annotation_file, ref_fasta_file, outdir, 
                  itd_min_len=None, itd_min_pid=None, itd_max_apart=None, 
                  exon_bound_fusion_only=False, coding_fusion_only=False, sense_fusion_only=False,
-                 suppl_annots=None,
+                 suppl_annots=None, contigs_to_transcripts_bam=None,
                  debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
 	self.contigs_fasta_file = contigs_fasta_file
@@ -38,6 +38,10 @@ class ExonMapper:
         self.aligns = {}        
 
         self.annotation_file = annotation_file
+
+	if contigs_to_transcripts_bam is not None:
+	    self.contigs_to_transcripts = pysam.AlignmentFile(contigs_to_transcripts_bam)
+	    itd_finder.contigs_to_transcripts = self.contigs_to_transcripts
 	
 	self.mappings = []
 	self.events = []
@@ -54,6 +58,8 @@ class ExonMapper:
 
 	self.suppl_annots = suppl_annots
 
+	itd_finder.conditions = self.itd_conditions
+
     def map_contigs_to_transcripts(self):
 	"""Maps contig alignments to transcripts, discovering variants at the same time"""
 	# extract all transcripts info in dictionary
@@ -69,6 +75,7 @@ class ExonMapper:
 
 	chimeras = {}
 	for aln in self.bam.fetch(until_eof=True):
+	    print 'processing', aln.query_name
 	    if aln.is_unmapped:
 		continue
 
@@ -89,6 +96,8 @@ class ExonMapper:
 		                                                                    align.blocks,
 		                                                                    align.query_blocks
 		                                                                    ))
+
+	    partially_aligned = self.is_partially_aligned(align, query_len=len(contig_seq))
 
 	    # entire contig align within single exon or intron
 	    within_intron = []
@@ -120,7 +129,7 @@ class ExonMapper:
 		    all_block_matches[txt] = block_matches
 		    mappings.append((self.transcripts[txt], block_matches))
 
-		    if self.is_full_match(block_matches):
+		    if not partially_aligned and self.is_full_match(block_matches):
 			full_matched_transcripts.append(self.transcripts[txt])
 
 		# report mapping
@@ -134,7 +143,12 @@ class ExonMapper:
 		    events = self.find_events({best_transcript.id:all_block_matches[best_transcript.id]},
 		                              align,
 		                              {best_transcript.id:best_transcript},
-		                              suppl_known_features = suppl_known_features)
+		                              suppl_known_features = suppl_known_features,
+		                              contig_seq = contig_seq,
+		                              partially_aligned = partially_aligned,
+		                              is_chimera = gmap.is_chimera(aln),
+		                              )
+
 		    for event in events:
 			event.contig_sizes.append(len(contig_seq))
 		    if events:
@@ -181,9 +195,12 @@ class ExonMapper:
 		    chimera_block_matches.reverse()
 
 		fusion = fusion_finder.find_chimera(chimera_block_matches, self.transcripts, aligns, contig_seq,
-		                                   exon_bound_only=self.fusion_conditions['exon_bound_only'],
-		                                   coding_only=self.fusion_conditions['coding_only'],
-		                                   sense_only=self.fusion_conditions['sense_only'])
+		                                    exon_bound_only=self.fusion_conditions['exon_bound_only'],
+		                                    coding_only=self.fusion_conditions['coding_only'],
+		                                    sense_only=self.fusion_conditions['sense_only'],
+		                                    ref_fasta=self.ref_fasta,
+		                                    outdir=self.outdir,
+		                                    debug=self.debug)
 		if fusion:
 		    homol_seq, homol_coords = None, None
 		    if self.aligner.lower() == 'gmap':
@@ -211,6 +228,13 @@ class ExonMapper:
 			                                          self.debug)
 		    if expanded_contig_breaks is not None:
 			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
+			
+    def is_partially_aligned(self, align, query_len=None, max_unmapped=15):
+	if query_len is None:
+	    query_len = align.query_len
+	if query_len - (align.qend - align.qstart + 1) > max_unmapped:
+	    return True
+	return False
 					
     def map_exons(self, blocks, exons):
 	"""Maps alignment blocks to exons
@@ -254,7 +278,8 @@ class ExonMapper:
 	novel_seq = self.contigs_fasta.fetch(adj.contigs[0], start, end - 1)
 	return novel_seq
 	    
-    def find_events(self, matches_by_transcript, align, transcripts, small=20, suppl_known_features=None):
+    def find_events(self, matches_by_transcript, align, transcripts, small=20, suppl_known_features=None, 
+                    contig_seq=None, min_ITD_size=12, partially_aligned=False, is_chimera=False):
 	"""Find events from single alignment
 	
 	Wrapper for finding events within a single alignment
@@ -274,6 +299,8 @@ class ExonMapper:
 	    transcripts: (dictionary) key=transcript_id value: Transcript
 	    small: (int) max size of ins or dup that the span of the novel seq would be used in contig_support_span,
 	                 anything larger than that we just check if there is any spanning reads that cross the breakpoint
+	    contig_seq: (str) contig sequence (for finding ITD)
+	    min_ITD_size: (int) minimum ITD size for causing bad alignment
 	Returns:
 	    List of Adjacencies
 	"""
@@ -288,6 +315,24 @@ class ExonMapper:
 	                                             sense_only=self.fusion_conditions['sense_only'])
 	    if fusion is not None:
 		events.append(fusion)
+
+	elif len(matches_by_transcript.keys()) == 1 and not is_chimera:
+	    # ITD: use unmapped blocks as signal for potential ITD
+	    transcript_id = matches_by_transcript.keys()[0]
+	    transcript = transcripts[transcript_id]
+	    block_matches = matches_by_transcript[transcript_id]
+	    unmapped_blocks = [i for i in range(len(block_matches)) if block_matches[i] is None]
+
+	    if unmapped_blocks:
+		itd = itd_finder.confirm_with_transcript_seq(align.query, contig_seq, transcript, self.ref_fasta, outdir=self.outdir, debug=self.debug)
+		#event = itd_finder.detect_by_txt_align(align.query, contig_seq, transcript, self.ref_fasta)
+		if itd is not None:
+		    events.append(itd)
+		    
+	    elif partially_aligned:
+		itd = itd_finder.detect_from_partial_alignment(align, contig_seq, transcript, self.ref_fasta, outdir=self.outdir, debug=self.debug)
+		if itd is not None:
+		    events.append(itd)
 	    	    	
 	# events within a gene
 	local_events = novel_splice_finder.find_novel_junctions(matches_by_transcript, align, transcripts, self.ref_fasta, suppl_known_features)
@@ -321,8 +366,6 @@ class ExonMapper:
 			                      debug=self.debug
 			                      )
 		    			
-		    adj.size = len(adj.novel_seq)
-		    
 		    # bigger events mean we can only check if there is reads that cross the breakpoint
 		    if adj.size > small:
 			adj.contig_support_span = [(min(adj.contig_breaks[0]), min(adj.contig_breaks[0]) + 1)]
@@ -561,8 +604,8 @@ class ExonMapper:
 			                                                                                     max_homol_allowed))
 		    for contig in event.contigs:
 			bad_contigs.add(contig)
-	
-	fusions = [e for e in self.events if e.rna_event == 'fusion']		
+
+	fusions = [e for e in self.events if hasattr(e, 'rna_event') and e.rna_event == 'fusion']
 	if fusions and align_info is not None:
 	    bad_contigs_realign = fusion_finder.screen_realigns(fusions, outdir, align_info, contigs_fasta=self.contigs_fasta, debug=self.debug)
 	    if bad_contigs_realign:
@@ -602,6 +645,7 @@ def main(args):
                     coding_fusion_only = not args.include_noncoding_fusion,
                     sense_fusion_only = not args.include_antisense_fusion,
                     suppl_annots = args.suppl_annot,
+                    contigs_to_transcripts_bam = args.c2t_bam,
                     debug = args.debug)
     em.map_contigs_to_transcripts()
 	
@@ -615,7 +659,7 @@ def main(args):
 	}
     # screen events based on realignments
     em.screen_events(args.out_dir, align_info=align_info, max_homol_allowed=args.max_homol_allowed, debug=args.debug)
-    
+
     # added support
     support_reads = None
     junction_depths = None
@@ -663,6 +707,7 @@ if __name__ == '__main__':
     parser.add_argument('genome_fasta', type=str, help="reference genome FASTA (indexed with samtools)")
     parser.add_argument('out_dir', type=str, help="output directory")
     parser.add_argument("-b", "--r2c_bam", metavar="r2c_BAM", type=str, help="reads-to-contigs bam file")
+    parser.add_argument("--c2t_bam", metavar="c2t_BAM", type=str, help="contigs-to-transcripts bam file")
     parser.add_argument("-t", "--num_threads", type=int, default=8, help="number of threads. Default:8") 
     parser.add_argument("-g", "--genome", type=str, help="genome prefix")
     parser.add_argument("-G", "--index_dir", type=str, help="genome index directory")
