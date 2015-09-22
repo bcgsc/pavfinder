@@ -325,7 +325,6 @@ class ExonMapper:
 
 	    if unmapped_blocks:
 		itd = itd_finder.confirm_with_transcript_seq(align.query, contig_seq, transcript, self.ref_fasta, outdir=self.outdir, debug=self.debug)
-		#event = itd_finder.detect_by_txt_align(align.query, contig_seq, transcript, self.ref_fasta)
 		if itd is not None:
 		    events.append(itd)
 		    
