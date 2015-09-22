@@ -228,7 +228,7 @@ class ExonMapper:
 			                                          self.debug)
 		    if expanded_contig_breaks is not None:
 			event.contig_support_span = [(expanded_contig_breaks[0] - 1, expanded_contig_breaks[1] + 1)]
-			
+
     def is_partially_aligned(self, align, query_len=None, max_unmapped=15):
 	if query_len is None:
 	    query_len = align.query_len
