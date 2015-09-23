@@ -355,6 +355,7 @@ class ExonMapper:
 		if adj.rearrangement == 'ins' or adj.rearrangement == 'dup':
 		    novel_seq = self.extract_novel_seq(adj)
 		    adj.novel_seq = novel_seq if align.strand == '+' else reverse_complement(novel_seq)
+		    adj.size = len(novel_seq)
 		    
 		    # will not call ITD on homopolymer expansion
 		    if len(novel_seq) >= self.itd_conditions['min_len'] and len(Set(list(novel_seq.upper()))) > 1:
