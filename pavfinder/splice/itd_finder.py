@@ -416,17 +416,20 @@ def detect_from_partial_alignment(align, contig_seq, transcript, ref_fasta, outd
 		if dup[1] == unmapped and dup[1][1] == len(contig_seq):
 		    genome_pos = (align.qpos_to_tpos(dup[1][0] - 1),
 		                  align.qpos_to_tpos(dup[0][0]))
-		    itd = Event((align.target, align.target),
-			        genome_pos,
-			        'dup',
-			        contig = align.query,
-			        contig_breaks = (dup[1][0] - 1, dup[1][0]),
-			        orients = ('L', 'R')
-			        )
-		    itd.rna_event = 'ITD'
-		    itd.size = dup[1][0] - dup[0][0]
-		    itd.genes = (transcript.gene, transcript.gene)
-		    itd.transcripts = (transcript.id, transcript.id)
-		    itd.exons = (transcript.coord_to_exon(genome_pos[0]), transcript.coord_to_exon(genome_pos[1]))
+		    # the conversion of qpos to tpos may not be possible if the qpos is not
+		    # aligned in the original alignment - give up in that case
+		    if genome_pos[0] is not None and genome_pos[1] is not None:
+			itd = Event((align.target, align.target),
+			            genome_pos,
+			            'dup',
+			            contig = align.query,
+			            contig_breaks = (dup[1][0] - 1, dup[1][0]),
+			            orients = ('L', 'R')
+			            )
+			itd.rna_event = 'ITD'
+			itd.size = dup[1][0] - dup[0][0]
+			itd.genes = (transcript.gene, transcript.gene)
+			itd.transcripts = (transcript.id, transcript.id)
+			itd.exons = (transcript.coord_to_exon(genome_pos[0]), transcript.coord_to_exon(genome_pos[1]))
 
     return itd
