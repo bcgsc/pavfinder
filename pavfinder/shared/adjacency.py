@@ -78,6 +78,10 @@ class Adjacency:
 	self.stigmas = Set()
 	
 	self.dubious = False
+
+	self.repeat_seq = None
+	self.repeat_num = None
+	self.repeat_num_change = None
 		
     def debug(self):
         print '%s %s %s %s %s %s' % (self.rearrangement, self.chroms, self.breaks, self.get_size(), ','.join(self.contigs), self.orients)
@@ -312,6 +316,14 @@ class Adjacency:
 	    info['END'] = end
 	if type(sv_len) is int:
 	    info['SVLEN'] = sv_len
+
+	if sv_type == 'DUP':
+	    if self.repeat_seq is not None:
+		info['REPEAT_SEQ'] = self.repeat_seq
+	    if self.repeat_num is not None:
+		info['REPEAT_NUM'] = self.repeat_num
+	    if self.repeat_num_change is not None:
+		info['REPEAT_NUM_CHANGE'] = self.repeat_num_change
 	
 	# read support
 	if self.final_support is not None:
@@ -375,6 +387,9 @@ class Adjacency:
 	           'homol_coord1',
 	           'homol_coord2',
 	           'novel_seq',
+	           'repeat_seq',
+	           'repeat_num',
+	           'repeat_change',
 	           'probe',
 	           'spanning_reads',
                    )
@@ -409,6 +424,19 @@ class Adjacency:
 	    
 	data.append(self.novel_seq)
 	
+	if self.repeat_seq is not None:
+	    data.append(self.repeat_seq)
+	else:
+	    data.append('-')
+	if self.repeat_num is not None:
+	    data.append(self.repeat_num)
+	else:
+	    data.append('-')
+	if self.repeat_num_change is not None:
+	    data.append(self.repeat_num_change)
+	else:
+	    data.append('-')
+
 	try:
 	    data.append(self.probes[0])
 	except:
@@ -594,6 +622,7 @@ class Adjacency:
 	    neighborhood= 500
 	    insertions = []
 	    used = Set()
+
 	    for i in range(len(trls)):
 		if i in used:
 		    continue
@@ -610,9 +639,12 @@ class Adjacency:
 			target_chrom = trls[i].chroms[0]
 			target_breaks = trls[i].breaks[0], trls[j].breaks[0]
 			target_orients = trls[i].orients[0], trls[j].orients[0]
+			target_spans = (trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend), (trls[j].aligns[0][0].tstart, trls[j].aligns[0][0].tend)
 			source_chroms = trls[i].chroms[1]
 			source_breaks = trls[i].breaks[1], trls[j].breaks[1]
 			source_orients = trls[i].orients[1], trls[j].orients[1]
+			source_spans = min(trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend, trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend),\
+			             max(trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend, trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend)
 			
 			if trls[i].aligns[0][0].dubious:
 			    print 'anchor', target_chrom, target_breaks, trls[i].aligns[0][0].target, trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend
@@ -621,20 +653,24 @@ class Adjacency:
 			target_chrom = trls[i].chroms[1]
 			target_breaks = trls[i].breaks[1], trls[j].breaks[1]
 			target_orients = trls[i].orients[1], trls[j].orients[1]
+			target_spans = (trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend), (trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend)
 			source_chroms = trls[i].chroms[0]
 			source_breaks = trls[i].breaks[0], trls[j].breaks[0]
 			source_orients = trls[i].orients[0], trls[j].orients[0]
+			source_spans = min(trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend, trls[j].aligns[0][0].tstart, trls[j].aligns[0][0].tend),\
+			             max(trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend, trls[j].aligns[0][0].tstart, trls[j].aligns[0][0].tend)
 			
 			if trls[i].aligns[0][1].dubious:
 			    anchor_dubious = True
 			    
 		    if anchor_dubious:
 			continue
-								    
+
 		    if abs(target_breaks[0] - target_breaks[1]) <= neighborhood and\
 		       target_orients[0] != target_orients[1] and\
-		       ((source_orients[0] == 'L' and source_orients[1] == 'R' and source_breaks[0] > source_breaks[1]) or\
-		       (source_orients[0] == 'R' and source_orients[1] == 'L' and source_breaks[1] < source_breaks[0])):
+		       source_breaks == source_spans and\
+		       ((source_orients[0] == 'L' and source_orients[1] == 'R' and source_breaks[1] < source_breaks[0]) or\
+		       (source_orients[0] == 'R' and source_orients[1] == 'L' and source_breaks[0] < source_breaks[1])):
 			
 			if source_breaks[0] > source_breaks[1]:
 			    insertion_size = source_breaks[0] - source_breaks[1] + 1
@@ -696,6 +732,8 @@ class Adjacency:
 		else:
 		    i += 1
 
+	grouped_trl_ids = Set()
+	variants = []
 	trls_remained = [trl for trl in trls if trl.id not in grouped_trl_ids]
 
 	return variants, trls_remained

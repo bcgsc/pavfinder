@@ -4,7 +4,8 @@ import time
 class VCF:
     # 8 mandatory fields. 'FORMAT' is optional
     fields = ('CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO')
-    info_fields = ('SVTYPE', 'EVENTTYPE', 'PARID', 'MATEID', 'END', 'SVLEN', 'CIPOS', 'HOMLEN', 'HOMSEQ', 'BKPTID', 'EVENT', 'READSUPPORT', 'SOMATIC') 
+    info_fields = ('SVTYPE', 'EVENTTYPE', 'PARID', 'MATEID', 'END', 'SVLEN', 'CIPOS', 'HOMLEN', 'HOMSEQ', 'BKPTID', 'EVENT', 'READSUPPORT', 'SOMATIC',
+                   'REPEAT_SEQ', 'REPEAT_NUM', 'REPEAT_NUM_CHANGE')
     
     version = '4.2'
     
@@ -23,6 +24,9 @@ class VCF:
     meta_info['EVENT'] = ('1', 'String', 'ID of event associated to breakend')
     meta_info['READSUPPORT'] = (1, 'Integer', 'Read support of assembled event')
     meta_info['SOMATIC'] = (0, 'Flag', 'Somatic')
+    meta_info['REPEAT_SEQ'] = (1, 'Integer', 'Repeat sequence in tandem duplication')
+    meta_info['REPEAT_NUM'] = (1, 'Integer', 'Number of novel repeats in tandem duplication')
+    meta_info['REPEAT_NUM_CHANGE'] = (1, 'String', 'Change of repeat number in tandem duplication')
     
     # ALT  key=ID, value=Description
     meta_alt = OrderedDict()

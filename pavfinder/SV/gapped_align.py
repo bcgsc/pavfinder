@@ -12,7 +12,7 @@ def find_single_unique(alns, aligner, bam, debug=False):
         'bwa_mem': bwa_mem.find_single_unique,
     }[aligner](alns, bam, debug=debug)
     
-def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False):
+def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False, query_fasta=None, target_fasta=None):
     adjs = []
     
     if not align.is_valid() or\
@@ -41,7 +41,16 @@ def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False):
             if target_gaps.has_key(gap_count):
 		breaks = (align.blocks[i][1], align.blocks[i + 1][0])
 		contig_breaks = (align.query_blocks[i][1], align.query_blocks[i + 1][0])
-				
+
+		del_seq = target_fasta.fetch(align.target, breaks[0], breaks[1]-1)
+		if align.strand == '-':
+		    del_seq = reverse_complement(del_seq)
+
+		duplicated, repeat_seq, repeat_num = is_duplicated(del_seq, sorted(contig_breaks, key=int), contig_seq)
+		if duplicated[0] > 0 or duplicated[1] > 0:
+		    contig_breaks = (contig_breaks[0] - len(repeat_seq) * duplicated[0],
+		                     contig_breaks[1] + len(repeat_seq) * duplicated[1])
+
 		if target_gaps[gap_count][0] == 'N' and is_transcriptome:
 		    continue
 		
@@ -59,7 +68,14 @@ def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False):
 		                aligns=[align],
 		                align_types='gapped')
 		adjs.append(adj)
-	    
+
+		if duplicated[0] > 0 or duplicated[1] > 0:
+		    if align.strand == '+':
+			adj.repeat_seq = repeat_seq.upper()
+		    else:
+			adj.repeat_seq = reverse_complement(repeat_seq.upper())
+		    adj.repeat_num = repeat_num
+		    adj.repeat_num_change = '%d>%d' % (duplicated[0] + duplicated[1] + repeat_num, duplicated[0] + duplicated[1])
 		
             gap_count += 1
             
@@ -78,7 +94,7 @@ def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False):
 		
 	    length_novel_seq = len(novel_seq)
 			    
-	    duplicated = is_duplicated(novel_seq, sorted(contig_breaks, key=int), contig_seq)
+	    duplicated, repeat_seq, repeat_num = is_duplicated(novel_seq, sorted(contig_breaks, key=int), contig_seq)
 	    if duplicated[0] > 0 or duplicated[1] > 0:
 		if not ins_as_ins:
 		    event = 'dup'
@@ -94,47 +110,84 @@ def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False):
 			else:
 			    breaks = (breaks[0] - length_novel_seq, breaks[1] + 1)
 		    
-		contig_breaks = (contig_breaks[0] - length_novel_seq * duplicated[0],
-	                         contig_breaks[1] + length_novel_seq * duplicated[1])
+		contig_breaks = (contig_breaks[0] - len(repeat_seq) * duplicated[0],
+	                         contig_breaks[1] + len(repeat_seq) * duplicated[1])
 		    			
 	    probe_seq, break_pos = Adjacency.extract_probe(contig_seq, contig_breaks)
 	    
             adj = Adjacency((align.target, align.target), breaks, event, contig=align.query, 
 	                    contig_breaks=contig_breaks, contig_sizes=len(contig_seq), probes=probe_seq, 
 	                    novel_seq=novel_seq_ref, orients=('L', 'R'), aligns=[align], align_types='gapped')
+
+	    if event == 'dup':
+		if align.strand == '+':
+		    adj.repeat_seq = repeat_seq.upper()
+		else:
+		    adj.repeat_seq = reverse_complement(repeat_seq.upper())
+		adj.repeat_num = repeat_num
+		adj.repeat_num_change = '%d>%d' % (duplicated[0] + duplicated[1], duplicated[0] + duplicated[1] + repeat_num)
+
 	    adjs.append(adj)
             
     return adjs
 
-def is_duplicated(novel_seq, contig_breaks, contig_seq, min_len=3):    
+def is_homopolymer(seq):
+    return len(Set(map(''.join, zip(*[iter(seq)] * 1)))) == 1
+
+def find_repeat(seq):
+    def chop_seq(seq, size):
+	"""chop seq into equal size sub-strings"""
+	return map(''.join, zip(*[iter(seq)] * size))
+
+    size_range = [2,4]
+    for size in range(size_range[0], size_range[1] + 1):
+	if len(seq) % size == 0:
+	    uniq_subseqs = Set(chop_seq(seq, size))
+	    if len(uniq_subseqs) == 1:
+		return list(uniq_subseqs)[0]
+
+    return None
+
+def is_duplicated(novel_seq, contig_breaks, contig_seq, min_len=3):
+    repeat_seq, repeat_num = None, None
+    if is_homopolymer(novel_seq):
+	repeat_seq = novel_seq[0]
+	repeat_num = len(novel_seq)
+    else:
+	repeat_seq = find_repeat(novel_seq)
+	if repeat_seq is not None:
+	    repeat_num = len(novel_seq) / len(repeat_seq)
+
     duplicated = [0, 0]
-    length_novel_seq = len(novel_seq)
-    if length_novel_seq > min_len:
-	num_repeats = 0	
-	# start = index position
-	start = contig_breaks[0] - length_novel_seq
+    if repeat_seq is not None:
+	repeat_len = len(repeat_seq)
+
+	# upstream
+	num_repeats = 0
+	start = contig_breaks[0] - repeat_len
 	while start >= 0:
-	    before_seq = contig_seq[start : start + length_novel_seq]
-	    if novel_seq.upper() == before_seq.upper():
+	    before_seq = contig_seq[start : start + repeat_len]
+	    if repeat_seq.upper() == before_seq.upper():
 		num_repeats += 1
-		start -= length_novel_seq
+		start -= repeat_len
 	    else:
 		break
 	duplicated[0] = num_repeats
 	
-	num_repeats = 0	
+	# downstream
+	num_repeats = 0
 	start = contig_breaks[1] - 1
-	while start + length_novel_seq < len(contig_seq):
-	    after_seq = contig_seq[start : start + length_novel_seq]
-	    if novel_seq.upper() == after_seq.upper():
+	while start + repeat_len < len(contig_seq):
+	    after_seq = contig_seq[start : start + repeat_len]
+	    if repeat_seq.upper() == after_seq.upper():
 		num_repeats += 1
-		start += length_novel_seq
+		start += repeat_len
 	    else:
 		break
 	duplicated[1] = num_repeats
-		
-    return duplicated
-	    
+
+    return duplicated, repeat_seq, repeat_num
+
 def screen_probe_alns(adj_aligns, probe_alns, align_type, min_pc_mapped=1.0):
     for aln in probe_alns:
 	if aln.is_unmapped:

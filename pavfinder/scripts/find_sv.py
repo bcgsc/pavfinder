@@ -43,7 +43,8 @@ class SVFinder:
 	the respective modules to identify adjs"""
 	def find_events_in_single_align(align):
 	    """Implement as sub-function so that small-scale events can be found on split alignments too"""
-	    adjs = gapped_align.find_adjs(align, contig_seq, False, ins_as_ins=ins_as_ins)
+	    adjs = gapped_align.find_adjs(align, contig_seq, False, ins_as_ins=ins_as_ins,
+	                                  query_fasta=self.contig_fasta, target_fasta=self.ref_fasta)
 		
 	    repeats = Set()
 	    for i in range(len(adjs)):
@@ -59,9 +60,10 @@ class SVFinder:
 			                                                                             adj.breaks[1]))
 		    continue
 		    
-		new_contig_breaks = self.expand_contig_breaks(adj.chroms[0], adj.breaks, contig, adj.contig_breaks[0], adj.rearrangement, self.debug)
-		if new_contig_breaks is not None:
-		    adj.contig_breaks[0] = new_contig_breaks
+		# seems unnecessary
+		#new_contig_breaks = self.expand_contig_breaks(adj.chroms[0], adj.breaks, contig, adj.contig_breaks[0], adj.rearrangement, self.debug)
+		#if new_contig_breaks is not None:
+		    #adj.contig_breaks[0] = new_contig_breaks
 		    			    
 	    if repeats:
 		for i in sorted(repeats, reverse=True):
@@ -230,7 +232,7 @@ class SVFinder:
 	    self.variants.extend(ins_variants)
 	    		
 	# collect adjs that don't require grouping
-	adjs_no_grouping = [adj for adj in adjs if adj.rearrangement != 'inv' and adj.rearrangement != 'trl' and not adj.id in ins_adjs]
+	adjs_no_grouping = [adj for adj in adjs if adj.align_types[0] != 'split' and adj.rearrangement != 'inv' and adj.rearrangement != 'trl' and not adj.id in ins_adjs]
 	
 	# handle inversions
 	invs = [adj for adj in adjs if adj.rearrangement == 'inv']
@@ -254,6 +256,19 @@ class SVFinder:
 	    for trl in trls_remained:
 		if not trl.dubious:
 		    self.variants.append(Variant('TRL', [trl]))
+
+	# convert dels or dups to insertions
+	split_events = [adj for adj in adjs if not adj.rearrangement in ('trl', 'ins') and adj.align_types[0] == 'split']
+	split_events_remained = None
+	if split_events:
+	    ins_variants, split_events_remained = Adjacency.extract_interchrom_ins(split_events)
+	    self.variants.extend(ins_variants)
+
+	# append remaining non-dubious split events
+	if split_events_remained:
+	    for adj in split_events_remained:
+		if not adj.dubious:
+		    self.variants.append(Variant(adj.rearrangement.upper(), [adj]))
 
 	for adj in adjs_no_grouping:
 	    if not adj.dubious:
