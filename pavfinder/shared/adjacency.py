@@ -268,6 +268,15 @@ class Adjacency:
 	if self.somatic:
 	    info['SOMATIC'] = 'SOMATIC'
 	    
+	# repeat contraction
+	if self.rearrangement == 'del' and self.repeat_seq is not None:
+	    if self.repeat_seq is not None:
+		info['REPEAT_SEQ'] = self.repeat_seq
+	    if self.repeat_num is not None:
+		info['REPEAT_NUM'] = self.repeat_num
+	    if self.repeat_num_change is not None:
+		info['REPEAT_NUM_CHANGE'] = self.repeat_num_change
+
 	if ref is not None and alt is not None:
 	    fields = [chrom, pos, id, ref, alt, qual, filter, VCF.info_dict_to_str(info)]
 	    return '\t'.join(map(str, fields))
