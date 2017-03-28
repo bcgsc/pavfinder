@@ -223,55 +223,54 @@ class SVFinder:
 	
     
     def create_variants(self, adjs):
+	def track_adjs(used_ids, variants):
+	    if variants:
+		for variant in variants:
+		    for adj in variant.adjs:
+			used_ids.add(adj.id)
+	    #print 'used', used_ids
+
 	"""Creates variants from adjacencies"""
 	self.variants = []
+	adjs_ids_used = Set()
+
+	split_events = [adj for adj in adjs if not adj.rearrangement in ('trl', 'ins') and adj.align_types[0] == 'split']
+	ins_variants, split_events_remained = Adjacency.extract_interchrom_ins(split_events)
+	self.variants.extend(ins_variants)
+	track_adjs(adjs_ids_used, ins_variants)
 
 	# special cases for imprecise insertions
-	ins_variants, ins_adjs = Adjacency.extract_imprecise_ins([adj for adj in adjs if adj.align_types[0] == 'split' and adj.rearrangement != 'inv'], debug=self.debug)
-	if ins_variants:
-	    self.variants.extend(ins_variants)
-	    		
-	# collect adjs that don't require grouping
-	adjs_no_grouping = [adj for adj in adjs if adj.align_types[0] != 'split' and adj.rearrangement != 'inv' and adj.rearrangement != 'trl' and not adj.id in ins_adjs]
+	ins_variants, ins_adjs = Adjacency.extract_imprecise_ins([adj for adj in adjs if adj.align_types[0] == 'split' and adj.rearrangement != 'inv' and not adj.id in adjs_ids_used],
+	                                                         debug=self.debug)
+	self.variants.extend(ins_variants)
+	track_adjs(adjs_ids_used, ins_variants)
 	
 	# handle inversions
-	invs = [adj for adj in adjs if adj.rearrangement == 'inv']
-	if invs:
-	    self.variants.extend(Adjacency.group_inversions(invs))
+	invs = [adj for adj in adjs if adj.rearrangement == 'inv' and not adj.id in adjs_ids_used]
+	inv_variants = Adjacency.group_inversions(invs)
+	self.variants.extend(inv_variants)
+	track_adjs(adjs_ids_used, inv_variants)
 
 	# group reciprocal transcloations
-	trls = [adj for adj in adjs if adj.rearrangement == 'trl']
-	trls_remained = None
-	if trls:
-	    reciprocal_trls, trls_remained = Adjacency.group_trls(trls)
-	    self.variants.extend(reciprocal_trls)
+	trls = [adj for adj in adjs if adj.rearrangement == 'trl' and not adj.id in adjs_ids_used]
+	reciprocal_trls, trls_remained = Adjacency.group_trls(trls)
+	self.variants.extend(reciprocal_trls)
+	track_adjs(adjs_ids_used, reciprocal_trls)
 
 	# convert translocations to insertions
-	if trls_remained:
-	    ins_variants, trls_remained = Adjacency.extract_interchrom_ins(trls_remained)
-	    self.variants.extend(ins_variants)
+	trls = [adj for adj in adjs if adj.rearrangement == 'trl' and not adj.id in adjs_ids_used]
+	ins_variants, trls_remained = Adjacency.extract_interchrom_ins(trls)
+	self.variants.extend(ins_variants)
+	track_adjs(adjs_ids_used, ins_variants)
 
 	# append remaining non-dubious translocations
-	if trls_remained:
-	    for trl in trls_remained:
-		if not trl.dubious:
-		    self.variants.append(Variant('TRL', [trl]))
+	trls = [adj for adj in adjs if adj.rearrangement == 'trl' and not adj.id in adjs_ids_used]
+	for trl in trls:
+	    if not trl.dubious:
+		variant = Variant('TRL', [trl])
 
-	# convert dels or dups to insertions
-	split_events = [adj for adj in adjs if not adj.rearrangement in ('trl', 'ins') and adj.align_types[0] == 'split']
-	split_events_remained = None
-	if split_events:
-	    ins_variants, split_events_remained = Adjacency.extract_interchrom_ins(split_events)
-	    self.variants.extend(ins_variants)
-
-	# append remaining non-dubious split events
-	if split_events_remained:
-	    for adj in split_events_remained:
-		if not adj.dubious:
-		    self.variants.append(Variant(adj.rearrangement.upper(), [adj]))
-
-	for adj in adjs_no_grouping:
-	    if not adj.dubious:
+	for adj in adjs:
+	    if not adj.id in adjs_ids_used and not adj.dubious:
 		self.variants.append(Variant(adj.rearrangement.upper(), [adj]))
 
     def is_novel_sequence_repeat(self, adj, min_len=3):
@@ -711,7 +710,8 @@ class SVFinder:
 	Args:
 	    bam_file: (str) Path of reads-to-contigs BAM
 	"""
-	support_types = ('spanning', 'flanking')
+	#support_types = ('spanning', 'flanking')
+	support_types = ('spanning',)
 	
 	def initialize(obj, normal=False):
 	    if not normal:
@@ -784,6 +784,7 @@ class SVFinder:
 		    support, tlens = fetch_support(coords, bf, self.contig_fasta, overlap_buffer=overlap_buffer, perfect=perfect, debug=self.debug)
 		# otherwise use multi-process parsing of bam file
 		else:
+		    num_procs = min(self.num_procs, len(coords))
 		    support, tlens = scan_all(coords, bf, self.contig_fasta_file, self.num_procs, overlap_buffer=overlap_buffer, perfect=perfect, debug=self.debug)
 		    
 		print 'total tlens', len(tlens), sample_type
