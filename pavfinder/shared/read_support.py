@@ -191,7 +191,7 @@ def extract_reads(bam, contigs, coords, tids, overlap_buffer, contig_fasta, perf
         if key < 0 or key > max_tid:
             break
         elif key < min_tid or key not in tids:
-            continue        
+	    continue
         else:
             contig = bam.getrname(key)
             if not contig in contigs:
@@ -212,9 +212,9 @@ def extract_reads(bam, contigs, coords, tids, overlap_buffer, contig_fasta, perf
 	                                                               perfect=perfect, 
 	                                                               get_seq=get_seq, 
 	                                                               debug=debug)
-	    results[breaks]['tiling'] = check_tiling(reads, breaks_sorted, contig_len, debug=debug)	    
-	    results[breaks]['flanking'], tlens = find_flanking(reads, breaks_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
-	    tlens_all.extend(tlens)
+	    #results[breaks]['tiling'] = check_tiling(reads, breaks_sorted, contig_len, debug=debug)
+	    #results[breaks]['flanking'], tlens = find_flanking(reads, breaks_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
+	    #tlens_all.extend(tlens)
                                                                                 
         for breaks in results.keys():
             support.append((contig, breaks[0], breaks[1], results[breaks]['spanning'], results[breaks]['flanking'], results[breaks]['tiling'], support_reads))
@@ -346,12 +346,14 @@ def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=Fals
 	                                            overlap_buffer=overlap_buffer, 
 	                                            perfect=perfect, 
 	                                            get_seq=get_seq)
-	    tiling = check_tiling(reads, span_sorted, contig_len, debug=debug)
-	    
-	    flanking, tlens = find_flanking(reads, span_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
+	    #tiling = check_tiling(reads, span_sorted, contig_len, debug=debug)
+	    #flanking, tlens = find_flanking(reads, span_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
+	    tiling = None
+	    flanking, tlens = None, []
+
 	    results[contig][coords] = (spanning, flanking, tiling, support_reads)
 	    tlens_all.extend(tlens)
-                                           
+
     return results, tlens_all
 
 def expand_contig_breaks(chrom, breaks, contig, contig_breaks, event, ref_fasta, contig_fasta, debug=False):
