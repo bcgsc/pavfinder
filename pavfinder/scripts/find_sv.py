@@ -5,6 +5,7 @@ import sys
 import os
 import re
 import pysam
+from collections import defaultdict
 from pybedtools import BedTool
 from pavfinder import __version__
 from pavfinder.SV import gapped_align
@@ -12,9 +13,9 @@ from pavfinder.SV import split_align
 from pavfinder.shared.adjacency import Adjacency
 from pavfinder.shared.variant import Variant
 from pavfinder.shared.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
-from pavfinder.shared.read_support import scan_all, fetch_support
 from pavfinder.shared.alignment import reverse_complement, target_non_canonical
 from pavfinder.shared.vcf import VCF
+import subprocess
 
 class SVFinder:    
     def __init__(self, bam_file, aligner, contig_fasta, genome_fasta, out_dir,
@@ -700,181 +701,25 @@ class SVFinder:
 		    sys.stdout.write("can't output Adjacency")
 		    
 	    out.close()
-	    	    
-    def find_support(self, tumor_bam=None, min_overlap=None, normal_bam=None, min_overlap_normal=None):
-	"""Extracts read support from reads-to-contigs BAM
-	
-	Assumes reads-to-contigs is NOT multi-mapped 
-	(so we add the support of different contigs of the same event together)
-	
-	Args:
-	    bam_file: (str) Path of reads-to-contigs BAM
-	"""
-	#support_types = ('spanning', 'flanking')
-	support_types = ('spanning',)
-	
-	def initialize(obj, normal=False):
-	    if not normal:
-		obj.support = {}
-		support = obj.support
-	    else:
-		obj.support_normal = {}
-		support = obj.support_normal
-	    for support_type in support_types:
-		support[support_type] = 0
-	
-	def sum_support(obj, values, normal=False):
-	    """Add read support
-	    
-	    Args:
-	        obj: Adjacency or Variant
-	        support_types: (tuple of str) 'spanning', 'pairs' 
-	        values: (list of tuples)
-	    """
-	    for i in range(len(support_types)):
-		for support in values:
-		    if not normal:
-			obj.support[support_types[i]] += support[i]
-		    else:
-			obj.support_normal[support_types[i]] += support[i]
-			
-	def get_final_support(obj, normal=False):
-	    if not normal:
-		obj.final_support = obj.support['spanning']
-	    else:
-		obj.final_support_normal = obj.support_normal['spanning']
-	
-	coords = {}
-	for variant in self.variants:
-	    if variant.filtered_out:
-		continue
 
-	    for adj in variant.adjs:
-		for i in range(len(adj.contigs)):
-		    contig = adj.contigs[i]
-		    span = adj.get_contig_support_span(i)
-		    try:
-			coords[contig].append(span)
-		    except:
-			coords[contig] = [span]
-			
-	if coords:
-	    bam_files = {'tumor':tumor_bam, 'normal':normal_bam}
-	    
-	    for sample_type in ('tumor', 'normal'):
-		bf = bam_files[sample_type]
-		if bf is None:
-		    continue
-		
-		if sample_type == 'tumor':
-		    avg_tlen = self.avg_tlen
-		    overlap_buffer = min_overlap
-		    perfect = False
-		    normal = False
-		else:
-		    avg_tlen = self.avg_tlen_normal
-		    overlap_buffer = min_overlap_normal
-		    perfect = False
-		    normal = True
-				    
-		avg_tlen = None
-		tlens = []
-		# if fewer than 1000 adjs, use 'fetch' of Pysam
-		if len(coords) < 1000:
-		    support, tlens = fetch_support(coords, bf, self.contig_fasta, overlap_buffer=overlap_buffer, perfect=perfect, debug=self.debug)
-		# otherwise use multi-process parsing of bam file
-		else:
-		    num_procs = min(self.num_procs, len(coords))
-		    support, tlens = scan_all(coords, bf, self.contig_fasta_file, self.num_procs, overlap_buffer=overlap_buffer, perfect=perfect, debug=self.debug)
-		    
-		print 'total tlens', len(tlens), sample_type
-		
-		for variant in self.variants:
-		    # initialize
-		    initialize(variant, normal=normal)
-		    # for summing adj support into variant
-		    support_adjs = []
-		    for adj in variant.adjs:
-			# initialize
-			initialize(adj, normal=normal)
-			# for summing contig support into adj
-			support_contigs = []
-			for i in range(len(adj.contigs)):
-			    contig = adj.contigs[i]
-			    span = adj.get_contig_support_span(i)
-			    coord = '%s-%s' % (span[0], span[1])
-						
-			    if support.has_key(contig) and support[contig].has_key(coord):
-				support_contigs.append(support[contig][coord])
-								    
-			sum_support(adj, support_contigs, normal=normal)			    
-			get_final_support(adj, normal=normal)
-			if not normal:
-			    support_adjs.append([adj.support[support_type] for support_type in support_types])
-			else:
-			    support_adjs.append([adj.support_normal[support_type] for support_type in support_types])
-			
-		    sum_support(variant, support_adjs, normal=normal)
-		    get_final_support(variant, normal=normal)
-			 
-		if tlens:
-		    avg_tlen = float(sum(tlens)) / len(tlens)
-		    print 'avg tlen', avg_tlen, sample_type
-		    	
-	if self.debug:
-	    for variant in self.variants:
-		for adj in variant.adjs:
-		    print 'tumor support adj', adj.support, adj.final_support
-		    print 'normal support adj', adj.support_normal, adj.final_support_normal
-		print 'tumor support variant', variant.support, variant.final_support
-		print 'normal support variant', variant.support_normal, variant.final_support_normal
-		
-    def filter_by_read_support(self, variant, min_support, normal=False):
-	"""Filters out variant failing to have minimum read support
-	
-	final_support or find_support_normal (int) will be compared against min_support (int)
-		
-	Args:
-	    variant: Variant
-	    min_support: (int) minimum number of read support
-	    normal: (boolean) whether "support" or "support_normal" should be looked at
-	Returns:
-	    filtered_out
-	    True = final_support or find_support_normal < min_support
-	"""
-	#max_homol_len = 25
-	#min_flanking = 2	    
-	filtered_out = False
-		
-	if not normal:
-	    support = variant.support
-	    final_support = variant.final_support
-	else:
-	    support = variant.support_normal
-	    final_support = variant.final_support_normal
-	
-	if final_support < min_support:
-	    filtered_out = True
-	    if self.debug:
-		sys.stdout.write('%s %s filtered out spanning:%d minimum:%d\n' % (variant.chrom, 
-		                                                                  variant.pos,
-		                                                                  final_support,
-		                                                                  min_support))										     
-										    
-	#for adj in variant.adjs:
-	    #flanking = support['flanking']		
-	    #if adj.homol_seq and len(adj.homol_seq[0]) > max_homol_len:
-		#if flanking < min_flanking:
-		    #filtered_out = True
-		    #if self.debug:
-			#sys.stdout.write('%s %s %s homol_len:%d filtered out frags:%d minimum:%d\n' % (adj.contigs, 
-												       #adj.rearrangement,
-												       #adj_size,
-												       #len(adj.homol_seq[0]),
-												       #support['flanking'],
-												       #min_flanking))	    	    	    	    	  
-
-	return filtered_out
+    def find_support(self, bam, out_prefix=None, min_support=None, min_overlap=None, allow_clipped_support=False, min_ratio_mapped=None):
+	cmd = "python %s/check_support.py %s %s %s --num_procs %d" % (os.path.dirname(__file__),
+	                                                              self.out_dir,
+	                                                              bam,
+	                                                              self.contig_fasta_file,
+	                                                              self.num_procs,
+	                                                              )
+	if out_prefix is not None:
+	    cmd += ' --out_prefix %s' % out_prefix
+	if min_support is not None:
+	    cmd += ' --min_support %d' % min_support
+	if allow_clipped_support:
+	    cmd += ' --allow_clipped_support'
+	    if min_ratio_mapped is not None:
+		cmd += ' --support_min_mapped %s' % min_ratio_mapped
+	print cmd
+	process = subprocess.Popen(cmd, shell=True)
+	process.wait()
     
     def screen_by_coordinate(self, adjs, bad_bed_file):
 	def create_bed(outfile):
@@ -955,52 +800,8 @@ class SVFinder:
 		if adj.filtered_out:
 		    variant.filtered_out = True
 
-    def filter_and_classify(self, min_support, min_support_normal):
-	"""Filters out all variants based on read support and assign somatic status
-	
-	somatic is True if
-	1. tumor and normal r2c provided,
-	   support_final >= min_support, support_final_normal < min_support_normal
-	2. only normal r2c provided
-	   support_final_normal < min_support_normal
-		
-	Args:
-	    min_support: (int) minimum read support number
-	    min_support_normal: (int) minimum read support number for normal
-	"""
-	for variant in self.variants:
-	    if variant.filtered_out:
-		continue
-	    
-	    if variant.support is not None:
-		variant.filtered_out = self.filter_by_read_support(variant, min_support)
-	    
-	    if variant.support_normal is not None:
-		variant.filtered_out_normal = self.filter_by_read_support(variant, min_support_normal, normal=True)
-		    	
-	    if variant.filtered_out is not None:
-		if not variant.filtered_out:
-		    if variant.filtered_out_normal is not None:
-			variant.somatic = True
-			if not variant.filtered_out_normal:
-			    variant.somatic = False
-			    
-	    elif variant.filtered_out_normal is not None:
-		variant.somatic = True
-		if not variant.filtered_out_normal:
-		    variant.somatic = False
-		
-	    # assign somatic status to adjacencies
-	    if variant.somatic:
-		for adj in variant.adjs:
-		    adj.somatic = True
-						   
-	    if self.debug:
-		if not variant.somatic:
-		    sys.stdout.write('germline %s %s tumor:%s normal:%s\n' % (variant.adjs[0].chroms[0], 
-		                                                              variant.adjs[0].breaks[0], 
-		                                                              variant.final_support, 
-		                                                              variant.final_support_normal))
+    def subtract_events(self, prefix1, prefix2):
+	pass
 					    
 def main(args, options):
     sv_finder = SVFinder(*args, 
@@ -1031,15 +832,6 @@ def main(args, options):
     # realign to increase specificity
     if options.genome and options.index_dir and sv_finder.variants:
 	sv_finder.screen_realigns(use_realigns=options.use_realigns)
-	
-    # r2c bam files given, find read support
-    if options.r2c_bam_file or options.normal_bam:
-	sv_finder.find_support(tumor_bam=options.r2c_bam_file, 
-	                       min_overlap=options.min_overlap, 
-	                       normal_bam=options.normal_bam, 
-	                       min_overlap_normal=options.min_overlap_normal)
-	# filter and assign somatic status    
-	sv_finder.filter_and_classify(options.min_support, options.min_support_normal)
             
     # output
     sv_finder.output(options.normal_bam is not None,
@@ -1048,6 +840,35 @@ def main(args, options):
                      insertion_as_breakends=options.insertion_as_breakends,
                      )
     
+    # filter for read support
+    # tumor
+    if options.r2c_bam_file and options.normal_bam:
+	out_prefix = 'tumor_support'
+    else:
+	out_prefix = None
+    if options.r2c_bam_file:
+	sv_finder.find_support(options.r2c_bam_file,
+	                       min_support=options.min_support,
+	                       min_overlap=options.min_overlap,
+	                       allow_clipped_support=options.allow_clipped_support,
+	                       min_ratio_mapped=options.support_min_mapped,
+	                       out_prefix=out_prefix)
+
+    # normal
+    if out_prefix is not None:
+	out_prefix = 'normal_support'
+    if options.normal_bam:
+	sv_finder.find_support(options.normal,
+	                       min_support=options.min_support_normal,
+	                       min_overlap=options.min_overlap_normal,
+	                       allow_clipped_support=options.allow_clipped_support,
+	                       min_ratio_mapped=options.support_min_mapped,
+	                       out_prefix=out_prefix)
+
+    # find somatic (only in tumor filtered but not in normal filtered
+    if options.r2c_bam_file and options.normal_bam:
+	# subtract
+	pass
 
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contig_fasta(indexed) genome_file(indexed) out_dir"
@@ -1064,6 +885,8 @@ if __name__ == '__main__':
     parser.add_option("--min_support_normal", dest="min_support_normal", help="minimum read support for normal. Default:1", type='int', default=1)
     parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
     parser.add_option("--min_overlap_normal", dest="min_overlap_normal", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
+    parser.add_option("--allow_clipped_support", dest="allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_option("--support_min_mapped", dest="support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8", type='float', default=0.8)
     parser.add_option("--normal_bam", dest="normal_bam", help="reads-to-contigs bam file of match normal")
     parser.add_option("--reference_url", dest="reference_url", help="URL of reference")
     parser.add_option("--assembly_url", dest="assembly_url", help="URL of assembly file for VCF")
