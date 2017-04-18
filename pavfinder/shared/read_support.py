@@ -6,47 +6,50 @@ from optparse import OptionParser
 from sets import Set
 import multiprocessing as mp
 from intspan import intspan
+from collections import OrderedDict, defaultdict
+from operator import itemgetter
 
-def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
+def find_flanking(reads, span, contig_len, overlap_buffer=1, allow_clipped=False, min_ratio_mapped=None, debug=False):
+    uniq_frags = defaultdict(list)
+
     tlens = []
     proper_pairs = Set()
     for read in reads:
-	if read.is_proper_pair and is_fully_mapped(read, contig_len):
+	if read.is_proper_pair and is_fully_mapped(read, contig_len, allow_clipped=allow_clipped, min_ratio_mapped=min_ratio_mapped):
 	    proper_pairs.add(read.qname + str(read.pos))
-	    if read.tlen > 0:
-		tlens.append(read.tlen)
-    
-    uniq_frags = Set()
-    for read in [r for r in reads if not r.is_unmapped]:
-	frag = None
-	
-	if read.qname + str(read.pos) in proper_pairs and read.tlen > 0:
-	    # internal fragment
+	    #if read.tlen > 0:
+		#tlens.append(read.tlen)
+
+    for read in [r for r in reads if not r.is_unmapped and r.tlen > 0]:
+	if read.qname + str(read.pos) in proper_pairs:
+	     # internal fragment
 	    frag = (read.pos + read.alen, read.pnext)
-	 
-	if frag is not None and frag[0] <= breaks[0] - overlap_buffer and frag[1] >= breaks[1] + overlap_buffer:
-	    uniq_frags.add(frag)
-		
+
+	    if frag is not None and frag[0] <= span[0] - overlap_buffer and frag[1] >= span[1] + overlap_buffer:
+		uniq_frags[frag].append(read.qname)
+
+    num_frags = len(uniq_frags.keys())
+
     if debug:
-	for f in uniq_frags:
-	    sys.stdout.write("Accepted flanking: %s %s\n" % (breaks, f))
-	    
-    return len(uniq_frags), tlens
+	for f in uniq_frags.keys():
+	    sys.stdout.write("Accepted flanking: %s %s %s\n" % (span, f, ','.join(uniq_frags[f])))
 
-def find_spanning(reads, breaks, contig_seq, overlap_buffer=1, debug=False, perfect=False, get_seq=False):
+    return num_frags, tlens
+
+def find_spanning(reads, span, contig_seq, overlap_buffer=1, debug=False, perfect=False, get_seq=False, allow_clipped=False, min_ratio_mapped=None):
+    def check_read(start, end):
+	break_seq = contig_seq[start - 1 - overlap_buffer: end + overlap_buffer]
+	return read.pos < start - overlap_buffer and\
+	       read.pos + read.alen >= end + overlap_buffer and\
+	       is_fully_mapped(read, contig_len, perfect=perfect, allow_clipped=allow_clipped, min_ratio_mapped=min_ratio_mapped) and\
+	       is_break_region_perfect(read, break_seq, (start, end), overlap_buffer)
+
     contig_len = len(contig_seq)
-    break_seq = contig_seq[breaks[0] - 1 - overlap_buffer: breaks[1] + overlap_buffer]
-
     pos = Set()
-    # cannot use 2 mates of same read as evidence
     names = Set()
-    spanning_reads = []
     for read in reads:
 	if read.alen:
-	    if read.pos < breaks[0] - overlap_buffer and\
-	       read.pos + read.alen >= breaks[1] + overlap_buffer and\
-	       is_fully_mapped(read, contig_len, perfect=perfect) and\
-	       is_break_region_perfect(read, break_seq, breaks, overlap_buffer):
+	    if check_read(span[0], span[1]):
 		strand = '+' if not read.is_reverse else '-'
 
 		start_pos = read.pos
@@ -54,21 +57,20 @@ def find_spanning(reads, breaks, contig_seq, overlap_buffer=1, debug=False, perf
 		    start_pos = -1 * read.cigar[0][1]
 		key = str(start_pos) + strand
 		
- 		if not key in pos and not read.qname in names:
+		if not key in pos and not read.qname in names:
 		    pos.add(key)
 		    names.add(read.qname)
-		    if get_seq:
-			spanning_reads.append((read.qname, read.seq))
-		    
+
 		    if debug:
 			sys.stdout.write("Accepted spanning read(perfect:%s): %s %s %s %s %s\n" % (perfect, 
-			                                                                           read.qname, 
-			                                                                           breaks, 
-			                                                                           (read.pos + 1, read.pos + read.alen),
-			                                                                           read.seq,
-			                                                                           strand))
-			
-    return len(pos), spanning_reads
+		                                                                                   read.qname,
+		                                                                                   span,
+		                                                                                   (read.pos + 1, read.pos + read.alen),
+		                                                                                   read.seq,
+		                                                                                   strand))
+    num_frags = len(pos)
+
+    return num_frags
 
 def is_break_region_perfect(read, break_seq, breaks, overlap_buffer):
     start_idx = breaks[0] - read.pos - 1
@@ -115,22 +117,22 @@ def check_tiling(reads, breaks, contig_len, debug=False):
 	    return True
     
     return False
-    
-def is_fully_mapped(read, contig_len, perfect=False):
-    """Checks to see if given read's alignment is prefect
-    2 conditions: if read length is the same as aligned length
-                  if edit distance is 0 (assume edit distance is given by aligner
-    Args:
-        read: (Pysam Aligned object)
-    Returns:
-        boolean of whether alignment is perfect
-    """
-    # take out rlen==alen condition to allow for insertions and deletion in alignments
+
+def is_fully_mapped(read, contig_len, perfect=False, allow_clipped=False, min_ratio_mapped=None):
     if not re.search('[HS]', read.cigarstring) or is_fully_mapped_to_edge(read, contig_len):
         if perfect:
             return True if read.opt('NM') == 0 else False
         return True
     
+    elif allow_clipped and\
+         min_ratio_mapped is not None and\
+         len(read.cigar) == 2 and\
+         re.search('S', read.cigarstring) and\
+         float(read.alen) / read.inferred_length >= min_ratio_mapped:
+	if perfect:
+            return True if read.opt('NM') == 0 else False
+	return True
+
     return False
 
 def is_fully_mapped_to_edge(read, contig_len):
@@ -153,158 +155,47 @@ def is_fully_mapped_to_edge(read, contig_len):
     return False
 
 def worker(args):
-    """Wrapper of extract_reads() to extract read support
-    
-    Args:
-        args: (tuple) list of items returned by create_batches()
-    """
-    bam_file, contigs, coords, tids, overlap_buffer, contig_fasta_file, perfect, get_seq, debug = args
-    bam = pysam.Samfile(bam_file, 'rb')
+    bam_file, coords, overlap_buffer, contig_fasta_file, perfect, get_seq, allow_clipped, min_ratio_mapped, debug = args
     contig_fasta = pysam.Fastafile(contig_fasta_file)
-    return extract_reads(bam, Set(contigs), coords, tids, overlap_buffer, contig_fasta, perfect=perfect, get_seq=get_seq, debug=debug)
-    
-def extract_reads(bam, contigs, coords, tids, overlap_buffer, contig_fasta, perfect=False, get_seq=False, debug=False):
-    """Extract read support of given list of contigs
-    
-    Args:
-        bam: (Pysam bam handle)
-        contigs: (set) contig names to get support for
-        coords: (dictionary) coords[contig] = [spans]
-                spans = (list) of (start, end) where 'start' and 'end' are not sorted
-        tids: target ids of corresponding contigs 
-    Returns:
-        List of tuples:
-        contig: (str) contig name
-        start of break: (int) first break position
-        end of break: (int) second break position
-        positive spanning reads: (int) number of positive spanning reads
-        negative spanning reads: (int) number of negative spanning reads
-        flanking pairs: (int) number of flanking pairs
-    """
-    min_tid = min(tids)
-    max_tid = max(tids)
-    
-    support = []
-    count = 1
-    tlens_all = []
-    for key, group in groupby(bam.fetch(until_eof=True), lambda x: x.tid):        
-        if key < 0 or key > max_tid:
-            break
-        elif key < min_tid or key not in tids:
-	    continue
-        else:
-            contig = bam.getrname(key)
-            if not contig in contigs:
-                continue
-            
-	contig_seq = contig_fasta.fetch(contig)
-	contig_len = len(contig_seq)
-        results = {}
-        reads = list(group)
-	support_reads = []
-        for breaks in coords[contig]:
-            # initialization
-            results[breaks] = {'spanning':0, 'flanking':0, 'depth':0, 'tiling':False}
-            
-            breaks_sorted = sorted(breaks)
-	    results[breaks]['spanning'], support_reads = find_spanning(reads, breaks_sorted, contig_seq, 
-	                                                               overlap_buffer=overlap_buffer, 
-	                                                               perfect=perfect, 
-	                                                               get_seq=get_seq, 
-	                                                               debug=debug)
-	    #results[breaks]['tiling'] = check_tiling(reads, breaks_sorted, contig_len, debug=debug)
-	    #results[breaks]['flanking'], tlens = find_flanking(reads, breaks_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
-	    #tlens_all.extend(tlens)
-                                                                                
-        for breaks in results.keys():
-            support.append((contig, breaks[0], breaks[1], results[breaks]['spanning'], results[breaks]['flanking'], results[breaks]['tiling'], support_reads))
 
-        count += 1        
-        if count > len(contigs):
-            break
-            
-    support.append(tlens_all)
-    return support
-                    
-def create_batches(bam_file, coords, contigs, size, overlap_buffer, contig_fasta_file, perfect, get_seq, debug=False):
-    """Iterator to creates list of arguments of processes spawned
+    coords_batch = defaultdict(list)
+    for contig, start, end, align_type in coords:
+	coords_batch[contig].append(((start, end), align_type))
     
-    Args:
-        bam_file: (str) absolute path of reads-to-contigs bam file
-        coords: (dictionary) coords[contig] = [spans]
-                spans = (list) of (start, end) where 'start' and 'end' are not sorted
-        contigs: (list) contig names
-        sizes: (int) number of contigs per process
-    Yeilds:
-        tuple of:
-        bam_file: (str) original bam file argument
-        contigs: (list) contig names to be processed
-        coords: (dict) original coords argument
-        tids: (list) target ids of corresponding contigs 
-        debug: (boolean) outputs debug statements
-    """
-    bam = pysam.Samfile(bam_file, 'rb')
-    tids = [bam.gettid(contig) for contig in contigs]
-    
+    results, tlens = fetch_support(coords_batch,
+                                   bam_file,
+                                   contig_fasta,
+                                   overlap_buffer=overlap_buffer,
+                                   perfect=perfect,
+                                   get_seq=get_seq,
+                                   allow_clipped=allow_clipped,
+                                   min_ratio_mapped=min_ratio_mapped,
+                                   debug=debug)
+
+    supports = []
+    for contig, coords in results.iteritems():
+	for coord in coords:
+	    start, end = map(int, coord.split('-'))
+	    supports.append([contig, start, end,
+	                     results[contig][coord][0],
+	                     results[contig][coord][1],
+	                     results[contig][coord][2],
+	                     results[contig][coord][3]])
+    supports.append(tlens)
+    return supports
+
+def create_batches(bam_file, coords, size, overlap_buffer, contig_fasta_file, perfect, get_seq, allow_clipped, min_ratio_mapped, debug=False):
     if size == 0:
-        yield bam_file, contigs, coords, tids, overlap_buffer, contig_fasta_file, perfect, get_seq, debug
+        yield bam_file, coords, overlap_buffer, contig_fasta_file, perfect, get_seq, debug
     else:
-        for i in xrange(0, len(contigs), size):
-            if len(contigs) - (i + size) < size:
-                yield bam_file, contigs[i:], coords, tids[i:], overlap_buffer, contig_fasta_file, perfect, get_seq, debug
+        for i in xrange(0, len(coords), size):
+            if len(coords) - (i + size) < size:
+                yield bam_file, coords[i:], overlap_buffer, contig_fasta_file, perfect, get_seq, allow_clipped, min_ratio_mapped, debug
                 break
             else:
-                yield bam_file, contigs[i:i + size], coords, tids[i:i + size], overlap_buffer, contig_fasta_file, perfect, get_seq, debug
-            
-def scan_all(coords, bam_file, contig_fasta_file, num_procs, overlap_buffer, perfect=False, get_seq=False, debug=False):
-    """Scans every read in reads to contig bam file for support
-    
-    Args:
-        coords: (dictionary) coords[contig] = [spans]
-                spans = (list) of (start, end) where 'start' and 'end' are not sorted
-        bam_file: (string) absolute path of reads-to-contigs bam file
-        num_procs: (int) number of concurrent processes
-        debug: (boolean) prints debug statements
-    Returns:
-        dictionary of number of read support
-        results[contig][coords] = (spanning_pos, spanning_neg, flanking)
-        contig: (str)contig name
-        coords: (str) original given coordinates (won't be sorted) "coord1-coord2"
-        spanning_pos: (int) number unique postively spanning reads
-        spanning_neg: (int) number unique postively spanning reads
-        flanking: (int) number of unique flanking pairs
-    """
-    contigs = coords.keys()
-    batches = list(create_batches(bam_file, coords, contigs, len(contigs)/num_procs, overlap_buffer, contig_fasta_file, perfect, get_seq, debug=debug))
-    pool = mp.Pool(processes=num_procs)
-    batch_results = pool.map(worker, batches)
-    pool.close()
-    pool.join()
-    
-    results = {}
-    tlens_all = []
-    support_reads = []
-    for batch_result in batch_results:
-        for support in batch_result:
-	    # insert sizes
-	    if len(support) > 7:
-		tlens_all.extend(support)
-		continue
-	    
-	    if len(support) == 0:
-		continue
-	    
-            contig, start, stop, spanning, flanking, tiling, support_reads = support
-            coords = '%s-%s' % (start, stop)
-            try:
-                results[contig][coords] = (spanning, flanking, tiling, support_reads)
-            except:
-                results[contig] = {}
-                results[contig][coords] = (spanning, flanking, tiling, support_reads)
-            
-    return results, tlens_all
+                yield bam_file, coords[i:i + size], overlap_buffer, contig_fasta_file, perfect, get_seq, allow_clipped, min_ratio_mapped, debug
 
-def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=False, get_seq=False, debug=False):
+def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=False, get_seq=False, allow_clipped=False, min_ratio_mapped=None, debug=False):
     """Fetches read support when number given coords is relatively small
     It will use Pysam's fetch() instead of going through all read alignments
     Args:
@@ -324,35 +215,42 @@ def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=Fals
     bam = pysam.Samfile(bam_file, 'rb')
     results = {}
     tlens_all = []
-    for contig, spans in coords.iteritems():
+    count = 0
+    window_size = 2000
+    for contig, spans_align_types in coords.iteritems():
+	count += 1
         results[contig] = {}
 	contig_seq = contig_fasta.fetch(contig)
 	contig_len = len(contig_seq)
-        for span in spans:
-            # initialize results
-            coords = '-'.join(map(str, span))
-            results[contig][coords] = [0, 0]
-            
-            # extract all read objects
-            reads = []
-            for read in bam.fetch(contig):
-                reads.append(read)
 
-            # sort each span
-            span_sorted = sorted(span)
-            # flanking pairs
-            #flanking = find_flanking_pairs(reads, span_sorted)
-	    spanning, support_reads = find_spanning(reads, span_sorted, contig_seq, debug=debug, 
-	                                            overlap_buffer=overlap_buffer, 
-	                                            perfect=perfect, 
-	                                            get_seq=get_seq)
-	    #tiling = check_tiling(reads, span_sorted, contig_len, debug=debug)
-	    #flanking, tlens = find_flanking(reads, span_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
-	    tiling = None
-	    flanking, tlens = None, []
+	spans = []
+	for span, align_type in spans_align_types:
+	    spans.append(span)
+	    coord = '-'.join(map(str, span))
+	    results[contig][coord] = [0, 0, None, []]
 
-	    results[contig][coords] = (spanning, flanking, tiling, support_reads)
-	    tlens_all.extend(tlens)
+	    reads = []
+	    for read in bam.fetch(contig, max(0, span[0] - window_size), min(contig_len, span[1] + window_size)):
+		reads.append(read)
+
+	    spanning = find_spanning(reads, span, contig_seq, debug=debug,
+	                             overlap_buffer=overlap_buffer,
+	                             perfect=perfect,
+	                             get_seq=get_seq,
+	                             allow_clipped=allow_clipped,
+	                             min_ratio_mapped=min_ratio_mapped)
+
+	    flanking, tlens = find_flanking(reads,
+	                                    span,
+	                                    contig_len,
+	                                    overlap_buffer=overlap_buffer,
+	                                    allow_clipped=allow_clipped,
+	                                    min_ratio_mapped=min_ratio_mapped,
+	                                    debug=debug)
+
+	    results[contig][coord][0] = spanning
+	    results[contig][coord][1] = flanking
+	#print count, len(coords.keys()), contig_len
 
     return results, tlens_all
 
@@ -435,33 +333,83 @@ def expand_contig_breaks(chrom, breaks, contig, contig_breaks, event, ref_fasta,
 	
     return tuple(contig_breaks_expanded)
 
+def sum_support(values, use_minimum=False):
+    if not use_minimum:
+	return sum(values)
+    else:
+	return min(values)
+
+def filter_support(spanning, flanking, min_support, use_spanning=True, use_flanking=False):
+    support = 0
+    if use_spanning and use_flanking:
+	support = spanning + flanking
+    elif use_spanning:
+	support = spanning
+    elif use_flanking:
+	support = flanking
+
+    return support >= min_support
 
 def main(args, options):
     coords_file = args[0]
         
-    coords = {}
+    coords = []
     for line in open(coords_file, 'r'):
         cols = line.rstrip('\n').split()
         span = tuple(sorted((int(cols[1]), int(cols[2]))))
-                    
-        try:
-            coords[cols[0]].append(span)
-        except:
-            coords[cols[0]] = [span]
+        #coords[cols[0]].append((span, cols[3]))
+	coords.append((cols[0], span[0], span[1], cols[3]))
+    coords_sorted = sorted(coords, key=itemgetter(0,1,2))
             
-    contigs = coords.keys()
-    
-    batches = list(create_batches(args[1], coords, contigs, len(contigs)/options.num_procs))
+    batches = list(create_batches(args[1],
+                                  coords_sorted,
+                                  len(coords_sorted)/options.num_procs,
+                                  options.min_overlap,
+                                  args[2],
+                                  False,
+                                  False,
+                                  options.allow_clipped_support,
+                                  options.support_min_mapped,
+                                  ))
+    print 'uuu', len(batches)
     pool = mp.Pool(processes=options.num_procs)
-    supports = pool.map(worker, batches)
-    
+    batch_results = pool.map(worker, batches)
     pool.close()
     pool.join()
     
+    results = {}
+    tlens_all = []
+    support_reads = []
+    for batch_result in batch_results:
+        for support in batch_result:
+	    # insert sizes
+	    if len(support) > 7:
+		tlens_all.extend(support)
+		continue
+
+	    if len(support) == 0:
+		continue
+
+            contig, start, stop, spanning, flanking, tiling, support_reads = support
+            coords = '%s-%s' % (start, stop)
+            try:
+                results[contig][coords] = (spanning, flanking, tiling, support_reads)
+            except:
+                results[contig] = {}
+                results[contig][coords] = (spanning, flanking, tiling, support_reads)
+
+    with open(args[3], 'w') as out:
+	for contig in results.keys():
+	    for coords in results[contig]:
+		out.write('%s\n' % '\t'.join(map(str, [contig, coords, results[contig][coords][0], results[contig][coords][1]])))
+
 if __name__ == '__main__':
-    usage = "Usage: %prog coords_file bamfile"
+    usage = "Usage: %prog coords_file bamfile contigs_fasta out_file"
     parser = OptionParser(usage=usage)
     parser.add_option("-n", "--num_procs", dest="num_procs", help="Number of processes. Default: 5", default=5, type=int)
+    parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
+    parser.add_option("--allow_clipped_support", dest="allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_option("--support_min_mapped", dest="support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8", type='float', default=0.8)
     (options, args) = parser.parse_args()
-    if len(args) == 2:
+    if len(args) == 4:
         main(args, options)
