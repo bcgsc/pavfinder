@@ -179,8 +179,13 @@ class Adjacency:
 	    
 	# read support
 	if self.final_support is not None:
-	    infos[0]['READSUPPORT'] = self.final_support
-	    infos[1]['READSUPPORT'] = self.final_support
+	    #infos[0]['READSUPPORT'] = self.final_support
+	    #infos[1]['READSUPPORT'] = self.final_support
+	    infos[0]['SPANNING_READS'] = self.support['spanning']
+	    infos[1]['SPANNING_READS'] = self.support['spanning']
+	    if self.support['flanking'] is not NONE:
+		infos[0]['FLANKING_PAIRS'] = self.support['flanking']
+		infos[1]['FLANKING_PAIRS'] = self.support['flanking']
 	    
 	adj_size = self.get_size()
 	if type(adj_size) is int:
@@ -262,8 +267,9 @@ class Adjacency:
 	
 	# read support
 	if self.final_support is not None:
-	    info['READSUPPORT'] = self.final_support
-	    
+	    #info['READSUPPORT'] = self.final_support
+	    info['SPANNING_READS'] = self.support['spanning']
+
 	# somatic
 	if self.somatic:
 	    info['SOMATIC'] = 'SOMATIC'
@@ -336,7 +342,10 @@ class Adjacency:
 	
 	# read support
 	if self.final_support is not None:
-	    info['READSUPPORT'] = self.final_support
+	    #info['READSUPPORT'] = self.final_support
+	    info['SPANNING_READS'] = self.support['spanning']
+	    if self.support['flanking'] is not None:
+		info['FLANKING_PAIRS'] = self.support['flanking']
 	    
 	# somatic
 	if self.somatic:
@@ -401,6 +410,7 @@ class Adjacency:
 	           'repeat_change',
 	           'probe',
 	           'spanning_reads',
+	           'flanking_pairs',
                    )
         return '\t'.join(headers)
     
@@ -450,10 +460,17 @@ class Adjacency:
 	    data.append(self.probes[0])
 	except:
 	    data.append('-')
-	if self.support is not None:
+
+	if self.support is not None and self.support['spanning'] is not None:
 	    data.append(str(self.support['spanning']))
 	else:
 	    data.append('-')
+
+	if self.support is not None and self.support['flanking'] is not None:
+	    data.append(str(self.support['flanking']))
+	else:
+	    data.append('-')
+
 	outputs.append('\t'.join(map(str, data)))
 	                
         return '\n'.join(outputs)
