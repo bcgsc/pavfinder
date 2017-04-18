@@ -4,7 +4,7 @@ import time
 class VCF:
     # 8 mandatory fields. 'FORMAT' is optional
     fields = ('CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO')
-    info_fields = ('SVTYPE', 'EVENTTYPE', 'PARID', 'MATEID', 'END', 'SVLEN', 'CIPOS', 'HOMLEN', 'HOMSEQ', 'BKPTID', 'EVENT', 'READSUPPORT', 'SOMATIC',
+    info_fields = ('SVTYPE', 'EVENTTYPE', 'PARID', 'MATEID', 'END', 'SVLEN', 'CIPOS', 'HOMLEN', 'HOMSEQ', 'BKPTID', 'EVENT', 'SPANNING_READS', 'FLANKING_PAIRS', 'SOMATIC',
                    'REPEAT_SEQ', 'REPEAT_NUM', 'REPEAT_NUM_CHANGE')
     
     version = '4.2'
@@ -22,7 +22,8 @@ class VCF:
     meta_info['HOMSEQ'] = ('.', 'String', 'Sequence of base pair identical micro-homology at event breakpoints')
     meta_info['BKPTID'] = ('.', 'String', 'ID of the assembled alternate allele in the assembly file')
     meta_info['EVENT'] = ('1', 'String', 'ID of event associated to breakend')
-    meta_info['READSUPPORT'] = (1, 'Integer', 'Read support of assembled event')
+    meta_info['SPANNING_READS'] = (1, 'Integer', 'Number of reads spanning breakpoint')
+    meta_info['FLANKING_PAIRS'] = (1, 'Integer', 'Number of unique read pairs flanking breakpoint')
     meta_info['SOMATIC'] = (0, 'Flag', 'Somatic')
     meta_info['REPEAT_SEQ'] = (1, 'Integer', 'Repeat sequence in tandem duplication')
     meta_info['REPEAT_NUM'] = (1, 'Integer', 'Number of novel repeats in tandem duplication')
