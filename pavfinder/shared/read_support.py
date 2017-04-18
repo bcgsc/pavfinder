@@ -341,12 +341,12 @@ def sum_support(values, use_minimum=False):
 
 def filter_support(spanning, flanking, min_support, use_spanning=True, use_flanking=False):
     support = 0
-    if use_spanning and use_flanking:
-	support = spanning + flanking
-    elif use_spanning:
-	support = spanning
-    elif use_flanking:
-	support = flanking
+    if use_spanning:
+	if spanning:
+	    support += spanning
+    if use_flanking:
+	if flanking:
+	    support += flanking
 
     return support >= min_support
 
@@ -357,7 +357,6 @@ def main(args, options):
     for line in open(coords_file, 'r'):
         cols = line.rstrip('\n').split()
         span = tuple(sorted((int(cols[1]), int(cols[2]))))
-        #coords[cols[0]].append((span, cols[3]))
 	coords.append((cols[0], span[0], span[1], cols[3]))
     coords_sorted = sorted(coords, key=itemgetter(0,1,2))
             
@@ -371,7 +370,6 @@ def main(args, options):
                                   options.allow_clipped_support,
                                   options.support_min_mapped,
                                   ))
-    print 'uuu', len(batches)
     pool = mp.Pool(processes=options.num_procs)
     batch_results = pool.map(worker, batches)
     pool.close()

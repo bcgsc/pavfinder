@@ -92,8 +92,6 @@ def parse_support(support_output):
             spanning = int(cols[2])
             if cols[3].isdigit():
                 flanking = int(cols[3])
-            else:
-                flanking = '-'
             support[cols[0]][cols[1]] = spanning, flanking
             
     return support
@@ -107,7 +105,7 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
         for contig, start, end in zip(adj['contig'].split(','),
                                       adj['contig-break1'].split(','),
                                       adj['contig-break2'].split(',')):
-            span = '-'.join(map(str, sorted([start, end])))
+            span = '-'.join(map(str, tuple(sorted((int(start), int(end))))))
             if support.has_key(contig) and support[contig].has_key(span):
                 if type(support[contig][span][0]) is int:
                     spanning.append(support[contig][span][0])
@@ -162,6 +160,7 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
     return failed_adjs, failed_variants
 
 def get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
+                min_overlap=None,
                 allow_clipped_support=False,
                 support_min_mapped=None):
     import pavfinder.shared.read_support
@@ -176,8 +175,9 @@ def get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
         cmd += ' --allow_clipped_support'
     if support_min_mapped is not None:
         cmd += ' --support_min_mapped %s' % support_min_mapped
+    if min_overlap is not None:
+        cmd += ' --min_overlap %d' % min_overlap
     print cmd
-    #process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
     process = subprocess.Popen(cmd, shell=True)
     process.wait()
         
@@ -228,15 +228,68 @@ def output(adjs, variants, adjs_failed, variants_failed, outdir, out_prefix=None
                 line = '\t'.join(cols)
                 vcf.write('%s\n' % line)
 
+def gather_and_filter(adjs, variants, vid_to_aid, coords_file, contigs_fa,
+                      bam_file, out_dir, out_prefix, num_procs,
+                      min_support, min_overlap, allow_clipped, support_min_mapped):
+    # get support
+    if out_prefix is None:
+        support_file = '%s/support.tsv' % out_dir
+    else:
+        support_file = '%s/%s_support.tsv' % (out_dir, out_prefix)
+    if not os.path.exists(support_file):
+        get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
+                    min_overlap=min_overlap,
+                    allow_clipped_support=allow_clipped,
+                    support_min_mapped=support_min_mapped)
+        print 'done getting support', bam_file
+
+    # filter
+    if os.path.exists(support_file):
+        # parse support
+        support = parse_support(support_file)
+
+        # filter support
+        adjs_failed, variants_failed = filter_events(adjs, variants, vid_to_aid, support, min_support)
+
+        # output
+        output(adjs, variants, adjs_failed, variants_failed, out_dir, out_prefix=out_prefix)
+
+def subtract_events(out_dir):
+    tumor_adjs = parse_adjs(out_dir + '/adjacencies_tumor_filtered.tsv')
+    tumor_variants = parse_variants(out_dir + '/variants_tumor_filtered.vcf')
+
+    normal_adjs = parse_adjs(out_dir + '/adjacencies_normal_filtered.tsv')
+
+    tumor_adj_ids = Set([adj['ID'] for adj in tumor_adjs])
+    normal_adj_ids = Set([adj['ID'] for adj in normal_adjs])
+    germline_adj_ids = tumor_adj_ids & normal_adj_ids
+
+    # identify variants
+    germline_variants = []
+    for v in range(len(tumor_variants)):
+        variant = tumor_variants[v]
+        if type(variant) is str:
+            continue
+        for i in variant['ID'].split('-'):
+            if i in germline_adj_ids:
+                germline_variants.append(v)
+
+    output(tumor_adjs, tumor_variants, germline_adj_ids, germline_variants, out_dir, out_prefix='somatic')
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("sv_dir", type=str, help="directory of sv output")
-    parser.add_argument("r2c", type=str, help="r2c bam file")
+    parser.add_argument("bam", type=str, help="r2c bam file")
     parser.add_argument("contigs_fa", type=str, help="contig fasta file")
-    parser.add_argument("--out_prefix", type=str, help="prefix of output file", default=None)
+    parser.add_argument("--normal_bam", type=str, help="normal r2c bam file")
+    #parser.add_argument("--out_prefix", type=str, help="prefix of output file", default=None)
     parser.add_argument("--num_procs", help="Number of processes. Default: 5", default=5, type=int)
     parser.add_argument("--min_support", help="minimum read support. Default:2", type=int, default=2)
-    parser.add_argument("--allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_argument("--min_support_normal", help="minimum read support for normal. Default:2", type=int, default=2)
+    parser.add_argument("--min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type=int, default=4)
+    parser.add_argument("--min_overlap_normal", help="minimum breakpoint overlap for identifying read support. Default:4", type=int, default=4)
+    parser.add_argument("--allow_clipped", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_argument("--allow_clipped_normal", help="allow using clipped reads in gathering read support for normal bam", action="store_true", default=False)
     parser.add_argument("--support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped", type=float, default=None)
     
     args = parser.parse_args()
@@ -257,28 +310,18 @@ def main():
     create_coords_file(adjs, vid_to_aid, coords_file)
     print 'done creating coords file'
     
-    # get support
-    if args.out_prefix is not None:
-        support_file = '%s/%s_support.tsv' % (out_dir, args.out_prefix)
+    support_args = [(args.bam, None, args.min_support, args.min_overlap, args.allow_clipped, args.support_min_mapped)]
+    if args.normal_bam:
+        support_args = [(args.bam, 'tumor', args.min_support, args.min_overlap, args.allow_clipped, args.support_min_mapped),
+                        (args.normal_bam, 'normal', args.min_support_normal, args.min_overlap_normal, args.allow_clipped_normal, args.support_min_mapped)]
     else:
-        support_file = '%s/support.tsv' % out_dir
-    if not os.path.exists(support_file):
-        get_support(coords_file, args.r2c, args.contigs_fa, support_file, args.num_procs,
-                    allow_clipped_support=args.allow_clipped_support,
-                    support_min_mapped=args.support_min_mapped)
-    
-    if os.path.exists(support_file):
-        print 'done getting support'
-        # parse support
-        support = parse_support(support_file)
-        print 'done parsing support'
-    
-        # filter support
-        adjs_failed, variants_failed = filter_events(adjs, variants, vid_to_aid, support, args.min_support)
-        print 'done filtering support'
+        support_args = [(args.bam, None, args.min_support, args.min_overlap, args.allow_clipped, args.support_min_mapped)]
+    for bam_file, out_prefix, min_support, min_overlap, allow_clipped, support_min_mapped in support_args:
+        gather_and_filter(adjs, variants, vid_to_aid, coords_file, args.contigs_fa,
+                          bam_file, out_dir, out_prefix, args.num_procs,
+                          min_support, min_overlap, allow_clipped, support_min_mapped)
 
-        # output
-        output(adjs, variants, adjs_failed, variants_failed, args.sv_dir, out_prefix=args.out_prefix)
-        print 'done making filtered output'
+    if args.normal_bam:
+        subtract_events(out_dir)
     
 main()

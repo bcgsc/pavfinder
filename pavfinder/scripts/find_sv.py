@@ -610,7 +610,7 @@ class SVFinder:
 	for failed_var in failed_variants:
 	    self.variants.remove(failed_var)
 		        
-    def output(self, only_somatic=False, reference_url=None, assembly_url=None, insertion_as_breakends=None):
+    def output(self, reference_url=None, assembly_url=None, insertion_as_breakends=None):
 	"""Wrapper function to output Variants and Adjacencies
 	Args:
 	    only_somatic: (boolean) Only outputs somatic variants/adjacencies
@@ -619,8 +619,8 @@ class SVFinder:
 	    insertion_as_breakends: (boolean) Output big insertion as breakends
 	"""
 	variants = [variant for variant in self.variants if not variant.filtered_out]
-	if only_somatic:
-	    variants = [variant for variant in variants if variant.somatic]
+	#if only_somatic:
+	    #variants = [variant for variant in variants if variant.somatic]
 	    
 	#if variants:
 	self.output_variants(variants, 
@@ -702,21 +702,34 @@ class SVFinder:
 		    
 	    out.close()
 
-    def find_support(self, bam, out_prefix=None, min_support=None, min_overlap=None, allow_clipped_support=False, min_ratio_mapped=None):
+    def find_support(self, bam, min_support, min_overlap, allow_clipped=False,
+                     normal_bam=None, min_support_normal=None, min_overlap_normal=None,
+                     allow_clipped_normal=False, min_ratio_mapped=None):
 	cmd = "python %s/check_support.py %s %s %s --num_procs %d" % (os.path.dirname(__file__),
 	                                                              self.out_dir,
 	                                                              bam,
 	                                                              self.contig_fasta_file,
 	                                                              self.num_procs,
 	                                                              )
-	if out_prefix is not None:
-	    cmd += ' --out_prefix %s' % out_prefix
 	if min_support is not None:
 	    cmd += ' --min_support %d' % min_support
-	if allow_clipped_support:
-	    cmd += ' --allow_clipped_support'
+	if allow_clipped:
+	    cmd += ' --allow_clipped'
 	    if min_ratio_mapped is not None:
 		cmd += ' --support_min_mapped %s' % min_ratio_mapped
+	if min_overlap is not None:
+	    cmd += ' --min_overlap %d' % min_overlap
+
+	# normal
+	if normal_bam is not None:
+	    cmd += ' --normal_bam %s' % normal_bam
+	if min_support_normal is not None:
+	    cmd += ' --min_support_normal %s' % min_support_normal
+	if min_overlap_normal is not None:
+	    cmd += ' --min_overlap_normal %s' % min_overlap_normal
+	if allow_clipped_normal:
+	    cmd += ' --allow_clipped_normal'
+
 	print cmd
 	process = subprocess.Popen(cmd, shell=True)
 	process.wait()
@@ -834,41 +847,15 @@ def main(args, options):
 	sv_finder.screen_realigns(use_realigns=options.use_realigns)
             
     # output
-    sv_finder.output(options.normal_bam is not None,
-                     reference_url=options.reference_url,
+    sv_finder.output(reference_url=options.reference_url,
                      assembly_url=options.assembly_url,
                      insertion_as_breakends=options.insertion_as_breakends,
                      )
     
-    # filter for read support
-    # tumor
-    if options.r2c_bam_file and options.normal_bam:
-	out_prefix = 'tumor_support'
-    else:
-	out_prefix = None
     if options.r2c_bam_file:
-	sv_finder.find_support(options.r2c_bam_file,
-	                       min_support=options.min_support,
-	                       min_overlap=options.min_overlap,
-	                       allow_clipped_support=options.allow_clipped_support,
-	                       min_ratio_mapped=options.support_min_mapped,
-	                       out_prefix=out_prefix)
-
-    # normal
-    if out_prefix is not None:
-	out_prefix = 'normal_support'
-    if options.normal_bam:
-	sv_finder.find_support(options.normal,
-	                       min_support=options.min_support_normal,
-	                       min_overlap=options.min_overlap_normal,
-	                       allow_clipped_support=options.allow_clipped_support,
-	                       min_ratio_mapped=options.support_min_mapped,
-	                       out_prefix=out_prefix)
-
-    # find somatic (only in tumor filtered but not in normal filtered
-    if options.r2c_bam_file and options.normal_bam:
-	# subtract
-	pass
+	sv_finder.find_support(options.r2c_bam_file, options.min_support, options.min_overlap, options.allow_clipped,
+	                       options.normal_bam, options.min_support_normal, options.min_overlap_normal,
+	                       options.allow_clipped_normal, options.support_min_mapped)
 
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam aligner contig_fasta(indexed) genome_file(indexed) out_dir"
@@ -885,7 +872,8 @@ if __name__ == '__main__':
     parser.add_option("--min_support_normal", dest="min_support_normal", help="minimum read support for normal. Default:1", type='int', default=1)
     parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
     parser.add_option("--min_overlap_normal", dest="min_overlap_normal", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
-    parser.add_option("--allow_clipped_support", dest="allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_option("--allow_clipped", dest="allow_clipped", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_option("--allow_clipped_normal", dest="allow_clipped_normal", help="allow using clipped reads in gathering normal read support", action="store_true", default=False)
     parser.add_option("--support_min_mapped", dest="support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8", type='float', default=0.8)
     parser.add_option("--normal_bam", dest="normal_bam", help="reads-to-contigs bam file of match normal")
     parser.add_option("--reference_url", dest="reference_url", help="URL of reference")
