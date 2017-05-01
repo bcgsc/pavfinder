@@ -252,17 +252,17 @@ class SVFinder:
 	self.variants.extend(inv_variants)
 	track_adjs(adjs_ids_used, inv_variants)
 
-	# group reciprocal transcloations
-	trls = [adj for adj in adjs if adj.rearrangement == 'trl' and not adj.id in adjs_ids_used]
-	reciprocal_trls, trls_remained = Adjacency.group_trls(trls)
-	self.variants.extend(reciprocal_trls)
-	track_adjs(adjs_ids_used, reciprocal_trls)
-
 	# convert translocations to insertions
 	trls = [adj for adj in adjs if adj.rearrangement == 'trl' and not adj.id in adjs_ids_used]
 	ins_variants, trls_remained = Adjacency.extract_interchrom_ins(trls)
 	self.variants.extend(ins_variants)
 	track_adjs(adjs_ids_used, ins_variants)
+
+	# group reciprocal transcloations
+	trls = [adj for adj in adjs if adj.rearrangement == 'trl' and not adj.id in adjs_ids_used]
+	reciprocal_trls, trls_remained = Adjacency.group_trls(trls)
+	self.variants.extend(reciprocal_trls)
+	track_adjs(adjs_ids_used, reciprocal_trls)
 
 	# append remaining non-dubious translocations
 	trls = [adj for adj in adjs if adj.rearrangement == 'trl' and not adj.id in adjs_ids_used]
