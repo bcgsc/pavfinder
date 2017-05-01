@@ -750,7 +750,6 @@ class Adjacency:
 		    (trls[i].orients == ('L', 'L') and trls[i + 1].orients == ('R', 'R')) or\
 		    (trls[i].orients == ('R', 'R') and trls[i + 1].orients == ('L', 'L'))
 		    ):
-		    
 		    variants.append(Variant('TRL', [trls[i], trls[i + 1]]))
 		    grouped_trl_ids.add(trls[i].id)
 		    grouped_trl_ids.add(trls[i + 1].id)
@@ -759,7 +758,6 @@ class Adjacency:
 		    i += 1
 
 	grouped_trl_ids = Set()
-	variants = []
 	trls_remained = [trl for trl in trls if trl.id not in grouped_trl_ids]
 
 	return variants, trls_remained
