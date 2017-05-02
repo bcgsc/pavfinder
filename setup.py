@@ -23,7 +23,8 @@ setup(
         'intspan>=0.701',
         ],
 	scripts = ['pavfinder/scripts/pavfinder',
-			   'pavfinder/scripts/find_sv.py',
-			   'pavfinder/scripts/map_transcripts.py',
-		],
+                   'pavfinder/scripts/find_sv.py',
+                   'pavfinder/scripts/map_transcripts.py',
+                   'pavfinder/check_support.py',
+                   ],
 )

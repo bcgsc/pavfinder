@@ -23,3 +23,10 @@ v0.2.0 (all transcriptome changes)
 - accepts supplementary gene annotation GTF (``--suppl_annot``) for checking novelty of splicing events
 - will not call ITD on homopolymer expansion
 - changed event-label of same-gene chimera to actual rearrangement (e.g. a duplication within the same gene will be called 'dup' but not 'fusion')
+
+v0.3.0
+
+- added support for detecting potential transposable element insertion and repeat expansion and contraction
+- changed support read detection workflow
+- added test data
+
