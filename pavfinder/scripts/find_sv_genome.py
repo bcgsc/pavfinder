@@ -8,13 +8,13 @@ import pysam
 from collections import defaultdict
 from pybedtools import BedTool
 from pavfinder import __version__
-from pavfinder.SV import gapped_align
-from pavfinder.SV import split_align
-from pavfinder.shared.adjacency import Adjacency
-from pavfinder.shared.variant import Variant
-from pavfinder.shared.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
-from pavfinder.shared.alignment import reverse_complement, target_non_canonical
-from pavfinder.shared.vcf import VCF
+from pavfinder.genome import gapped_align
+from pavfinder.genome import split_align
+from pavfinder.genome.adjacency import Adjacency
+from pavfinder.genome.variant import Variant
+from pavfinder.genome.annotate import overlap_pe, parallel_parse_overlaps, annotate_rna_event, annotate_gene_fusion, update_features, get_acen_coords
+from pavfinder.genome.alignment import reverse_complement, target_non_canonical
+from pavfinder.genome.vcf import VCF
 import subprocess
 
 class SVFinder:    
