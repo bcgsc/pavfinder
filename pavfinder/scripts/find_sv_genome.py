@@ -18,11 +18,10 @@ from pavfinder.shared.vcf import VCF
 import subprocess
 
 class SVFinder:    
-    def __init__(self, bam_file, aligner, contig_fasta, genome_fasta, out_dir,
+    def __init__(self, bam_file, contig_fasta, genome_fasta, out_dir,
                  genome=None, index_dir=None, num_procs=0,
                  skip_simple_repeats=False, cytobands_file=None, acen_buffer=0, debug=False):
 	self.bam = pysam.Samfile(bam_file, 'rb')
-	self.aligner = aligner
 	self.contig_fasta_file = contig_fasta
 	self.contig_fasta = pysam.Fastafile(contig_fasta)
 	self.ref_fasta = pysam.Fastafile(genome_fasta)
@@ -121,7 +120,6 @@ class SVFinder:
 	    
 	    if len(alns) > 1:
 		chimeric_aligns, dubious = split_align.find_chimera(alns, 
-		                                                    self.aligner, 
 		                                                    self.bam, 
 		                                                    min_coverage=min_ctg_cov, 
 		                                                    check_alt_paths=check_alt_paths, 
@@ -142,7 +140,7 @@ class SVFinder:
 			if skip:
 			    continue
 		
-		    adjs = split_align.find_adjs(chimeric_aligns, self.aligner, contig_seq, dubious=dubious, debug=self.debug)
+		    adjs = split_align.find_adjs(chimeric_aligns, contig_seq, dubious=dubious, debug=self.debug)
 		    
 		    bad = Set()
 		    for i in range(len(adjs)):
@@ -186,7 +184,7 @@ class SVFinder:
 		    for align in chimeric_aligns:
 			all_adjs.extend(find_events_in_single_align(align))
 			
-	    best_align = gapped_align.find_single_unique(alns, self.aligner, self.bam, debug=self.debug)
+	    best_align = gapped_align.find_single_unique(alns, self.bam, debug=self.debug)
 	    if best_align:
 		all_adjs.extend(find_events_in_single_align(best_align))
 		    
@@ -545,11 +543,11 @@ class SVFinder:
     def screen_realigns(self, use_realigns=False):
 	"""Realign probe sequences of adjacencies and screen results
 
-	- aligner, genome, and index_dir must have been set when object is initialized
+	- genome, and index_dir must have been set when object is initialized
 	- output is always set to "realign.fa" and "realign.bam"
 	- will fail Adjacency if probe sequence can align to single location
 	"""
-	if not self.aligner or not self.genome or not self.index_dir:
+	if not self.genome or not self.index_dir:
 	    return None
 	
 	name_sep = '.'
@@ -558,7 +556,6 @@ class SVFinder:
 	    all_adjs.extend(variant.adjs)
 	realign_bam_file = Adjacency.realign(all_adjs,
 	                                     self.out_dir,
-	                                     self.aligner,
 	                                     probe=True,
 	                                     contigs_fasta=self.contig_fasta,
 	                                     name_sep=name_sep,
@@ -858,7 +855,7 @@ def main(args, options):
 	                       options.allow_clipped_normal, options.support_min_mapped)
 
 if __name__ == '__main__':
-    usage = "Usage: %prog c2g_bam aligner contig_fasta(indexed) genome_file(indexed) out_dir"
+    usage = "Usage: %prog c2g_bam contig_fasta(indexed) genome_file(indexed) out_dir"
     parser = OptionParser(usage=usage, version=__version__)
     
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
@@ -893,7 +890,7 @@ if __name__ == '__main__':
     parser.add_option("--skip_contigs", dest="skip_contigs", help="text file of contig names to skip")
     
     (options, args) = parser.parse_args()
-    if len(args) == 5:
+    if len(args) == 4:
         main(args, options)
 
 

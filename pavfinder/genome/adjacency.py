@@ -912,7 +912,7 @@ class Adjacency:
 	return adjs_merged
         
     @classmethod
-    def realign(cls, adjs, out_dir, aligner, 
+    def realign(cls, adjs, out_dir, 
                 probe=False, subseq=False, 
                 contigs_fasta = None,
                 use_realigns=False, 
@@ -925,7 +925,6 @@ class Adjacency:
 	Args:
 	    adjs: (list) Adjacencies for extracting sequences
 	    out_dir: (str) full path of output directory for storing sequences and alignments
-	    aligner: (str) Name of aligner (gmap, bwa_mem)
 	    probe: (boolean) Align probe sequence. Default: None
 	    subseq: (boolean) Align subsequences. Default: None
 	    contigs_fasta: (pysam.fastafile) For extracting sub-sequences
@@ -960,7 +959,6 @@ class Adjacency:
 	    for i in range(len(subseqs)):
 		out.write('>%s%s%s%s%d\n%s\n' % (adj.contigs[0], name_sep, adj.key(), name_sep, i, subseqs[i]))
 	    
-	import gmap
 	import bwa_mem
 		
 	prefix = 'realign'
@@ -977,9 +975,6 @@ class Adjacency:
 	# run aligner
 	realign_bam_file = '%s/%s.bam' % (out_dir, prefix)
 	if not use_realigns:
-	    if aligner == 'gmap':
-		return_code = gmap.run(out_file, realign_bam_file, genome, index_dir, num_procs, multi=True)
-	    elif aligner == 'bwa_mem':
-		return_code = bwa_mem.run(out_file, realign_bam_file, genome, index_dir, num_procs)
+	    return_code = bwa_mem.run(out_file, realign_bam_file, genome, index_dir, num_procs)
 	
 	return realign_bam_file

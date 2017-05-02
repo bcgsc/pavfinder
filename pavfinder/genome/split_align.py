@@ -4,15 +4,14 @@ from intspan import intspan
 from sets import Set
 import sys
 import re
-from pavfinder.shared import gmap, bwa_mem
-from pavfinder.shared.adjacency import Adjacency
-from pavfinder.shared.alignment import compare_chr, Alignment, target_non_canonical
+import bwa_mem
+from adjacency import Adjacency
+from alignment import compare_chr, Alignment, target_non_canonical
 
-def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, max_splits=3, check_haplotype=True, debug=False):
+def find_chimera(alns, bam, min_coverage=0.95, check_alt_paths=False, max_splits=3, check_haplotype=True, debug=False):
     """Finds primary_aligns alignments corresponding to chimera
     
     Args:
-        aligner: (str) 'gmap', 'bwa_mem'
         bam: Pysam handle to bam file
     Returns:
         List of Alignments
@@ -58,10 +57,10 @@ def find_chimera(alns, aligner, bam, min_coverage=0.95, check_alt_paths=False, m
 	    
 	return None
 		
-    primary_aligns, secondary_aligns = {
-        #'gmap': gmap.find_chimera,
-        'bwa_mem': bwa_mem.find_chimera,
-        }[aligner](alns, bam, check_haplotype=check_haplotype, debug=debug)
+    primary_aligns, secondary_aligns = bwa_mem.find_chimera(alns, bam, check_haplotype=check_haplotype, debug=debug)
+    #primary_aligns, secondary_aligns = {
+        #'bwa_mem': bwa_mem.find_chimera,
+        #}[aligner](alns, bam, check_haplotype=check_haplotype, debug=debug)
     		    
     if primary_aligns:
 	if len(primary_aligns) > max_splits:
@@ -468,7 +467,7 @@ def get_contig_coverage(aligns, end_to_end=False):
     else:
 	return (max(span) - min(span) + 1) / float(aligns[0].query_len)
 
-def find_adjs(aligns, aligner, contig_seq, dubious=None, debug=False):
+def find_adjs(aligns, contig_seq, dubious=None, debug=False):
     """Create adjs given primary_aligns alignments
     
     Will also determine microhomology and untemplated sequences based on information
@@ -476,48 +475,33 @@ def find_adjs(aligns, aligner, contig_seq, dubious=None, debug=False):
     
     Args:
         aligns: (list) primary_aligns Alignments 
-	aligner: (str) 'gmap', 'bwa_mem'
 	contig_seq: (str) Contig sequence
 	
     Returns:
 	List of Adjacency objects
     """
-    adjs = []
-    
-    if aligner == 'gmap':
-	# assume gmap will only provide two-member chimera
-	homol_seq, homol_coords = gmap.find_microhomology(aligns[0].sam, contig_seq)
+    adjs = []			    
+    for i in range(1, len(aligns)):
+	homol_seq, homol_coords = bwa_mem.find_microhomology((aligns[i - 1], aligns[i]), contig_seq)	    
+	novel_seq = bwa_mem.find_untemplated_sequence((aligns[i - 1], aligns[i]), contig_seq)
+	adj = call_event(aligns[i - 1], aligns[i], 
+                         homol_seq=homol_seq, 
+                         homol_coords=homol_coords,
+                         novel_seq=novel_seq,
+                         contig_seq=contig_seq,
+                         debug=debug)
+	
+	adj.dubious = False
+	if dubious is not None and len(dubious) > 0:
+	    if i - 1 in dubious:
+		adj.aligns[0][0].dubious = True
+	    if i in dubious:
+		adj.aligns[0][1].dubious = True
+	    adj.dubious = True
 	    
-	for i in range(1, len(aligns)):
-	    adj = call_event(aligns[i - 1], aligns[i], 
-	                     homol_seq=homol_seq, homol_coords=homol_coords, 
-	                     contig_seq=contig_seq, debug=debug)
-	    if adj is not None:
-		adj.event_id = str(len(adjs) + 1)
-		adjs.append(adj)
-			    
-    elif aligner == 'bwa_mem':
-	for i in range(1, len(aligns)):
-	    homol_seq, homol_coords = bwa_mem.find_microhomology((aligns[i - 1], aligns[i]), contig_seq)	    
-	    novel_seq = bwa_mem.find_untemplated_sequence((aligns[i - 1], aligns[i]), contig_seq)
-	    adj = call_event(aligns[i - 1], aligns[i], 
-	                     homol_seq=homol_seq, 
-	                     homol_coords=homol_coords,
-	                     novel_seq=novel_seq,
-	                     contig_seq=contig_seq,
-	                     debug=debug)
-	    
-	    adj.dubious = False
-	    if dubious is not None and len(dubious) > 0:
-		if i - 1 in dubious:
-		    adj.aligns[0][0].dubious = True
-		if i in dubious:
-		    adj.aligns[0][1].dubious = True
-		adj.dubious = True
-		
-	    if adj is not None:
-		adj.event_id = str(len(adjs) + 1)
-		adjs.append(adj)	
+	if adj is not None:
+	    adj.event_id = str(len(adjs) + 1)
+	    adjs.append(adj)	
 		
     return adjs
 

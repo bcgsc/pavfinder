@@ -2,15 +2,15 @@ from optparse import OptionParser
 import re
 from sets import Set
 import pysam
-from pavfinder.shared.alignment import Alignment, reverse_complement
-from pavfinder.shared.adjacency import Adjacency
-from pavfinder.shared import gmap, bwa_mem
+from alignment import Alignment, reverse_complement
+from adjacency import Adjacency
+import bwa_mem
 
-def find_single_unique(alns, aligner, bam, debug=False):
-    return {
-        'gmap': gmap.find_single_unique,
-        'bwa_mem': bwa_mem.find_single_unique,
-    }[aligner](alns, bam, debug=debug)
+def find_single_unique(alns, bam, debug=False):
+    return bwa_mem.find_single_unique(alns, bam, debug=debug)
+    #return {
+        #'bwa_mem': bwa_mem.find_single_unique,
+    #}[aligner](alns, bam, debug=debug)
     
 def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False, query_fasta=None, target_fasta=None):
     adjs = []
