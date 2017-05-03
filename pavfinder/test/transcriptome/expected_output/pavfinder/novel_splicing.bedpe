@@ -1,0 +1,3 @@
+#pavfinder 0.4.0
+#2017-05-03:13:26:49 /home/rchiu/work/git/pavfinder/pavfinder/scripts/map_splice.py /home/rchiu/work/git/pavfinder/pavfinder/test/transcriptome/c2g.bam /home/rchiu/work/git/pavfinder/pavfinder/test/transcriptome/test.fa /home/rchiu/work/git/pavfinder/pavfinder/test/transcriptome/refGene.sorted.gtf.gz /projects/btl/trans-abyss/public_releases/v1.4.8/annotations/hg19/hg19.fa /home/rchiu/work/git/pavfinder/pavfinder/test/transcriptome/expected_output/pavfinder/ --r2c /home/rchiu/work/git/pavfinder/pavfinder/test/transcriptome/r2c.bam
+chrom1	start1	end1	chrom2	start2	end2	name	score	strand1	strand2	event	gene	transcript	size	exon1	exon2	seq_id	seq_breaks	in_frame	probe	support_reads
