@@ -1,9 +1,6 @@
 Data is provided for testing the detection of genome structural variants, transcriptome structural and splice variants, and the TAP targeted pipeline.  
 
 ## pavfinder genome
-```
-python find_sv_genome.py test.bam bwa_mem test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
-```
 * input `test/genome`
   * `test.fa`: 
     * 2 sequences corresponding to a reciprocal translocation event, 
@@ -20,9 +17,6 @@ python find_sv_genome.py test.bam bwa_mem test.fa /path/to/hg19.fa /path/to/outp
 ```
 
 ## pavfinder transcriptome
-```
-python find_sv_transcriptome.py --gbam c2g.bam --tbam c2t.bam --transcripts_fasta refGene.fa --genome_index /path/to/gmapdb hg19 --r2c r2c.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to/output_directory
-```
 * input `test/transcriptome/`
   * `test.fa`:
     * one NUP98/NSD1 fusion
@@ -41,10 +35,11 @@ python find_sv_transcriptome.py --gbam c2g.bam --tbam c2t.bam --transcripts_fast
   * `junctions.bed`: all exon junctions with read-depth
   * `mappings.tsv`: gene/transcript coverage by each contig sequence
 
+```
+python find_sv_transcriptome.py --gbam c2g.bam --tbam c2t.bam --transcripts_fasta refGene.fa --genome_index /path/to/gmapdb hg19 --r2c r2c.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to/output_directory
+```
+
 ## tap
-```
-python tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
-```
 * input `test/transcriptome`
   * `test_1.fastq.gz`, `test_2.fastq.gz`
   * `test.cfg`: 
@@ -53,3 +48,6 @@ python tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fast
   
 * output `test/transcriptome/expected_output/tap/`
 
+```
+python tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
+```
