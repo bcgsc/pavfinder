@@ -4,20 +4,21 @@ set -euo pipefail
 script_dir=`dirname $0`
 script_name=`basename $0`
 
-version=$(python $script_dir/find_sv.py --version)
+version=$(python $script_dir/find_sv_genome.py --version)
 
 function usage {
-	echo Program: $script_name
-	echo Version: $version
+	echo $script_name $version
 	echo
-	echo "Usage: $script_name <sample> [options]" 
+	echo "Usage: $script_name <type> [options]" 
+	echo "<type>:"
+	echo "genome - find structural variants from genome assembly"
+	echo "fusion - find gene fusions, indels, PTDs, ITDs from transcriptome assembly"
+	echo "splice - find novel splice variants and report transcript/exon mappings from transcriptome assembly"
 	echo
-	echo "sample:	genome		find structural variants"
-	echo "	transcriptome	find gene fusions, indels, PTDs, ITDs, novel splice variants"
+	echo "[options]: $script_name <type> [-h|--help]"
 }
 
-if [ $# -gt 0 ]
-then
+if [ $# -gt 0 ]; then
 	sample=$1
 	shift
 else
@@ -25,23 +26,28 @@ else
 	exit 1
 fi
 
-if [ $sample = "transcriptome" ]
-then
-	if [ $# -gt 0 ]
-	then
-		python $script_dir/map_transcripts.py $@
+args=("$@")
+
+if [ $sample = "fusion" ]; then
+	if [[ $# -eq 0 || ( $# -eq 1 && ( "${args[0]}" = "--help" || "${args[0]}" = "-h" ) ) ]]; then
+		msg=$(python $script_dir/find_sv_transcriptome.py --help);
+		echo "$msg" | sed 's/find_sv_transcriptome.py/pavfinder fusion/';
 	else
-		msg=$(python $script_dir/map_transcripts.py --help)
-		echo "$msg" | sed 's/map_transcripts.py/pavfinder transcriptome/'
+		python $script_dir/find_sv_transcriptome.py $@
 	fi
-elif [ $sample = "genome" ]
-then
-	if [ $# -gt 0 ]
-	then
-		python $script_dir/find_sv.py $@
+elif [ $sample = "splice" ]; then
+    if [[ $# -eq 0 || ( $# -eq 1 && ( "${args[0]}" = "--help" || "${args[0]}" = "-h" ) ) ]]; then
+		msg=$(python $script_dir/map_splice.py --help);
+		echo "$msg" | sed 's/map_splice.py/pavfinder splice/';
 	else
-		msg=$(python $script_dir/find_sv.py --help)
-		echo "$msg" | sed 's/find_sv.py/pavfinder genome/'
+		python $script_dir/map_splice.py $@
+	fi
+elif [ $sample = "genome" ]; then
+	if [[ $# -eq 0 || ( $# -eq 1 && ( "${args[0]}" = "--help" || "${args[0]}" = "-h" ) ) ]]; then
+		msg=$(python $script_dir/find_sv_genome.py --help);
+		echo "$msg" | sed 's/find_sv_genome.py/pavfinder genome/';
+	else
+		python $script_dir/find_sv_genome.py $@
 	fi
 else
 	usage
