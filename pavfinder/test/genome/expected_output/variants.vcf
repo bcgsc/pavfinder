@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.2
-##fileDate=20170503
-##source=pavfinder_v0.4.0
+##fileDate=20170505
+##source=pavfinder 0.4.0
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
 ##INFO=<ID=EVENTTYPE,Number=1,Type=String,Description="Type of structural variant when breakend notation is used">
 ##INFO=<ID=PARID,Number=1,Type=String,Description="ID of partner breakend">

@@ -10,7 +10,7 @@ Data is provided for testing the detection of genome structural variants, transc
   * `test.bam`: bwa mem alignment of `test.fa` to hg19
 
 * output `test/genome/expected_output`
-  * `adjacencies.tsv`, `variants.vcf`
+  * `adjacencies.bedpe`, `variants.vcf`
 
 ```
 python find_sv_genome.py test.bam test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
