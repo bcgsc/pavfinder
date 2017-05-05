@@ -13,7 +13,7 @@ Data is provided for testing the detection of genome structural variants, transc
   * `adjacencies.tsv`, `variants.vcf`
 
 ```
-python find_sv_genome.py test.bam bwa_mem test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
+python find_sv_genome.py test.bam test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
 ```
 
 ## pavfinder transcriptome

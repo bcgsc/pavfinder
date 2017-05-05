@@ -25,7 +25,7 @@ setup(
         'pandas',
         'biopython',
         ],
-    package_data = {'pavfinder': ['test/*', 'scripts/*.py']},
+    package_data = {'pavfinder': ['test/*', 'scripts/*']},
     data_files = [('config', ['pavfinder/cfg/tap.cfg']), ('test', ["pavfinder/test/*"])],
     scripts = ['pavfinder/scripts/pavfinder',
                'pavfinder/scripts/check_support.py',
