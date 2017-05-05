@@ -9,7 +9,6 @@ import pysam
 from collections import defaultdict
 from pybedtools import BedTool
 import pavfinder as pv
-from pavfinder import __version__
 from pavfinder.genome import gapped_align
 from pavfinder.genome import split_align
 from pavfinder.genome.adjacency import Adjacency
@@ -875,7 +874,7 @@ def main(args, options):
 
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam contig_fasta(indexed) genome_file(indexed) out_dir"
-    parser = OptionParser(usage=usage, version=__version__)
+    parser = OptionParser(usage=usage, version=pv.__version__)
     
     parser.add_option("-b", "--r2c_bam", dest="r2c_bam_file", help="reads-to-contigs bam file")
     parser.add_option("-g", "--genome", dest="genome", help="genome")
