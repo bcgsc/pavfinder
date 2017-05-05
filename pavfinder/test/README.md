@@ -13,7 +13,7 @@ Data is provided for testing the detection of genome structural variants, transc
   * `adjacencies.bedpe`, `variants.vcf`
 
 ```
-python find_sv_genome.py test.bam test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
+pavfinder genome test.bam test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
 ```
 
 ## pavfinder transcriptome
@@ -36,7 +36,8 @@ python find_sv_genome.py test.bam test.fa /path/to/hg19.fa /path/to/output_direc
   * `mappings.tsv`: gene/transcript coverage by each contig sequence
 
 ```
-python find_sv_transcriptome.py --gbam c2g.bam --tbam c2t.bam --transcripts_fasta refGene.fa --genome_index /path/to/gmapdb hg19 --r2c r2c.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to/output_directory
+pavfinder fusion --gbam c2g.bam --tbam c2t.bam --transcripts_fasta refGene.fa --genome_index /path/to/gmapdb hg19 --r2c r2c.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to/output_directory
+pavfinder splice c2g.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to/output_directory --r2c r2c.bam
 ```
 
 ## tap
