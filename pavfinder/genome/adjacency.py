@@ -414,6 +414,38 @@ class Adjacency:
                    )
         return '\t'.join(headers)
     
+    @classmethod
+    def show_bedpe_headers(cls):
+	headers = ('chrom1',
+	           'start1',
+	           'end1',
+	           'chrom2',
+	           'start2',
+	           'end2',
+	           'name',
+	           'score',
+	           'strand1',
+	           'strand2',
+                   'orient1',
+                   'orient2',
+	           'event',
+                   'size',
+                   'contig',
+                   'contig-break1',
+                   'contig-break2',
+	           'homol_seq',
+	           'homol_coord1',
+	           'homol_coord2',
+	           'novel_seq',
+	           'repeat_seq',
+	           'repeat_num',
+	           'repeat_change',
+	           'probe',
+	           'spanning_reads',
+	           'flanking_pairs',
+                   )
+	return '#' + '\t'.join(headers)
+
     def as_tab(self):        
         outputs = []
 	
@@ -502,18 +534,35 @@ class Adjacency:
     
     def as_bedpe(self):
 	data = []
+	custom_fields = self.as_tab().split('\t')
+
 	for i in range(len(self.chroms)):
 	    data.append(self.chroms[i])
 	    data.append(str(self.breaks[i] - 1))
 	    data.append(str(self.breaks[i]))
-	data.append(self.key())
+	#data.append(self.key())
+	# name == ID
+	data.append(custom_fields[0])
 	data.append('.')
-	for i in range(len(self.orients)):
-	    if i == 'L':
-		data.append('+')
-	    else:
-		data.append('-')
-		
+	data.append('+')
+	data.append('+')
+
+	# 2 orients
+	data.append(custom_fields[4])
+	data.append(custom_fields[7])
+
+	# event
+	data.append(custom_fields[1])
+
+	# rest of fields, starting from 'size'
+	data.extend(custom_fields[8:])
+
+	#for i in range(len(self.orients)):
+	    #if i == 'L':
+		#data.append('+')
+	    #else:
+		#data.append('-')
+
 	return '\t'.join(data)
     
     def get_contig_support_span(self, contig_index):

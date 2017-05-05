@@ -4,9 +4,11 @@ from sets import Set
 import sys
 import os
 import re
+import datetime
 import pysam
 from collections import defaultdict
 from pybedtools import BedTool
+import pavfinder as pv
 from pavfinder import __version__
 from pavfinder.genome import gapped_align
 from pavfinder.genome import split_align
@@ -607,7 +609,7 @@ class SVFinder:
 	for failed_var in failed_variants:
 	    self.variants.remove(failed_var)
 		        
-    def output(self, reference_url=None, assembly_url=None, insertion_as_breakends=None):
+    def output(self, reference_url=None, assembly_url=None, insertion_as_breakends=None, header=None):
 	"""Wrapper function to output Variants and Adjacencies
 	Args:
 	    only_somatic: (boolean) Only outputs somatic variants/adjacencies
@@ -618,24 +620,31 @@ class SVFinder:
 	variants = [variant for variant in self.variants if not variant.filtered_out]
 	#if only_somatic:
 	    #variants = [variant for variant in variants if variant.somatic]
-	    
-	#if variants:
+
+	source = 'NA'
+	if header is not None and header.has_key('software'):
+	    source = header['software']
 	self.output_variants(variants, 
                              '%s/variants.vcf' % self.out_dir, 
                              reference_url=reference_url, 
                              assembly_url=assembly_url, 
                              insertion_as_breakends=insertion_as_breakends,
+	                     source=source,
 	                     )
     
 	adjs = []
 	for variant in variants:
 	    adjs.extend(variant.adjs)
 	    
+	header = '#%s\n#%s %s' % (header['software'],
+	                          header['time'],
+	                          header['cmd'])
 	self.output_adjacencies(adjs, 
-                                '%s/adjacencies.tsv' % self.out_dir, 
-                                format='tab')
+                                '%s/adjacencies.bedpe' % self.out_dir,
+                                format='bedpe',
+	                        header=header)
 		                         	
-    def output_variants(self, variants, out_file, reference_url=None, assembly_url=None, insertion_as_breakends=False):
+    def output_variants(self, variants, out_file, reference_url=None, assembly_url=None, insertion_as_breakends=False, source='NA'):
 	"""Output variants in VCF format
 	Args:
 	    variants: (List) Variants
@@ -652,7 +661,7 @@ class SVFinder:
 		records.extend(output.split('\n'))	
 		
 	out = open(out_file, 'w')
-	out.write('%s\n' % VCF.header(source='pavfinder_v%s' % __version__, reference_url=reference_url, assembly_url=assembly_url))
+	out.write('%s\n' % VCF.header(source=source, reference_url=reference_url, assembly_url=assembly_url))
 	# sort by chromosome and pos
 	records.sort(key=lambda record: (record.split('\t')[0], record.split('\t')[1]))
 	for record in records:
@@ -671,12 +680,13 @@ class SVFinder:
 		out.write('>%s %d\n%s\n' % (adj.id, len(adj.probes[0]), adj.probes[0]))
 	out.close()
 	
-    def output_adjacencies(self, adjs, out_file, format):
+    def output_adjacencies(self, adjs, out_file, format, header=None):
 	"""Output adjacencies in tsv format
 	Args:
 	    adjs: (List) Adjacencies
 	    out_file: (str) absolute path of output file
 	    format: (str) either "tab" or "bedpe"
+	    header: (str) header string
 	"""
 	fn = None
 	args = ()
@@ -684,11 +694,16 @@ class SVFinder:
 	    fn = 'as_bedpe'
 	elif format == 'tab':
 	    fn = 'as_tab'
-	    	    
+
 	if not fn is None:
 	    out = open(out_file, 'w')
+	    if header is not None:
+		out.write(header + '\n')
+
 	    if format == 'tab':
 		out.write('%s\n' % Adjacency.show_tab_headers())
+	    elif format == 'bedpe':
+		out.write('%s\n' % Adjacency.show_bedpe_headers())
 		
 	    for adj in adjs:	    
 		output = getattr(adj, fn)(*args)
@@ -844,9 +859,13 @@ def main(args, options):
 	sv_finder.screen_realigns(use_realigns=options.use_realigns)
             
     # output
+    cmd = ' '.join(sys.argv)
+    time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+    software = '%s %s' % (pv.__name__, pv.__version__)
     sv_finder.output(reference_url=options.reference_url,
                      assembly_url=options.assembly_url,
                      insertion_as_breakends=options.insertion_as_breakends,
+                     header={'cmd': cmd, 'time':time, 'software':software},
                      )
     
     if options.r2c_bam_file:
