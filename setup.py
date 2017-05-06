@@ -1,6 +1,7 @@
 import os
 from setuptools import setup, find_packages
-execfile(os.path.dirname(os.path.realpath(__file__)) + "/pavfinder/version.py")
+from pavfinder import __version__
+
 setup(
     name='pavfinder',
     version=__version__,
