@@ -30,7 +30,7 @@ setup(
     data_files = [('config', ['pavfinder/cfg/tap.cfg']), 
                   ('test/genome', ["pavfinder/test/genome/test.bam",
                                    "pavfinder/test/genome/test.fa",
-                                   "pavfinder/test/genome/test.fai"]),
+                                   "pavfinder/test/genome/test.fa.fai"]),
                   ('test/genome/expected_output', ["pavfinder/test/genome/expected_output/adjacencies.bedpe",
                                                    "pavfinder/test/genome/expected_output/variants.vcf"]),
                   ('test/transcriptome', ["pavfinder/test/transcriptome/c2g.bam",
