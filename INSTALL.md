@@ -21,6 +21,5 @@ Install the following Python packages (e.g. using `pip insall`)
 $ pip install virtualenv
 $ virtualenv <DIR>
 $ source <DIR>/bin/activate
-$ pip install -U cython
 $ pip install git+https://github.com/bcgsc/pavfinder.git#egg=pavfinder
 ```
