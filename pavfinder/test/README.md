@@ -47,7 +47,7 @@ pavfinder splice c2g.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to
     * full paths to `genome_fasta` and `genome_index`(GMAP hg19 index) must be specified
     * full paths to downloaded `refGene.fa` and `refGene.sorted.gtf.gz` can be specified for `transcripts_fasta` and `gtf`
   
-* output `test/transcriptome/expected_output/tap/`
+* output `test/transcriptome/expected_output/tap.tar.gz`
 
 ```
 python tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
