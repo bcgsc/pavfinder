@@ -8,7 +8,7 @@ Data is provided for testing the detection of genome structural variants, transc
     * 1 250bp insertion where the entire insertion sequence is captured,
     * 1 3.6kb deletion
     * 1 13kb duplication
-    * 1 860bp inversion
+    * 2 sequences corresponding to a 860bp inversion
     * 1 tri-nucleotide length polymorphism
   * `test.bam`: bwa mem alignment of `test.fa` to hg19
 
