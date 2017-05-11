@@ -25,6 +25,8 @@ setup(
         'numpy>=1.9.2',
         'pandas',
         'biopython',
+        'ruffus',
+        'python-igraph',
         ],
     package_data = {'pavfinder': ['test/*', 'scripts/*']},
     data_files = [('config', ['pavfinder/cfg/tap.cfg']), 
