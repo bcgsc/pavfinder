@@ -14,6 +14,8 @@ Install the following Python packages (e.g. using `pip insall`)
 - [pybedtools](https://daler.github.io/pybedtools/)
 - [intspan](https://pypi.python.org/pypi/intspan/)
 - [biopython](http://biopython.org/) (optional for transcriptome analysis)
+- [ruffus](http://www.ruffus.org.uk/) (for running TAP)
+- [python-igraph](http://igraph.org/python/) (for running TAP/Trans-ABySS)
 
 ## Install PAVFinder in virtualenv
 
