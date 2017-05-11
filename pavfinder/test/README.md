@@ -5,8 +5,11 @@ Data is provided for testing the detection of genome structural variants, transc
   * `test.fa`: 
     * 2 sequences corresponding to a reciprocal translocation event, 
     * 5-kb insertions where only breakpoints are captured,
-    * 1 250bp insertion where the entire insertion sequence is captured, and 
-    * 1 potential tri-nucleotide length polymorphism
+    * 1 250bp insertion where the entire insertion sequence is captured,
+    * 1 3.6kb deletion
+    * 1 13kb duplication
+    * 1 860bp inversion
+    * 1 tri-nucleotide length polymorphism
   * `test.bam`: bwa mem alignment of `test.fa` to hg19
 
 * output `test/genome/expected_output`
