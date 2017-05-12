@@ -585,7 +585,7 @@ def find_sv(inputs, events_output):
     """Finds structural variants using PAVFinder_transcriptome"""
     merged_fasta, c2g_bam, c2t_bam, r2c_index = inputs
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'find_sv.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s' % (c2g_bam,
+        cmd = 'find_sv_transcriptome.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s' % (c2g_bam,
                                                                                                     c2t_bam,
                                                                                                     params['alignments']['transcripts_fasta'],
                                                                                                     ' '.join(params['alignments']['genome_index']),
