@@ -1,7 +1,7 @@
 Data is provided for testing the detection of genome structural variants, transcriptome structural and splice variants, and the TAP targeted pipeline.  
 
 ## pavfinder genome
-* input `test/genome`
+* input `genome`
   * `test.fa`: 
     * 2 sequences corresponding to a reciprocal translocation event, 
     * 5-kb insertions where only breakpoints are captured,
@@ -12,7 +12,7 @@ Data is provided for testing the detection of genome structural variants, transc
     * 1 tri-nucleotide length polymorphism
   * `test.bam`: bwa mem alignment of `test.fa` to hg19
 
-* output `test/genome/expected_output`
+* output `genome/expected_output`
   * `adjacencies.bedpe`, `variants.vcf`
 
 ```
@@ -20,19 +20,25 @@ pavfinder genome test.bam test.fa /path/to/hg19.fa /path/to/output_directory --m
 ```
 
 ## pavfinder transcriptome
-* input `test/transcriptome/`
+* input `transcriptome`
   * `test.fa`:
-    * one NUP98/NSD1 fusion
-    * one FLT3 internal tandem duplication (ITD)
-    * one KMT2A partial tandem duplication (PTD)
-    * one NPM1 insertion
+    * 1 NUP98/NSD1 fusion
+    * 1 EIF4E3-FOXP1 read_through
+    * 1 FLT3 internal tandem duplication (ITD)
+    * 1 KMT2A partial tandem duplication (PTD)
+    * 1 NPM1 insertion
+    * 2 CEBPA deletions
+    * 1 ATXN3 trinucleotide-repeat expansion polymorphism
+    * 1 CEBPA trinucleotide-repeat contraction polymorphism
+    * various FLT3 novel splicing events (skipped exons, novel splice donors/acceptors)
   * `c2g.bam`: GMAP alignment of `test.fa` to hg19
   * `c2t.bam`: BWA mem alignment of `test.fa` to `refGene.fa`
   * `r2c.bam`: BWA mem alignment of reads to `test.fa`
   * `refGene.fa`: refseq transcript sequences which `test.fa` align to
   * `refGene.sorted.gtf.gz`: refseq GTF file sorted and indexed by tabix
+  * `acembly.sorted.gtf.gz`: aceview GTF file as supplementary annotation for novel splicing detection
 
-* output`test/transcriptome/expected_output/pavfinder`:
+* output`transcriptome/expected_output/pavfinder`:
   * `sv.bedpe`: fusions, ITD, PTD, indel events
   * `novel_splicing.bed`: no novel splice events detected in given data
   * `junctions.bed`: all exon junctions with read-depth
@@ -44,14 +50,14 @@ pavfinder splice c2g.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to
 ```
 
 ## tap
-* input `test/transcriptome`
+* input `transcriptome`
   * `test_1.fastq.gz`, `test_2.fastq.gz`
   * `test.cfg`: 
-    * full paths to `genome_fasta` and `genome_index`(GMAP hg19 index) must be specified
-    * full paths to downloaded `refGene.fa` and `refGene.sorted.gtf.gz` can be specified for `transcripts_fasta` and `gtf`
-  
-* output `test/transcriptome/expected_output/tap.tar.gz`
+    * specify full paths to `genome_fasta` and `genome_index`(GMAP hg19 index)
+    * specify full paths to `transcripts_fasta`(`refGene.fa` provided) and `gtf`(`refGene.sorted.gtf.gz` provided)
+  * `test_genes.bf`: Bloom filter corresponding to the genes described above containing the various events
+* output `transcriptome/expected_output/tap.tar.gz`
 
 ```
-python tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
+tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
 ```
