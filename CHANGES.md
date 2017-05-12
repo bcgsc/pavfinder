@@ -33,3 +33,4 @@ v0.4.0
 - integrated [pavfinder_transcriptome](https://github.com/bcgsc/pavfinder_transcriptome)
 - changed defaults of `subseq_len` and `probe_len` in `find_sv_transcriptome.py` for detecting events in test data
 - changed `adjacencies.tsv` output from genome to `adjacencies.bedpe` to agree with transcriptome output
+- changed event label `repeat_reduction` to `repeat_contraction`
