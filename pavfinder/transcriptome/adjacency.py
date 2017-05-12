@@ -96,7 +96,7 @@ class Adjacency:
          ]
     )
 
-    event_types = ['fusion', 'read_through', 'ITD', 'PTD', 'dup', 'ins', 'del', 'dup_inv', 'repeat_expansion', 'repeat_reduction']
+    event_types = ['fusion', 'read_through', 'ITD', 'PTD', 'dup', 'ins', 'del', 'dup_inv', 'repeat_expansion', 'repeat_contraction']
 
     def __init__(self, seq_id, targets, seq_breaks, target_breaks,
                  chroms = None, genome_breaks = None, orients = None,

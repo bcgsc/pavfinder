@@ -314,7 +314,7 @@ class SVFinder:
 		    if filter_adj(adj):
 			events.append(adj)
 
-		    if adj.event in ('repeat_expansion', 'repeat_reduction'):
+		    if adj.event in ('repeat_expansion', 'repeat_contraction'):
 			if len(adj.repeat_seq) == 3 and\
 			   adj.transcripts and\
 			   not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
@@ -1465,7 +1465,7 @@ class SVFinder:
 		if old_seq is not None and new_seq is not None and old_seq.lower() == new_seq.lower():
 		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_start + 1), (copy_num_ref, copy_num_ref + copy_num_change))
 
-	    elif adj.event == 'repeat_reduction':
+	    elif adj.event == 'repeat_contraction':
 		old_seq = construct_seq(adj.chroms[0],
 	                                (repeat_start, repeat_end),
 	                                break_start = adj.genome_breaks[0] + 1,
@@ -1493,7 +1493,7 @@ class SVFinder:
 		repeat_start, repeat_end, repeat_seq, breaks, copy_num_change = shift_result
 		if adj.event == 'repeat_expansion':
 		    update_adj(breaks, repeat_seq, copy_num_change)
-		elif adj.event == 'repeat_reduction':
+		elif adj.event == 'repeat_contraction':
 		    update_adj((breaks[0] - 1, breaks[1] + 1), repeat_seq, copy_num_change)
 		break
 
@@ -1568,7 +1568,7 @@ class SVFinder:
 			adj.copy_num_change = (original_copy_num, original_copy_num + changed_copy_num)
 		    elif adj.rearrangement == 'del':
 			original_copy_num += changed_copy_num
-			adj.event = 'repeat_reduction'
+			adj.event = 'repeat_contraction'
 			adj.copy_num_change = (original_copy_num, original_copy_num - changed_copy_num)
 		    adj.repeat_seq = repeat.upper()
 
@@ -1824,7 +1824,7 @@ class SVFinder:
     @classmethod
     def set_frame(cls, adjs, query_fasta, genome_fasta):
 	for adj in adjs:
-	    # already set in repeat_expansion/reduction cases
+	    # already set in repeat_expansion/contraction cases
 	    if adj.in_frame:
 		continue
 
