@@ -450,6 +450,10 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta):
     canonical_motifs = Set()
     canonical_motifs.add('gtag')
     
+    # must be at least 1 bp separating the donor and acceptor
+    if acceptor_start - donor_start < 3:
+	return False
+
     donor_seq = ref_fasta.fetch(chrom, donor_start - 1, donor_start - 1 + 2)
     acceptor_seq = ref_fasta.fetch(chrom, acceptor_start - 1, acceptor_start - 1 + 2)
     
