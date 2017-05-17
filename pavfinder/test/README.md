@@ -20,7 +20,7 @@ Data is provided for testing the detection of genome structural variants, transc
   * `support.tsv`: intermediate results file of read support
 
 ```
-pavfinder genome test.bam test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
+pavfinder genome c2g.bam test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10 --r2c r2c.bam
 ```
 
 ## pavfinder transcriptome
