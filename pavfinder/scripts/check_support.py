@@ -5,21 +5,25 @@ import os
 from collections import OrderedDict, defaultdict
 from sets import Set
 import subprocess
-from pavfinder.shared.read_support import sum_support, filter_support
+from pavfinder.genome.read_support import sum_support, filter_support
 
-def parse_adjs(tsv):
+def parse_adjs(bedpe):
     adjs = []
-    with open(tsv, 'r') as ff:
+    header = None
+    meta = ''
+    with open(bedpe, 'r') as ff:
         for line in ff:
-            cols = line.rstrip('\n').split('\t')
-            if cols[0] == 'ID':
+            cols = line.lstrip('#').rstrip('\n').split('\t')
+            if line[0] == '#' and cols[0] != 'chrom1':
+                meta += line
+            elif cols[0] == 'chrom1':
                 header = cols
-            else:
+            elif header and len(cols) == len(header):
                 adj = OrderedDict()
                 for i in range(len(cols)):
                     adj[header[i]] = cols[i]
                 adjs.append(adj)
-    return adjs
+    return adjs, meta
 
 def parse_variants(vcf):
     variants = []
@@ -62,7 +66,7 @@ def create_coords_file(adjs, vid_to_aid, out_file):
         for contig, start, end in zip(adj['contig'].split(','),
                                       adj['contig-break1'].split(','),
                                       adj['contig-break2'].split(',')):
-            coords[contig].append((start, end, adj['ID']))
+            coords[contig].append((start, end, adj['name']))
             
     with open(out_file, 'w') as out:
         for contig in sorted(coords.keys()):
@@ -100,7 +104,7 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
     failed_adjs = Set()
     adjs_by_id = {}
     for adj in adjs:
-        adjs_by_id[adj['ID']] = adj
+        adjs_by_id[adj['name']] = adj
         spanning, flanking = [], []
         for contig, start, end in zip(adj['contig'].split(','),
                                       adj['contig-break1'].split(','),
@@ -119,7 +123,7 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
             adj['flanking_pairs'] = None
 
         if not filter_support(adj['spanning_reads'], adj['flanking_pairs'], min_support, use_spanning=True):
-            failed_adjs.add(adj['ID'])
+            failed_adjs.add(adj['name'])
 
       
     failed_variants = Set()
@@ -162,9 +166,10 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
 def get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
                 min_overlap=None,
                 allow_clipped_support=False,
-                support_min_mapped=None):
-    import pavfinder.shared.read_support
-    script = '%s/read_support.py' % os.path.dirname(os.path.abspath(pavfinder.shared.read_support.__file__))
+                support_min_mapped=None,
+                debug=False):
+    import pavfinder.genome.read_support
+    script = '%s/read_support.py' % os.path.dirname(os.path.abspath(pavfinder.genome.read_support.__file__))
     cmd = "python %s %s %s %s %s -n %d" % (script,
                                            coords_file,
                                            bam_file,
@@ -177,29 +182,34 @@ def get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
         cmd += ' --support_min_mapped %s' % support_min_mapped
     if min_overlap is not None:
         cmd += ' --min_overlap %d' % min_overlap
+    if debug:
+        cmd += ' --debug'
     print cmd
     process = subprocess.Popen(cmd, shell=True)
     process.wait()
         
-def output(adjs, variants, adjs_failed, variants_failed, outdir, out_prefix=None):
+def output(adjs, variants, adjs_failed, variants_failed, outdir, out_prefix=None, adj_meta=None):
     if out_prefix is None:
-        out_file = '%s/adjacencies_filtered.tsv' % outdir
+        out_file = '%s/adjacencies_filtered.bedpe' % outdir
     else:
-        out_file = '%s/adjacencies_%s_filtered.tsv' % (outdir, out_prefix)
+        out_file = '%s/adjacencies_%s_filtered.bedpe' % (outdir, out_prefix)
     
-    with open(out_file, 'w') as tsv:
+    with open(out_file, 'w') as bedpe:
+        if adj_meta is not None:
+            bedpe.write(adj_meta)
+
         header = adjs[0].keys()
-        tsv.write('\t'.join(header) + '\n')
+        bedpe.write('#%s\n' % '\t'.join(header))
 
         by_id = {}
         for adj in adjs:
-            if adj['ID'] in adjs_failed:
+            if adj['name'] in adjs_failed:
                 continue
 
             cols = []
             for h in header:
                 cols.append(str(adj[h]))
-            tsv.write('\t'.join(cols) + '\n')
+            bedpe.write('\t'.join(cols) + '\n')
             by_id[cols[0]] = adj
         
     if out_prefix is None:
@@ -230,17 +240,19 @@ def output(adjs, variants, adjs_failed, variants_failed, outdir, out_prefix=None
 
 def gather_and_filter(adjs, variants, vid_to_aid, coords_file, contigs_fa,
                       bam_file, out_dir, out_prefix, num_procs,
-                      min_support, min_overlap, allow_clipped, support_min_mapped):
+                      min_support, min_overlap, allow_clipped, support_min_mapped,
+                      adj_meta=None, force=False, debug=False):
     # get support
     if out_prefix is None:
         support_file = '%s/support.tsv' % out_dir
     else:
         support_file = '%s/%s_support.tsv' % (out_dir, out_prefix)
-    if not os.path.exists(support_file):
+    if not os.path.exists(support_file) or force:
         get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
                     min_overlap=min_overlap,
                     allow_clipped_support=allow_clipped,
-                    support_min_mapped=support_min_mapped)
+                    support_min_mapped=support_min_mapped,
+                    debug=debug)
         print 'done getting support', bam_file
 
     # filter
@@ -252,16 +264,16 @@ def gather_and_filter(adjs, variants, vid_to_aid, coords_file, contigs_fa,
         adjs_failed, variants_failed = filter_events(adjs, variants, vid_to_aid, support, min_support)
 
         # output
-        output(adjs, variants, adjs_failed, variants_failed, out_dir, out_prefix=out_prefix)
+        output(adjs, variants, adjs_failed, variants_failed, out_dir, out_prefix=out_prefix, adj_meta=adj_meta)
 
 def subtract_events(out_dir):
-    tumor_adjs = parse_adjs(out_dir + '/adjacencies_tumor_filtered.tsv')
+    tumor_adjs, tumor_meta = parse_adjs(out_dir + '/adjacencies_tumor_filtered.bedpe')
     tumor_variants = parse_variants(out_dir + '/variants_tumor_filtered.vcf')
 
-    normal_adjs = parse_adjs(out_dir + '/adjacencies_normal_filtered.tsv')
+    normal_adjs, normal_meta = parse_adjs(out_dir + '/adjacencies_normal_filtered.bedpe')
 
-    tumor_adj_ids = Set([adj['ID'] for adj in tumor_adjs])
-    normal_adj_ids = Set([adj['ID'] for adj in normal_adjs])
+    tumor_adj_ids = Set([adj['name'] for adj in tumor_adjs])
+    normal_adj_ids = Set([adj['name'] for adj in normal_adjs])
     germline_adj_ids = tumor_adj_ids & normal_adj_ids
 
     # identify variants
@@ -274,7 +286,7 @@ def subtract_events(out_dir):
             if i in germline_adj_ids:
                 germline_variants.append(v)
 
-    output(tumor_adjs, tumor_variants, germline_adj_ids, germline_variants, out_dir, out_prefix='somatic')
+    output(tumor_adjs, tumor_variants, germline_adj_ids, germline_variants, out_dir, out_prefix='somatic', meta_adj=tumor_meta)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -282,7 +294,6 @@ def parse_args():
     parser.add_argument("bam", type=str, help="r2c bam file")
     parser.add_argument("contigs_fa", type=str, help="contig fasta file")
     parser.add_argument("--normal_bam", type=str, help="normal r2c bam file")
-    #parser.add_argument("--out_prefix", type=str, help="prefix of output file", default=None)
     parser.add_argument("--num_procs", help="Number of processes. Default: 5", default=5, type=int)
     parser.add_argument("--min_support", help="minimum read support. Default:2", type=int, default=2)
     parser.add_argument("--min_support_normal", help="minimum read support for normal. Default:2", type=int, default=2)
@@ -291,14 +302,16 @@ def parse_args():
     parser.add_argument("--allow_clipped", help="allow using clipped reads in gathering read support", action="store_true", default=False)
     parser.add_argument("--allow_clipped_normal", help="allow using clipped reads in gathering read support for normal bam", action="store_true", default=False)
     parser.add_argument("--support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped", type=float, default=None)
-    
+    parser.add_argument("--force", help="overwrite previous support output", action="store_true", default=False)
+    parser.add_argument("--debug", help="debug mode", action="store_true", default=False)
+
     args = parser.parse_args()
     return args
 
 def main():
     args = parse_args()
     
-    adjs = parse_adjs(args.sv_dir + '/adjacencies.tsv')
+    adjs, meta = parse_adjs(args.sv_dir + '/adjacencies.bedpe')
     variants = parse_variants(args.sv_dir + '/variants.vcf')
     print 'done parsing events'
     
@@ -319,7 +332,8 @@ def main():
     for bam_file, out_prefix, min_support, min_overlap, allow_clipped, support_min_mapped in support_args:
         gather_and_filter(adjs, variants, vid_to_aid, coords_file, args.contigs_fa,
                           bam_file, out_dir, out_prefix, args.num_procs,
-                          min_support, min_overlap, allow_clipped, support_min_mapped)
+                          min_support, min_overlap, allow_clipped, support_min_mapped,
+                          adj_meta=meta, force=args.force, debug=args.debug)
 
     if args.normal_bam:
         subtract_events(out_dir)
