@@ -1,4 +1,3 @@
-from optparse import OptionParser
 import pysam
 from intspan import intspan
 from sets import Set

@@ -1,4 +1,3 @@
-from optparse import OptionParser
 import re
 from sets import Set
 import pysam
