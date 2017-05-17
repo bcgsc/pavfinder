@@ -1,4 +1,3 @@
-#from optparse import OptionParser
 import argparse
 import sys
 import os
