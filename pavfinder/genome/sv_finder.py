@@ -708,15 +708,15 @@ class SVFinder:
 		    
 	    out.close()
 
-    def find_support(self, bam, min_support, min_overlap, allow_clipped=False,
+    def find_support(self, script, bam, min_support, min_overlap, allow_clipped=False,
                      normal_bam=None, min_support_normal=None, min_overlap_normal=None,
-                     allow_clipped_normal=False, min_ratio_mapped=None):
-	cmd = "python %s/check_support.py %s %s %s --num_procs %d" % (os.path.dirname(__file__),
-	                                                              self.out_dir,
-	                                                              bam,
-	                                                              self.contig_fasta_file,
-	                                                              self.num_procs,
-	                                                              )
+                     allow_clipped_normal=False, min_ratio_mapped=None, force=False, debug=False):
+	cmd = "python %s %s %s %s --num_procs %d" % (script,
+	                                             self.out_dir,
+	                                             bam,
+	                                             self.contig_fasta_file,
+	                                             self.num_procs,
+	                                             )
 	if min_support is not None:
 	    cmd += ' --min_support %d' % min_support
 	if allow_clipped:
@@ -735,6 +735,10 @@ class SVFinder:
 	    cmd += ' --min_overlap_normal %s' % min_overlap_normal
 	if allow_clipped_normal:
 	    cmd += ' --allow_clipped_normal'
+	if force:
+	    cmd += ' --force'
+	if debug:
+	    cmd += ' --debug'
 
 	print cmd
 	process = subprocess.Popen(cmd, shell=True)
