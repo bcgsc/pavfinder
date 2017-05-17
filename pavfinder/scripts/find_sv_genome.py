@@ -1,5 +1,6 @@
 from optparse import OptionParser
 import sys
+import os
 import datetime
 import pavfinder as pv
 from pavfinder.genome.sv_finder import SVFinder
@@ -45,9 +46,11 @@ def main(args, options):
                      )
     
     if options.r2c_bam_file:
-	sv_finder.find_support(options.r2c_bam_file, options.min_support, options.min_overlap, options.allow_clipped,
+	support_script = '%s/check_support.py' % (os.path.dirname(__file__))
+	sv_finder.find_support(support_script, options.r2c_bam_file,
+	                       options.min_support, options.min_overlap, options.allow_clipped,
 	                       options.normal_bam, options.min_support_normal, options.min_overlap_normal,
-	                       options.allow_clipped_normal, options.support_min_mapped)
+	                       options.allow_clipped_normal, options.support_min_mapped, force=options.force_support, debug=options.debug)
 
 if __name__ == '__main__':
     usage = "Usage: %prog c2g_bam contig_fasta(indexed) genome_file(indexed) out_dir"
@@ -83,6 +86,7 @@ if __name__ == '__main__':
     parser.add_option("--min_ctg_size", dest="min_ctg_size", help="minimum contig size. Default:0 (no screening)", type="int", default=0)
     parser.add_option("--bad_coords", dest="bad_coords", help="BED file for coordinates to screen out e.g. segdups")
     parser.add_option("--skip_contigs", dest="skip_contigs", help="text file of contig names to skip")
+    parser.add_option("--force_support", dest="force_support", help="overwrite previous read support if any", action="store_true", default=False)
     
     (options, args) = parser.parse_args()
     if len(args) == 4:
