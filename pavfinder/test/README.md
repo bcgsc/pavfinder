@@ -4,16 +4,20 @@ Data is provided for testing the detection of genome structural variants, transc
 * input `genome`
   * `test.fa`: 
     * 2 sequences corresponding to a reciprocal translocation event, 
-    * 5-kb insertions where only breakpoints are captured,
+    * 2 5-kb insertions where only breakpoints are captured,
     * 1 250bp insertion where the entire insertion sequence is captured,
     * 1 3.6kb deletion
     * 1 13kb duplication
     * 2 sequences corresponding to a 860bp inversion
     * 1 tri-nucleotide length polymorphism
-  * `test.bam`: bwa mem alignment of `test.fa` to hg19
+  * `c2g.bam`: bwa mem alignment of `test.fa` to hg19
+  * `r2c.bam`: bwa mem alignment of reads to `test.fa`
 
 * output `genome/expected_output`
-  * `adjacencies.bedpe`, `variants.vcf`
+  * `adjacencies.bedpe`, `variants.vcf`: events detected from contig sequences
+  * `adjacencies_filtered.bedpe`, `variants_filtered.vcf`: events with read support
+  * `coords.tsv`: intermediate file listing event contig coordinates for gathering read support
+  * `support.tsv`: intermediate results file of read support
 
 ```
 pavfinder genome test.bam test.fa /path/to/hg19.fa /path/to/output_directory --min_size 10
