@@ -22,7 +22,7 @@ def find_flanking(reads, span, contig_len, overlap_buffer=1, allow_clipped=False
 
     for read in [r for r in reads if not r.is_unmapped and r.tlen > 0]:
 	if read.qname + str(read.pos) in proper_pairs:
-	     # internal fragment
+	    # internal fragment
 	    frag = (read.pos + read.alen, read.pnext)
 
 	    if frag is not None and frag[0] <= span[0] - overlap_buffer and frag[1] >= span[1] + overlap_buffer:
@@ -250,7 +250,6 @@ def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=Fals
 
 	    results[contig][coord][0] = spanning
 	    results[contig][coord][1] = flanking
-	#print count, len(coords.keys()), contig_len
 
     return results, tlens_all
 
@@ -369,6 +368,7 @@ def main(args, options):
                                   False,
                                   options.allow_clipped_support,
                                   options.support_min_mapped,
+                                  debug=options.debug,
                                   ))
     pool = mp.Pool(processes=options.num_procs)
     batch_results = pool.map(worker, batches)
@@ -408,6 +408,7 @@ if __name__ == '__main__':
     parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
     parser.add_option("--allow_clipped_support", dest="allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
     parser.add_option("--support_min_mapped", dest="support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8", type='float', default=0.8)
+    parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
     (options, args) = parser.parse_args()
     if len(args) == 4:
         main(args, options)
