@@ -2,7 +2,7 @@ import pysam
 import sys
 import re
 from itertools import groupby, chain
-from optparse import OptionParser
+import argparse
 from sets import Set
 import multiprocessing as mp
 from intspan import intspan
@@ -349,28 +349,26 @@ def filter_support(spanning, flanking, min_support, use_spanning=True, use_flank
 
     return support >= min_support
 
-def main(args, options):
-    coords_file = args[0]
-        
+def main(args):
     coords = []
-    for line in open(coords_file, 'r'):
+    for line in open(args.coords, 'r'):
         cols = line.rstrip('\n').split()
         span = tuple(sorted((int(cols[1]), int(cols[2]))))
 	coords.append((cols[0], span[0], span[1], cols[3]))
     coords_sorted = sorted(coords, key=itemgetter(0,1,2))
             
-    batches = list(create_batches(args[1],
+    batches = list(create_batches(args.bam,
                                   coords_sorted,
-                                  len(coords_sorted)/options.num_procs,
-                                  options.min_overlap,
-                                  args[2],
+                                  len(coords_sorted)/args.num_procs,
+                                  args.min_overlap,
+                                  args.contigs,
                                   False,
                                   False,
-                                  options.allow_clipped_support,
-                                  options.support_min_mapped,
-                                  debug=options.debug,
+                                  args.allow_clipped_support,
+                                  args.support_min_mapped,
+                                  debug=args.debug,
                                   ))
-    pool = mp.Pool(processes=options.num_procs)
+    pool = mp.Pool(processes=args.num_procs)
     batch_results = pool.map(worker, batches)
     pool.close()
     pool.join()
@@ -396,19 +394,22 @@ def main(args, options):
                 results[contig] = {}
                 results[contig][coords] = (spanning, flanking, tiling, support_reads)
 
-    with open(args[3], 'w') as out:
+    with open(args.outfile, 'w') as out:
 	for contig in results.keys():
 	    for coords in results[contig]:
 		out.write('%s\n' % '\t'.join(map(str, [contig, coords, results[contig][coords][0], results[contig][coords][1]])))
 
 if __name__ == '__main__':
-    usage = "Usage: %prog coords_file bamfile contigs_fasta out_file"
-    parser = OptionParser(usage=usage)
-    parser.add_option("-n", "--num_procs", dest="num_procs", help="Number of processes. Default: 5", default=5, type=int)
-    parser.add_option("--min_overlap", dest="min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type='int', default=4)
-    parser.add_option("--allow_clipped_support", dest="allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
-    parser.add_option("--support_min_mapped", dest="support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8", type='float', default=0.8)
-    parser.add_option("--debug", dest="debug", help="debug mode", action="store_true", default=False)
-    (options, args) = parser.parse_args()
-    if len(args) == 4:
-        main(args, options)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("coords", type=str, help="coords tsv file")
+    parser.add_argument("bam", type=str, help="bam file")
+    parser.add_argument("contigs", type=str, help="contigs fasta file")
+    parser.add_argument("outfile", type=str, help="output file")
+    parser.add_argument("-n", "--num_procs", help="Number of processes. Default: 5", default=5, type=int)
+    parser.add_argument("--min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type=int, default=4)
+    parser.add_argument("--allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_argument("--support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8", type=float, default=0.8)
+    parser.add_argument("--debug", help="debug mode", action="store_true", default=False)
+
+    args = parser.parse_args()
+    main(args)
