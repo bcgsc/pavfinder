@@ -344,12 +344,6 @@ class Transcript:
 	    elif pos >= utr3[0] and pos <= utr3[1]:
 		return 3
 	return False
-    
-    @staticmethod
-    def abc():
-	print 'abc'
-	gg = BedTool("/projects/btl/TAP/annotation/refseq_hg19.refGene.genePred.utr_cds.sorted.2014-08-21.gtf.gz")
-	print gg
 
     @staticmethod
     def extract_transcripts(annotation_file):
@@ -362,12 +356,9 @@ class Transcript:
 	    List of Transcripts with exon info, strand
 	"""
 	transcripts = {}
-	ee = BedTool(annotation_file)
 	for feature in BedTool(annotation_file):
 	    if feature[2] == 'exon':
 		exon = (int(feature.start) + 1, int(feature.stop))
-		#if feature.attrs.has_key('exon_number'):
-		    #exon_num = int(feature.attrs['exon_number'])
 		transcript_id = feature.attrs['transcript_id']
 		gene = None
 		if feature.attrs.has_key('gene_name'):
