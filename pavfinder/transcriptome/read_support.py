@@ -2,7 +2,7 @@ import pysam
 import sys
 import re
 from itertools import groupby, chain
-from optparse import OptionParser
+import argparse
 from sets import Set
 import multiprocessing as mp
 from intspan import intspan
@@ -512,11 +512,9 @@ def expand_contig_breaks(chrom, breaks, contig, contig_breaks, event, ref_fasta,
     return tuple(contig_breaks_expanded)
 
 
-def main(args, options):
-    coords_file = args[0]
-        
+def main(args):
     coords = {}
-    for line in open(coords_file, 'r'):
+    for line in open(args.coords, 'r'):
         cols = line.rstrip('\n').split()
         span = tuple(sorted((int(cols[1]), int(cols[2]))))
                     
@@ -527,17 +525,17 @@ def main(args, options):
             
     contigs = coords.keys()
     
-    batches = list(create_batches(args[1], coords, contigs, len(contigs)/options.num_procs))
-    pool = mp.Pool(processes=options.num_procs)
+    batches = list(create_batches(args.bam, coords, contigs, len(contigs)/args.num_procs))
+    pool = mp.Pool(processes=args.num_procs)
     supports = pool.map(worker, batches)
     
     pool.close()
     pool.join()
     
 if __name__ == '__main__':
-    usage = "Usage: %prog coords_file bamfile"
-    parser = OptionParser(usage=usage)
-    parser.add_option("-n", "--num_procs", dest="num_procs", help="Number of processes. Default: 5", default=5, type=int)
-    (options, args) = parser.parse_args()
-    if len(args) == 2:
-        main(args, options)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("coords", type=str, help="coords file")
+    parser.add_argument("bam", type=str, help="bam file")
+    parser.add_argument("-n", "--num_procs", help="Number of processes. Default: 5", default=5, type=int)
+    args = parser.parse_args()
+    main(args)
