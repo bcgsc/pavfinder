@@ -20,7 +20,7 @@ setup(
     packages=find_packages(),
     install_requires = [
         'pysam>=0.8.1',
-        'pybedtools>=0.6.9',
+        'pybedtools>=0.7.0',
         'intspan>=0.701',
         'numpy>=1.9.2',
         'pandas',
