@@ -249,6 +249,12 @@ class SVFinder:
 	    partially_aligned = None
 	    if len(aligns) == 1:
 		partially_aligned = aligns[0].is_partial(query_seq)
+	    else:
+		query_spans = intspan()
+		for align in aligns:
+		    query_spans.add('%s-%s' % (align.qstart, align.qend))
+		if max(query_spans) - min(query_spans) + 1 < len(query_seq):
+		    partially_aligned = True
 	    
 	    aligns_mapped = 0
 	    block_matches = None
@@ -285,7 +291,7 @@ class SVFinder:
 			# reset block matches for process_split_aligns()
 			block_matches = None
 
-	    if partially_aligned:
+	    if partially_aligned and len(aligns) == 1:
 		if external_mappings is None or\
 		   not external_mappings.has_key(query) or\
 		   (external_mappings[query] and\
