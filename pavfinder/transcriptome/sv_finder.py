@@ -504,6 +504,7 @@ class SVFinder:
     def filter_subseqs(cls, events, query_fa, genome_index_dir, genome_index, working_dir, subseq_len=None, debug=False):
 	def create_query_fasta(events, fa_file, min_size=20):
 	    count = 0
+	    sizes = {}
 	    fa = open(fa_file, 'w')
 	    for event in events:
 		# don't check splicing events
@@ -518,11 +519,13 @@ class SVFinder:
 		    continue
 		
 		for i in range(len(subseqs)):
-		    fa.write('>%s:%s:%d\n%s\n' % (seq_id, event.key(), i, subseqs[i]))
+		    query_name = '%s:%s:%d' % (seq_id, event.key(), i)
+		    fa.write('>%s\n%s\n' % (query_name, subseqs[i]))
+		    sizes[query_name] = len(subseqs[i])
 		    count += 1
 		
 	    fa.close()
-	    return count
+	    return count, sizes
 	
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/subseqs.bam' % working_dir
@@ -547,10 +550,10 @@ class SVFinder:
 	    else:
 		return None
 	    
-	def is_mapped(aln, min_aligned):
+	def is_mapped(aln, size, min_aligned):
 	    if not aln.is_unmapped and int(aln.get_tag('NM')) == 0:
 		mapped_size = sum([t[1] for t in aln.cigartuples if t[0] == 0])
-		if float(mapped_size)/aln.infer_query_length() >= min_aligned:
+		if float(mapped_size)/size >= min_aligned:
 		    return True
 		else:
 		    return False
@@ -563,7 +566,7 @@ class SVFinder:
 		return True
 	    return False
 	
-	def parse_and_filter(bam, window=100):
+	def parse_and_filter(bam, sizes, window=100):
 	    events_by_query = collections.defaultdict(list)
 	    for i in range(len(events)):
 		seq_id = events[i].seq_id.split(',')[0]
@@ -581,7 +584,7 @@ class SVFinder:
 
 		alns = list(group)
 		
-		mapped_alns = [aln for aln in alns if is_mapped(aln, 1.0)]
+		mapped_alns = [aln for aln in alns if is_mapped(aln, sizes[query], 1.0)]
 		if mapped_alns:
 		    subseq_align_tallies[query] = 0
 		    matched = []
@@ -637,10 +640,10 @@ class SVFinder:
 		del events[i]
 	
 	query_fa_file = '%s/subseqs.fa' % working_dir
-	count = create_query_fasta(events, query_fa_file)
+	count, sizes = create_query_fasta(events, query_fa_file)
 	if count > 0:
 	    bam = run_align(query_fa_file)
-	    parse_and_filter(bam)
+	    parse_and_filter(bam, sizes)
 
 	    if not debug:
 		os.remove(bam.filename)
