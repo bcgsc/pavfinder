@@ -35,3 +35,7 @@ v0.4.0
 - changed `adjacencies.tsv` output from genome to `adjacencies.bedpe` to agree with transcriptome output
 - changed event label `repeat_reduction` to `repeat_contraction`
 - increased maximum microhomology from 5 to 10 for transcriptome analysis
+
+v0.4.1
+
+- chimera subseq checking improvements/fixes: determine subseq length from fasta file instead of cigar string in BAM file (hard-clip creates problem), multi-map checking requires mapping of entire sequence instead of just checking targets  
