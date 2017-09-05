@@ -180,6 +180,13 @@ pv_outdir = '%s/pv_%s' % (args.outdir, get_version('pv'))
 
 bbt_prefix = bbt_outdir + '/' + args.sample
 
+# for determining how many procs/threads to give to each analysis
+num_analysis = 2
+if args.only_sv or args.only_splicing:
+    num_analysis = 1
+elif args.only_assembly:
+    num_analysis = 0
+
 assembly_input = []
 
 @follows(mkdir(bbt_outdir))
@@ -211,7 +218,7 @@ def classify(paired_fqs, bbt_output, prefix, bf, nthreads):
 
     run_cmd('/bin/bash -c "%s"' % cmd)
     
-def format_read_pairs(lines):
+def format_read_pairs_for_abyss(lines):
     """format reads to '/1' and '/2' for abyss"""
     read_name1 = lines[0].split()[0]
     read_name2 = lines[4].split()[0]
@@ -239,7 +246,7 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
         with open(bbt_fastq[0], 'r') as fq:
             for lines in itertools.izip_longest(*[fq]*8):
                 target = lines[0].rstrip().split(' ')[1].split('.')[0]
-                lines = format_read_pairs(list(lines))
+                lines = format_read_pairs_for_abyss(list(lines))
                 seqs1[target].extend(lines[:4])
                 seqs2[target].extend(lines[-4:])
 
@@ -480,6 +487,9 @@ def concat_fasta(gene_fastas, single_merged_fasta):
         source = os.path.relpath(gene_fastas[0], os.path.dirname(single_merged_fasta))
         os.symlink(source, single_merged_fasta)
 
+    cmd = 'samtools faidx %s' % single_merged_fasta
+    run_cmd('/bin/bash -c "%s"' % cmd)
+
 @active_if(not args.only_assembly)
 @merge(r2c,
        '%s/r2c.bam' % assembly_outdir,
@@ -582,16 +592,22 @@ def c2t(contigs_fasta, c2t_bam, nthreads):
 @follows(mkdir(pv_outdir))
 @merge([concat_fasta, c2g, c2t, r2c_index_concat],
        pv_outdir + '/sv.bedpe',
+       args.nprocs,
        )
-def find_sv(inputs, events_output):
+def find_sv(inputs, events_output, nprocs):
     """Finds structural variants using PAVFinder_transcriptome"""
     merged_fasta, c2g_bam, c2t_bam, r2c_index = inputs
+
+    if num_analysis > 0:
+        nprocs /= num_analysis
+
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'find_sv_transcriptome.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s' % (c2g_bam,
-                                                                                                    c2t_bam,
-                                                                                                    params['alignments']['transcripts_fasta'],
-                                                                                                    ' '.join(params['alignments']['genome_index']),
-                                                                                                    os.path.splitext(r2c_index)[0])
+        cmd = 'find_sv_transcriptome.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d' % (c2g_bam,
+                                                                                                                             c2t_bam,
+                                                                                                                             params['alignments']['transcripts_fasta'],
+                                                                                                                             ' '.join(params['alignments']['genome_index']),
+                                                                                                                             os.path.splitext(r2c_index)[0],
+                                                                                                                             nprocs)
 
         if params.has_key('sv'):
             sparams = params['sv']
@@ -616,6 +632,10 @@ def find_sv(inputs, events_output):
 def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
     """Finds splice_variants, generates coverage and junctions files using PAVFinder_transcriptome"""
     merged_fasta, c2g_bam, r2c_index = inputs
+
+    if num_analysis > 0:
+        nprocs /= num_analysis
+
     if os.path.getsize(merged_fasta) > 0:
         cmd = 'map_splice.py %s %s %s %s %s --r2c %s --nproc %d' % (c2g_bam,
                                                                     merged_fasta,
