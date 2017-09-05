@@ -173,6 +173,7 @@ if args.fq:
 elif args.fq_list:
     read_pairs = format_read_pairs(list_file=args.fq_list)
 
+history_file = '%s/.ruffus_history.sqlite' % args.outdir
 bbt_outdir = '%s/bbt_%s' % (args.outdir, get_version('bbt'))
 assembly_outdir = '%s/transabyss_%s' % (args.outdir, get_version('transabyss'))
 pv_outdir = '%s/pv_%s' % (args.outdir, get_version('pv'))
@@ -455,12 +456,11 @@ def r2c(index, r2c_bam, nthreads):
         reads2_str = reads2[0]
     
     if os.path.getsize(index) > 0:
-        cmd = 'bwa mem -t %d %s %s %s | samtools view -uhS - | samtools sort -m %s - %s' % (nthreads,
-                                                                                            os.path.splitext(index)[0],
-                                                                                            reads1_str,
-                                                                                            reads2_str,
-                                                                                            params['alignments']['sort_mem'],
-                                                                                            os.path.splitext(r2c_bam)[0])
+        cmd = 'bwa mem %s %s %s | samtools view -uhS - | samtools sort -m %s - -o %s' % (os.path.splitext(index)[0],
+                                                                                         reads1_str,
+                                                                                         reads2_str,
+                                                                                         params['alignments']['sort_mem'],
+                                                                                         r2c_bam)
     else:
         cmd = 'touch %s' % r2c_bam
         
@@ -503,10 +503,10 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
                 cmd = subprocess.Popen('samtools view %s' % r2c_bams[i], shell=True, stdout=subprocess.PIPE)
                 sam.writelines(cmd.stdout)
 
-        cmd = 'cat %s %s | samtools view -Su - | samtools sort -m %s - %s' % (header_file,
-                                                                              sam_file,
-                                                                              params['alignments']['sort_mem'],
-                                                                              os.path.splitext(r2c_cat_bam)[0])
+        cmd = 'cat %s %s | samtools view -Su - | samtools sort -m %s - -o %s' % (header_file,
+                                                                                 sam_file,
+                                                                                 params['alignments']['sort_mem'],
+                                                                                 r2c_cat_bam)
 
         run_cmd('/bin/bash -c "%s"' % cmd)
 
@@ -556,9 +556,10 @@ def c2g(contigs_fasta, c2g_bam, genome_index, nthreads):
                                                                                               contigs_fasta,
                                                                                               nthreads,
                                                                                               c2g_bam)
-        run_cmd('/bin/bash -c "%s"' % cmd)
     else:
-        run_cmd('touch %s' % c2g_bam)
+        cmd = 'touch %s' % c2g_bam
+
+    run_cmd('/bin/bash -c "%s"' % cmd)
     
 @active_if(not args.only_splicing and not args.only_assembly)
 @transform(concat_fasta,
@@ -572,9 +573,10 @@ def c2t(contigs_fasta, c2t_bam, nthreads):
                                                                     params['alignments']['transcripts_fasta'],
                                                                     contigs_fasta,
                                                                     c2t_bam)
-        run_cmd('/bin/bash -c "%s"' % cmd)
     else:
-        run_cmd('touch %s' % c2t_bam)
+        cmd = 'touch %s' % c2t_bam
+
+    run_cmd('/bin/bash -c "%s"' % cmd)
     
 @active_if(not args.only_splicing and not args.only_assembly)
 @follows(mkdir(pv_outdir))
@@ -598,9 +600,10 @@ def find_sv(inputs, events_output):
 
         cmd += ' %s' % ' '.join([merged_fasta, params['annotations']['gtf'], params['annotations']['genome_fasta'], os.path.dirname(events_output)])
 
-        run_cmd(cmd)
     else:
-        run_cmd('touch %s' % events_output)
+        cmd = 'touch %s' % events_output
+
+    run_cmd(cmd)
 
 @active_if(not args.only_sv and not args.only_assembly)
 @follows(mkdir(pv_outdir))
@@ -641,4 +644,4 @@ def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
             run_cmd('touch %s' % output)
 
 pipeline_printout(sys.stdout, verbose=3)
-pipeline_run(verbose=3, multiprocess=args.nprocs, logger=logger)
+pipeline_run(verbose=3, multiprocess=args.nprocs, logger=logger, history_file=history_file)
