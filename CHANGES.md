@@ -38,4 +38,14 @@ v0.4.0
 
 v0.4.1
 
-- chimera subseq checking improvements/fixes: determine subseq length from fasta file instead of cigar string in BAM file (hard-clip creates problem), multi-map checking requires mapping of entire sequence instead of just checking targets  
+- chimera subseq checking improvements/fixes: determine subseq length from fasta file instead of cigar string in BAM file (hard-clip creates problem), multi-map checking requires mapping of entire sequence instead of just checking targets
+
+v0.4.2
+
+- minor changes to `tap.py`:
+  - requires `samtools` version >= 1.0 because `samtools sort` command changes
+  - creates ruffus history file in output directory
+  - explicity index fasta file after merging is done and before analysis scripts are run
+  - determine `num_proc` parameter for running `find_sv.py`
+  - changed name of one of duplicated `format_read_pairs()` functions
+
