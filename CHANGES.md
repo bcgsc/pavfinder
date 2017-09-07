@@ -48,4 +48,5 @@ v0.4.2
   - explicity index fasta file after merging is done and before analysis scripts are run
   - determine `num_proc` parameter for running `find_sv.py`
   - changed name of one of duplicated `format_read_pairs()` functions
+  - fixed bug if suppl_annot is not str
 
