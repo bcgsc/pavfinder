@@ -628,8 +628,8 @@ def find_sv(inputs, events_output, nprocs):
        args.gtf,
        args.genome_fasta,
        args.nprocs,
-       args.suppl_annot)
-def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
+       )
+def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs):
     """Finds splice_variants, generates coverage and junctions files using PAVFinder_transcriptome"""
     merged_fasta, c2g_bam, r2c_index = inputs
 
@@ -652,8 +652,8 @@ def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
             cmd += ' %s' % ' '.join(['--%s' % name for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True])
 
         if params['annotations'].has_key('suppl_annot') and params['annotations']['suppl_annot'] and\
-           (params['annotations']['suppl_annot'] is not None and not params['annotations']['suppl_annot'].isspace()):
-            if type(params['annotations']['suppl_annot']) is str:
+           params['annotations']['suppl_annot'] is not None:
+            if type(params['annotations']['suppl_annot']) is str and not params['annotations']['suppl_annot'].isspace():
                 cmd += ' --suppl_annot %s' % params['annotations']['suppl_annot']
             elif type(params['annotations']['suppl_annot']) is list or type(params['annotations']['suppl_annot']) is tuple:
                 cmd += ' --suppl_annot %s' % ' '.join(params['annotations']['suppl_annot'])
