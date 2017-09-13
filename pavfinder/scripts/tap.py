@@ -389,12 +389,12 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
             num_empty_assemblies += 1
     
     if num_empty_assemblies < len(k_assemblies):
-        cmd = 'transabyss-merge --mink %d --maxk %d --prefixes %s --length %d %s --out %s --force' % (min(ks),
-                                                                                                      max(ks),
-                                                                                                      prefixes,
-                                                                                                      readlen,
-                                                                                                      ' '.join(k_assemblies),
-                                                                                                      merged_fasta)
+        cmd = 'transabyss-merge --mink %d --maxk %d --prefixes %s --length %d %s --out %s --force --abyssmap' % (min(ks),
+                                                                                                                 max(ks),
+                                                                                                                 prefixes,
+                                                                                                                 readlen,
+                                                                                                                 ' '.join(k_assemblies),
+                                                                                                                 merged_fasta)
     else:
         cmd = 'touch %s' % merged_fasta
 
@@ -430,47 +430,17 @@ def r2c_bwa_index(merged_fasta, index):
 @active_if(not args.only_assembly)
 @transform(r2c_bwa_index,
            formatter(),
-           "{path[0]}/r2c.bam",
-           args.nprocs,
-           )
-def r2c(index, r2c_bam, nthreads):
-    """Aligns reads to assembly for each gene"""
-    # extract reads1 and reads2 paths
-    prefix = os.path.basename(os.path.dirname(index))
-    reads1 = []
-    reads2 = []
-    with open('%s/%s.in' % (os.path.dirname(index), prefix)) as ff:
-        for line in ff:
-            if prefix + '_1' in os.path.basename(line):
-                reads1.append(line.rstrip())
-            elif prefix + '_2' in os.path.basename(line):
-                reads2.append(line.rstrip())
-
-    if len(reads1) > 1:
-        if os.path.splitext(reads1[0])[1] == '.gz':
-            reads1_str = '<(zcat %s)' % ' '.join(reads1)
-        elif os.path.splitext(reads1[0])[1].lower() in ('.fastq', '.fq'):
-            reads1_str = '<(cat %s)' % ' '.join(reads1)
-    else:
-        reads1_str = reads1[0]
-
-    if len(reads2) > 1:
-        if os.path.splitext(reads2[0])[1] == '.gz':
-            reads2_str = '<(zcat %s)' % ' '.join(reads2)
-        elif os.path.splitext(reads2[0])[1].lower() in ('.fastq', '.fq'):
-            reads2_str = '<(cat %s)' % ' '.join(reads2)
-    else:
-        reads2_str = reads2[0]
+           "{path[0]}/r2c.bam")
+def r2c(index, r2c_bam):
+    gene = filter(None, index.split(os.sep))[-2]
+    reads1 = '%s/%s_1.fastq' % (bbt_outdir, gene)
+    reads2 = '%s/%s_2.fastq' % (bbt_outdir, gene)
+    r2c_bam = os.path.dirname(index) + '/r2c.bam'
     
-    if os.path.getsize(index) > 0:
-        cmd = 'bwa mem %s %s %s | samtools view -uhS - | samtools sort -m %s - -o %s' % (os.path.splitext(index)[0],
-                                                                                         reads1_str,
-                                                                                         reads2_str,
-                                                                                         params['alignments']['sort_mem'],
-                                                                                         r2c_bam)
-    else:
-        cmd = 'touch %s' % r2c_bam
-        
+    cmd = 'bwa mem %s <(cat %s %s) | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
+                                                                    reads1,
+                                                                    reads2,
+                                                                    r2c_bam)
     run_cmd('/bin/bash -c "%s"' % cmd)
 
 @merge(merge_assemblies,
