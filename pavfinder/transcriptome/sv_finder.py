@@ -33,6 +33,7 @@ class SVFinder:
                     max_homol_len=5, max_novel_len=20,
                     only_sense_fusion=True, only_exon_bound_fusion=True,
                     only_coding_fusion=True,
+                    only_fusions=False
                     ):
 	def filter_adj(adj):
 	    def check_junc_seq(homol=False, novel=False):
@@ -62,6 +63,9 @@ class SVFinder:
 			return False
 		return True
     
+	    if only_fusions and adj.event not in ('fusion', 'read_through'):
+		return False
+
 	    if no_indels and adj.rearrangement in ('ins', 'del'):
 		return False
 	    
@@ -305,29 +309,30 @@ class SVFinder:
 		    events.extend(process_split_aligns([align1, align2], query_seq, genes))
 		        
 	    # indels
-	    for align in aligns:
-		if target_type == 'transcripts':
-		    if self.transcripts_dict.has_key(align.target):
-			genes.add(self.transcripts_dict[align.target].gene)
+	    if not only_fusions:
+		for align in aligns:
+		    if target_type == 'transcripts':
+			if self.transcripts_dict.has_key(align.target):
+			    genes.add(self.transcripts_dict[align.target].gene)
 
-		adjs = self.find_indels(align, query_fasta, target_fasta, target_type, 
-		                        min_size=min_indel_size, min_dup_size=min_dup_size, min_flanking=min_indel_flanking,
-		                        max_novel_len=max_novel_len, no_indels=no_indels)
-		for adj in adjs:
-		    self.update_adj(adj, (align, align), query_seq, target_type, block_matches=block_matches)
-		    if target_type == 'genome' and not genes:
-			add_genes_from_event(genes, adj)
-		    
-		    if filter_adj(adj):
-			events.append(adj)
+		    adjs = self.find_indels(align, query_fasta, target_fasta, target_type,
+			                    min_size=min_indel_size, min_dup_size=min_dup_size, min_flanking=min_indel_flanking,
+			                    max_novel_len=max_novel_len, no_indels=no_indels)
+		    for adj in adjs:
+			self.update_adj(adj, (align, align), query_seq, target_type, block_matches=block_matches)
+			if target_type == 'genome' and not genes:
+			    add_genes_from_event(genes, adj)
 
-		    if adj.event in ('repeat_expansion', 'repeat_contraction'):
-			if len(adj.repeat_seq) == 3 and\
-			   adj.transcripts and\
-			   not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
-			   not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
-			    adj.in_frame = True
-			    self.adjust_for_amino_acid_repeat(adj)
+			if filter_adj(adj):
+			    events.append(adj)
+
+			if adj.event in ('repeat_expansion', 'repeat_contraction'):
+			    if len(adj.repeat_seq) == 3 and\
+			       adj.transcripts and\
+			       not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
+			       not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
+				adj.in_frame = True
+				self.adjust_for_amino_acid_repeat(adj)
 			
 	    if events:
 		events_by_query[query] = events

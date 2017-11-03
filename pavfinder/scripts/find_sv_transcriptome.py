@@ -139,6 +139,7 @@ def parse_args():
     parser.add_argument("--nproc", type=int, help="number of processes. Default:4", default=4)
     parser.add_argument("--genome_index", type=str, help="genome index path and name", nargs=2)
     parser.add_argument("--sort_by_coord", action="store_true", help="sort output by genome coordinates")
+    parser.add_argument("--only_fusions", action="store_true", help="report only fusions and read-throughs")
     parser.add_argument("--version", action='version', version='%s %s' % (pv.__name__, pv.__version__))
     filtering = parser.add_argument_group('filtering')
     filtering.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
@@ -202,7 +203,8 @@ def main():
                                                                       max_homol_len=args.max_homol_len,
                                                                       only_sense_fusion=not args.include_nonsense_fusion,
                                                                       only_exon_bound_fusion=not args.include_non_exon_bound_fusion,
-                                                                      only_coding_fusion=not args.include_noncoding_fusion
+                                                                      only_coding_fusion=not args.include_noncoding_fusion,
+                                                                      only_fusions=args.only_fusions
                                                                       )
         
     if tbam:
@@ -220,7 +222,8 @@ def main():
                                                                                 max_homol_len=args.max_homol_len,
                                                                                 only_sense_fusion=not args.include_nonsense_fusion,
                                                                                 only_exon_bound_fusion=not args.include_non_exon_bound_fusion,
-                                                                                only_coding_fusion=not args.include_noncoding_fusion
+                                                                                only_coding_fusion=not args.include_noncoding_fusion,
+                                                                                only_fusions=args.only_fusions
                                                                                 )        
 
     # combine events from genome and transcriptome alignments
