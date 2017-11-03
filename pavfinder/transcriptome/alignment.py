@@ -303,7 +303,7 @@ def search_by_regex(query_seq, target_seq):
 
     return matches
 
-def search_by_align(query_seq, target_seq, query_name, target_name, outdir, debug=False):
+def search_by_align(query_seq, target_seq, query_name, target_name, outdir, max_clipped=0, debug=False):
     query_fa = '%s/tmp_query.fa' % outdir
     fa = open(query_fa, 'w')
     fa.write('>%s\n%s\n' % (query_name, query_seq))
@@ -329,8 +329,7 @@ def search_by_align(query_seq, target_seq, query_name, target_name, outdir, debu
 	
     matches = []
     if os.path.exists(blast_output):
-	print blast_output
-	matches = parse_blast(blast_output, query_len=len(query_seq))
+	matches = parse_blast(blast_output, query_len=len(query_seq), max_clipped=max_clipped)
 	# clean up
 	if not debug:
 	    for ff in (query_fa, target_fa, blast_output):
@@ -338,14 +337,14 @@ def search_by_align(query_seq, target_seq, query_name, target_name, outdir, debu
 		
     return matches
 		
-def parse_blast(output, query_len):
+def parse_blast(output, query_len, max_clipped=0):
     matches = []
     fields = ('query', 'target', 'pid', 'alen', 'num_mismatch', 'num_gaps', 'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bit_score')
     for line in open(output, 'r'):
 	cols = line.rstrip('\n').split('\t')
 	# if somehow the number of values is different from the number of fields hard-coded above, no alignments will be captured
 	qstart, qend, tstart, tend = map(int, cols[6:10])
-	if qend - qstart + 1 == query_len:
+	if qend - qstart + 1 >= query_len - max_clipped:
 	    matches.append([tstart, tend])
     return matches
 
