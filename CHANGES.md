@@ -50,3 +50,11 @@ v0.4.2
   - changed name of one of duplicated `format_read_pairs()` functions
   - fixed bug if suppl_annot is not str
 
+v0.4.3
+
+- changes to handle novel untemplated sequence at ITD breakpoint
+	- uses `blastn` to check for duplication, and doesn't require end-to-end matching, but requires insertion sequence to be at least 15bp(hard-coded) long; allows bases at edges un-matched (specified by `max_novel_length` default=10)
+	- when parsing partial alignments, allow clipped bases (specified by `max_novel_length` again)
+	- introduce parameter `min_dup_size`: minimum insertion size to check if it's a duplication (default: 15)
+	- changed default `--max_novel_len` from 20 to 10
+
