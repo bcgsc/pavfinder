@@ -143,13 +143,14 @@ def parse_args():
     filtering = parser.add_argument_group('filtering')
     filtering.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
     filtering.add_argument("--min_indel_size", type=int, help="minimum indel size. Default:3", default=3)
+    filtering.add_argument("--min_dup_size", type=int, help="minimum ins size to check for dup classification. Default:15", default=15)
     filtering.add_argument("--min_indel_flanking", type=int, help="minimum flanking contig lengths for indels. Default:10", default=10)
     filtering.add_argument("--no_utr", action="store_true", help="don't report events in UTR")
     filtering.add_argument("--include_nonsense_fusion", action="store_true", help="include non-sense fusions")
     filtering.add_argument("--include_non_exon_bound_fusion", action="store_true", help="include non-exon-bound fusions")
     filtering.add_argument("--include_noncoding_fusion", action="store_true", help="include noncoding fusions")
     filtering.add_argument("--max_homol_len", type=int, help="maximum homology sequence length. Default:10", default=10)
-    filtering.add_argument("--max_novel_len", type=int, help="maximum novel sequence length. Default:20", default=20)
+    filtering.add_argument("--max_novel_len", type=int, help="maximum novel sequence length. Default:10", default=10)
     filtering.add_argument("--subseq_len", type=int, help="subsequence length for filtering. Default:50", default=50)
     filtering.add_argument("--probe_len", type=int, help="probe sequence length for filtering. Default:100", default=100)
     filtering.add_argument("--disable_subseq_filtering", action="store_true", help="disable subseq filtering")
@@ -194,6 +195,7 @@ def main():
                                                                       genome_fasta,
                                                                       'genome',
                                                                       min_indel_size=args.min_indel_size,
+                                                                      min_dup_size=args.min_dup_size,
                                                                       min_indel_flanking=args.min_indel_flanking,
                                                                       no_utr=args.no_utr,
                                                                       max_novel_len=args.max_novel_len,
@@ -210,6 +212,7 @@ def main():
                                                                                 'transcripts',
                                                                                 external_mappings=mappings['via_genome'],
                                                                                 min_indel_size=args.min_indel_size,
+                                                                                min_dup_size=args.min_dup_size,
                                                                                 min_indel_flanking=args.min_indel_flanking,
                                                                                 no_utr=args.no_utr,
                                                                                 no_indels=True,
