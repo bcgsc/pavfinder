@@ -28,7 +28,7 @@ class SVFinder:
         
     def find_events(self, bam, query_fasta, target_fasta, target_type, 
                     gene_mappings=None, external_mappings=None,
-                    min_indel_size=0, min_indel_flanking=0,
+                    min_indel_size=0, min_dup_size=0, min_indel_flanking=0,
                     no_utr=False, no_indels=False, no_inv=True,
                     max_homol_len=5, max_novel_len=20,
                     only_sense_fusion=True, only_exon_bound_fusion=True,
@@ -311,7 +311,8 @@ class SVFinder:
 			genes.add(self.transcripts_dict[align.target].gene)
 
 		adjs = self.find_indels(align, query_fasta, target_fasta, target_type, 
-		                        min_size=min_indel_size, min_flanking=min_indel_flanking, no_indels=no_indels)
+		                        min_size=min_indel_size, min_dup_size=min_dup_size, min_flanking=min_indel_flanking,
+		                        max_novel_len=max_novel_len, no_indels=no_indels)
 		for adj in adjs:
 		    self.update_adj(adj, (align, align), query_seq, target_type, block_matches=block_matches)
 		    if target_type == 'genome' and not genes:
@@ -338,7 +339,7 @@ class SVFinder:
 		    mappings_by_query[query] = genes, 'partial'
 		
 	if partial_aligns:
-	    new_aligns = self.map_partial_aligns(partial_aligns, query_fasta, target_type)
+	    new_aligns = self.map_partial_aligns(partial_aligns, query_fasta, target_type, max_unaligned_len=max_novel_len)
 	    
 	    for query, aligns in new_aligns.iteritems():
 		query_seq = query_fasta.fetch(query)
@@ -728,6 +729,13 @@ class SVFinder:
 	    fix_orients()
 	    sort_genome_breaks()
 	    
+	    # reverse-complement becasue sequences originally identified are in reference to transcripts
+	    if target_type == 'transcripts' and adj.transcripts[0].strand == '-':
+		if adj.novel_seq is not None:
+		    adj.novel_seq = reverse_complement(adj.novel_seq)
+		if adj.ins_seq is not None:
+		    adj.ins_seq = reverse_complement(adj.ins_seq)
+
 	adj.set_probe(query_seq, len_on_each_side=self.probe_len/2)
 	adj.size = adj.get_size()
 	
@@ -938,7 +946,7 @@ class SVFinder:
     def is_homopolymer(self, seq):
 	return len(Set(map(''.join, zip(*[iter(seq)] * 1)))) == 1
     
-    def map_partial_aligns(self, partial_aligns, query_fasta, target_type, min_len=15):
+    def map_partial_aligns(self, partial_aligns, query_fasta, target_type, max_unaligned_len=10, min_len=15):
 	"""attempt to map partial aligns"""
 	def extract_clipped_seq(query_seq, query_blocks):
 	    """Extract sequences that are clipped at the end"""
@@ -1009,24 +1017,34 @@ class SVFinder:
 		    transcript = self.transcripts_dict[align.target]
 	    return transcript
 	
-	def parse_partial_aligns(bam, query_target, query_span):
+	def parse_partial_aligns(bam, query_target, query_span, max_unaligned_len=10):
 	    new_aligns = {}
 	    for query_pos, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
 		alns = list(group)
 		matches = []
+		matches_query = []
 		query_len = None
 		query, pos = query_pos.rsplit('-', 1)
 		for aln in alns:
-		    if aln.is_unmapped or aln.cigartuples[0][0] != 0 or aln.cigartuples[-1][0] != 0:
+		    if aln.is_unmapped:
 			continue
-		    align = Alignment.from_alignedRead(aln, bam)
-		    query_len = align.query_len
-		    if align.is_valid and align.target == query_target[query]:
-			tcoords_sorted = sorted([align.tstart, align.tend])
-			if align.strand == '+':
-			    matches.append(tcoords_sorted)
-			else:
-			    matches.append(tcoords_sorted[::-1])
+		    if (aln.cigartuples[0][0] == 0 and aln.cigartuples[-1][0] == 0) or\
+		       (aln.cigartuples[0][0] == 0 and\
+		        (aln.cigartuples[-1][0] == 4 or aln.cigartuples[-1][0] == 5) and\
+		        aln.cigartuples[-1][1] <= max_unaligned_len) or\
+		       (aln.cigartuples[-1][0] == 0 and\
+		        (aln.cigartuples[0][0] == 4 or aln.cigartuples[0][0] == 5) and\
+		        aln.cigartuples[0][1] <= max_unaligned_len):
+			align = Alignment.from_alignedRead(aln, bam)
+			query_len = align.query_len
+			if align.is_valid and align.target == query_target[query]:
+			    tcoords_sorted = sorted([align.tstart, align.tend])
+			    if align.strand == '+':
+				matches.append(tcoords_sorted)
+			    else:
+				matches.append(tcoords_sorted[::-1])
+			    qcoords_sorted = sorted([align.qstart, align.qend])
+			    matches_query.append(qcoords_sorted)
 		
 		if matches and len(matches) == 1:
 		    transcript = self.transcripts_dict[align.target]
@@ -1035,7 +1053,8 @@ class SVFinder:
 			target = transcript.chrom
 		    else:
 			target = align.target
-		    align = find_new_align(query, query_span[query], target, match, transcript)
+		    align = find_new_align(query, matches_query[0], target, match, transcript)
+		    #align = find_new_align(query, query_span[query], target, match, transcript)
 		    if align is not None:
 			new_aligns[query] = align
 	    return new_aligns
@@ -1135,7 +1154,7 @@ class SVFinder:
 		
 	return new_multi_aligns
     
-    def find_indels(self, align, query_fasta, target_fasta, target_type, min_size=0, min_flanking=0, no_indels=False):
+    def find_indels(self, align, query_fasta, target_fasta, target_type, min_size=0, min_dup_size=0, min_flanking=0, max_novel_len=0, no_indels=False):
 	def extract_flanking_blocks():
 	    flanking_blocks = []
 	    block_idx = -1
@@ -1225,11 +1244,12 @@ class SVFinder:
 	                                            query_fasta, 
 	                                            target_fasta,
 	                                            align.strand):
-		    if len(ins_seq) >= 10:
+		    if len(ins_seq) >= min_dup_size:
 			self.is_duplication(adj,
 		                            query_fasta.fetch(align.query),
 		                            target_fasta,
-		                            align.strand)
+		                            align.strand,
+			                    max_novel_len)
 
 	    if event_type == 'del':
 		self.is_repeat_number_change(adj,
@@ -1244,7 +1264,7 @@ class SVFinder:
 
 	return adjs
     
-    def is_duplication(self, adj, query_seq, target_fasta, strand, min_size_to_align=20, min_size_for_terminal_snp=20):
+    def is_duplication(self, adj, query_seq, target_fasta, strand, max_novel_len, min_size_to_align=20, min_size_for_terminal_snp=20):
 	def update_support_span(dup_is_up_in_target):
 	    seq_breaks = sorted(adj.seq_breaks)
 	    if dup_is_up_in_target:
@@ -1287,11 +1307,12 @@ class SVFinder:
 		if matches_upstream:
 		    break
 
-	# no matches, try alignment
-	#if not matches_downstream and not matches_upstream and len(novel_seq) >= min_size_to_align:
-	    #matches_downstream = search_by_align(novel_seq, target_downstream_seq, query_name, target_name, self.working_dir, debug=self.debug)
-	    #if not matches_downstream:
-		#matches_upstream = search_by_align(novel_seq, target_upstream_seq, query_name, target_name, self.working_dir, debug=self.debug)
+	# no matches, try alignment, novel_seq has to be "pretty" long (>=15)
+	if not matches_downstream and not matches_upstream and len(novel_seq) - max_novel_len and len(novel_seq) >= 15:
+	    print 'trying dup', adj.seq_id, len(novel_seq)
+	    matches_downstream = search_by_align(novel_seq, target_downstream_seq, query_name, target_name, self.working_dir, max_clipped=max_novel_len, debug=self.debug)
+	    if not matches_downstream:
+		matches_upstream = search_by_align(novel_seq, target_upstream_seq, query_name, target_name, self.working_dir, debug=self.debug)
 
 	if matches_downstream:
 	    matches = matches_downstream
@@ -1299,7 +1320,19 @@ class SVFinder:
 		# duplication
 		if len(matches) == 1:
 		    adj.rearrangement = 'dup'
-		    adj.target_breaks = (adj.target_breaks[1] + len(novel_seq) - 1, adj.target_breaks[1])
+		    adj.ins_seq = None
+		    adj.size = len(novel_seq)
+
+		    # see if there is untemplated novel sequence at breakpoint
+		    matched_len = matches[0][1] - matches[0][0] + 1
+		    novel_seq_len = len(novel_seq) - matched_len
+		    if novel_seq_len > 0:
+			if matches[0][0] == 1:
+			    adj.novel_seq = novel_seq[-1 * novel_seq_len:]
+			else:
+			    adj.novel_seq = novel_seq[:novel_seq_len]
+
+		    adj.target_breaks = (adj.target_breaks[1] + len(novel_seq) - 1 - novel_seq_len, adj.target_breaks[1])
 		    adj.orients = ('L', 'R')
 		    update_support_span(False)
 		else:
@@ -1313,7 +1346,19 @@ class SVFinder:
 	    if matches[-1][1] == len(target_upstream_seq):
 		if len(matches) == 1:
 		    adj.rearrangement = 'dup'
-		    adj.target_breaks = (adj.target_breaks[0], adj.target_breaks[0] - len(novel_seq) + 1)
+		    adj.ins_seq = None
+		    adj.size = len(novel_seq)
+
+		    # see if there is untemplated novel sequence at breakpoint
+		    matched_len = matches[0][1] - matches[0][0] + 1
+		    novel_seq_len = len(novel_seq) - matched_len
+		    if novel_seq_len > 0:
+			if matches[0][0] == 1:
+			    adj.novel_seq = novel_seq[-1 * novel_seq_len:]
+			else:
+			    adj.novel_seq = novel_seq[:novel_seq_len]
+
+		    adj.target_breaks = (adj.target_breaks[0], adj.target_breaks[0] - len(novel_seq) + 1 - novel_seq_len)
 		    adj.orients = ('L', 'R')
 		    update_support_span(True)
 		else:
