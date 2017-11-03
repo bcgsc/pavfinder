@@ -57,4 +57,5 @@ v0.4.3
 	- when parsing partial alignments, allow clipped bases (specified by `max_novel_length` again)
 	- introduce parameter `min_dup_size`: minimum insertion size to check if it's a duplication (default: 15)
 	- changed default `--max_novel_len` from 20 to 10
+- added `--only_fusions` parameter to only look for fusions
 
