@@ -58,4 +58,4 @@ v0.4.3
 	- introduce parameter `min_dup_size`: minimum insertion size to check if it's a duplication (default: 15)
 	- changed default `--max_novel_len` from 20 to 10
 - added `--only_fusions` parameter to only look for fusions
-
+- fixed bug in detecting retained_intron: retained_intron in last match block wasn't detected. 
