@@ -150,7 +150,28 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	known_juncs = accessory_known_features['junction']
 
     all_events = []
-    for i in range(len(matches) - 1):
+    for i in range(len(matches)):
+	# for retained intron, not a 'junction'
+	if matches[i] is not None and len(matches[i]) > 1:
+	    events = classify_novel_junction(matches[i], 
+	                                     None,
+	                                     align.target, 
+	                                     align.blocks[i], 
+	                                     transcript,
+	                                     ref_fasta,
+	                                     known_juncs = known_juncs,
+	                                     known_exons = known_exons,
+	                                     )
+	    if events:
+		for e in events:
+		    e['blocks'] = (i, j)
+		    e['transcript'] = transcript.id
+		    e['seq_breaks'] = [align.query_blocks[i][0], align.query_blocks[i][1]]
+		all_events.extend(events)
+		
+	if i == len(matches) - 1:
+	    break
+
 	j = i + 1
 		
 	if matches[i] is None and matches[j] is not None:
@@ -171,24 +192,6 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 		    e['seq_breaks'] = [align.query_blocks[i][1], align.query_blocks[j][0]]
 		all_events.extend(events)
 	    continue
-	
-	# for retained intron, not a 'junction'
-	if matches[i] is not None and len(matches[i]) > 1:
-	    events = classify_novel_junction(matches[i], 
-	                                     None,
-	                                     align.target, 
-	                                     align.blocks[i], 
-	                                     transcript,
-	                                     ref_fasta,
-	                                     known_juncs = known_juncs,
-	                                     known_exons = known_exons,
-	                                     )
-	    if events:
-		for e in events:
-		    e['blocks'] = (i, j)
-		    e['transcript'] = transcript.id
-		    e['seq_breaks'] = [align.query_blocks[i][0], align.query_blocks[i][1]]
-		all_events.extend(events)
 
 	# skip if junction is annotated
 	if (i, j) in annotated:
@@ -303,8 +306,9 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
     if match2 is None:
 	if len(match1) == 2:
 	    exons = [m[0] for m in match1]
-	    if match1[0][1] == '=>' and\
-	       match1[-1][1] == '<=' and\
+	    # only requires one flanking exon boundary matched, on the other side it's OK if the contig does not reach
+	    if ((match1[0][1] == '=>' and match1[-1][1][0] == '<') or\
+	       (match1[0][1][1] == '>' and match1[-1][1] == '<=')) and\
 	       len([(a, b) for a, b in zip(exons, exons[1:]) if b == a + 1]) == len(match1) - 1:
 		size = transcript.exons[exons[1]][0] - transcript.exons[exons[0]][1] - 1
 		if not known_exons or not (chrom, pos[0], pos[1]) in known_exons:
