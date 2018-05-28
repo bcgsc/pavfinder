@@ -40,7 +40,7 @@ class ExonMapper:
 	    query_seq = query_fasta.fetch(query)
 	    	    
 	    for align in aligns:
-		if not align.has_canonical_target():
+		if not align.has_canonical_target() or align.blocks is None:
 		    continue
 		block_matches = self.map_align(align)
 		if block_matches:
