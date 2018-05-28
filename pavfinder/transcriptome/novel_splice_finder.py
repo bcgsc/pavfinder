@@ -150,6 +150,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	known_juncs = accessory_known_features['junction']
 
     all_events = []
+    j = 0
     for i in range(len(matches)):
 	# for retained intron, not a 'junction'
 	if matches[i] is not None and len(matches[i]) > 1:
