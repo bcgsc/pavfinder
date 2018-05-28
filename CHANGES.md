@@ -58,4 +58,9 @@ v0.4.3
 	- introduce parameter `min_dup_size`: minimum insertion size to check if it's a duplication (default: 15)
 	- changed default `--max_novel_len` from 20 to 10
 - added `--only_fusions` parameter to only look for fusions
-- fixed bug in detecting retained_intron: retained_intron in last match block wasn't detected. 
+- fixed bug in detecting retained_intron: retained_intron in last match block wasn't detected.
+
+v0.4.4
+
+- bugfix: if retained_intron happened in first and only alignment block, the variable 'j' will be exposed as un-initialized. Initialize it to 0
+- always assume every alignment will have blocks but there are actually cases where Pysam cannot determine alignment blocks. Capture and skip those cases.
