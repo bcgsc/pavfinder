@@ -432,16 +432,28 @@ def r2c_bwa_index(merged_fasta, index):
            formatter(),
            "{path[0]}/r2c.bam")
 def r2c(index, r2c_bam):
-    gene = filter(None, index.split(os.sep))[-2]
-    reads1 = '%s/%s_1.fastq' % (bbt_outdir, gene)
-    reads2 = '%s/%s_2.fastq' % (bbt_outdir, gene)
     r2c_bam = os.path.dirname(index) + '/r2c.bam'
     
-    cmd = 'bwa mem %s <(cat %s %s) | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
-                                                                    reads1,
-                                                                    reads2,
-                                                                    r2c_bam)
-    run_cmd('/bin/bash -c "%s"' % cmd)
+    cmd = None
+    if args.bf:
+        gene = filter(None, index.split(os.sep))[-2]
+        reads1 = '%s/%s_1.fastq' % (bbt_outdir, gene)
+        reads2 = '%s/%s_2.fastq' % (bbt_outdir, gene)
+        cmd = 'bwa mem %s <(cat %s %s) | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
+                                                                        reads1,
+                                                                        reads2,
+                                                                        r2c_bam)
+    else:
+        in_files = glob.glob('%s/*.in' % os.path.dirname(index))
+        if in_files:
+            with open(in_files[0], 'r') as ff:
+                reads = [line.rstrip() for line in ff.readlines()]
+                cmd = 'bwa mem %s <(zcat %s) | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
+                                                                              ' '.join(reads),
+                                                                              r2c_bam)
+
+    if cmd is not None:
+        run_cmd('/bin/bash -c "%s"' % cmd)
 
 @merge(merge_assemblies,
        '%s/%s.fa' % (assembly_outdir, args.sample))
@@ -488,11 +500,13 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
                                                                                  params['alignments']['sort_mem'],
                                                                                  r2c_cat_bam)
 
-        run_cmd('/bin/bash -c "%s"' % cmd)
-
     elif len(r2c_bams) == 1:
         source = os.path.relpath(r2c_bams[0], os.path.dirname(r2c_cat_bam))
-        os.symlink(source, r2c_cat_bam)
+        cmd = 'samtools sort -m %s %s -o %s' % (params['alignments']['sort_mem'],
+                                               r2c_bams[0],
+                                               r2c_cat_bam)
+
+    run_cmd('/bin/bash -c "%s"' % cmd)
 
 def r2c_cleanup():
     """Removes individual r2c indices and intermediate files"""
