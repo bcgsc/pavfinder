@@ -53,6 +53,8 @@ setup(
                                           "pavfinder/test/transcriptome/refGene.fa.sa",
                                           "pavfinder/test/transcriptome/refGene.sorted.gtf.gz",
                                           "pavfinder/test/transcriptome/refGene.sorted.gtf.gz.tbi",
+                                          "pavfinder/test/transcriptome/ensGene.sorted.gtf.gz",
+                                          "pavfinder/test/transcriptome/ensGene.sorted.gtf.gz.tbi",
                                           "pavfinder/test/transcriptome/test_1.fastq.gz",
                                           "pavfinder/test/transcriptome/test_2.fastq.gz",
                                           "pavfinder/test/transcriptome/test.cfg",
