@@ -65,3 +65,5 @@ v0.4.4
 - bugfix: if retained_intron happened in first and only alignment block, the variable 'j' will be exposed as un-initialized. Initialize it to 0
 - always assume every alignment will have blocks but there are actually cases where Pysam cannot determine alignment blocks. Capture and skip those cases.
 - fixed r2c bug in tap when running in whole transcriptome mode
+- updated expected output files for tap
+- updated refgenes.sorted.gtf.gz and setup.py to copy ensGenes.sorted.gtf.gz
