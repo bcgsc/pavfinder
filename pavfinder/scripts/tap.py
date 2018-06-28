@@ -245,10 +245,14 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
     if args.bf:
         with open(bbt_fastq[0], 'r') as fq:
             for lines in itertools.izip_longest(*[fq]*8):
-                target = lines[0].rstrip().split(' ')[1].split('.')[0]
+                header_cols = lines[0].rstrip().split()
+                if len(header_cols) < 2:
+                    continue
+                targets = header_cols[1].split('.fa')[:-1]
                 lines = format_read_pairs_for_abyss(list(lines))
-                seqs1[target].extend(lines[:4])
-                seqs2[target].extend(lines[-4:])
+                for target in targets:
+                    seqs1[target].extend(lines[:4])
+                    seqs2[target].extend(lines[-4:])
 
         split_fastqs = output_split_pairs(seqs1, seqs2, bbt_outdir)
 
