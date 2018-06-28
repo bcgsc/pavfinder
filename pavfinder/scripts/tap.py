@@ -245,10 +245,7 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
     if args.bf:
         with open(bbt_fastq[0], 'r') as fq:
             for lines in itertools.izip_longest(*[fq]*8):
-                header_cols = lines[0].rstrip().split()
-                if len(header_cols) < 2:
-                    continue
-                targets = header_cols[1].split('.fa')[:-1]
+                targets = lines[0].rstrip().split()[-1].split('.fa')[:-1]
                 lines = format_read_pairs_for_abyss(list(lines))
                 for target in targets:
                     seqs1[target].extend(lines[:4])
@@ -503,6 +500,7 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
                                                                                  sam_file,
                                                                                  params['alignments']['sort_mem'],
                                                                                  r2c_cat_bam)
+        run_cmd('/bin/bash -c "%s"' % cmd)
 
     elif len(r2c_bams) == 1:
         source = os.path.relpath(r2c_bams[0], os.path.dirname(r2c_cat_bam))
@@ -510,7 +508,7 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
                                                r2c_bams[0],
                                                r2c_cat_bam)
 
-    run_cmd('/bin/bash -c "%s"' % cmd)
+        run_cmd('/bin/bash -c "%s"' % cmd)
 
 def r2c_cleanup():
     """Removes individual r2c indices and intermediate files"""
