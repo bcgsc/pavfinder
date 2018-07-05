@@ -338,6 +338,18 @@ def symlink_assembly_input(assembly_input, k_dirs, ks):
         target = '%s/%s' % (k_dir, os.path.basename(assembly_input))
         if not os.path.exists(target):
             os.symlink(os.path.relpath(assembly_input, k_dir), target)
+
+def get_assembly_params():
+    changed_params = []
+    if params.has_key('assembly'):
+        for param, value in params['assembly'].iteritems():
+            if value != 'default' and value.isdigit():
+                changed_params.append((param, value))
+
+    if changed_params:
+        return ' '.join(map(str, ['-%s %s' % (p[0], p[1]) for p in changed_params]))
+    else:
+        return None
                 
 @transform(symlink_assembly_input,
            formatter(".+/(.+)/(k\d+)"),
@@ -348,11 +360,15 @@ def assemble_single_gene(k_dir, contigs_file, is_strand_specific, logger, loggin
     """Assemblies each gene"""
     prefix, k = filter(None, k_dir.split(os.sep))[-2:]
     fastqs = ' '.join(open('%s/%s.in' % (k_dir, prefix), 'r').read().split('\n')[:-1])
-    
+
     cmd = 'transabyss --kmer %s --pe %s --outdir %s --name %s --cleanup 3' % (k.lstrip('k'),
                                                                               fastqs,
                                                                               k_dir,
                                                                               prefix)
+    assembly_params = get_assembly_params()
+    if assembly_params is not None:
+        cmd += ' %s' % assembly_params
+
     if is_strand_specific:
         cmd += ' --SS'
 
