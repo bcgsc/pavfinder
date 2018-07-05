@@ -67,3 +67,7 @@ v0.4.4
 - fixed r2c bug in tap when running in whole transcriptome mode
 - updated expected output files for tap
 - updated refgenes.sorted.gtf.gz and setup.py to copy ensGenes.sorted.gtf.gz
+
+v1.0
+- modified `tap.py` to deal with multimatch headers from BBT 2.1.1
+- modified `tap.py` to parse in assembly parameters from cfg file
