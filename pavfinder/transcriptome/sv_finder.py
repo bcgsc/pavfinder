@@ -62,7 +62,7 @@ class SVFinder:
 			                                                        junc_seq)
 			return False
 		return True
-    
+
 	    if only_fusions and adj.event not in ('fusion', 'read_through'):
 		return False
 
@@ -295,6 +295,11 @@ class SVFinder:
 			# reset block matches for process_split_aligns()
 			block_matches = None
 
+	    elif target_type == 'transcripts':
+		for align in aligns:
+		    if self.transcripts_dict.has_key(align.target):
+			genes.add(self.transcripts_dict[align.target].gene)
+
 	    if partially_aligned and len(aligns) == 1:
 		if external_mappings is None or\
 		   not external_mappings.has_key(query) or\
@@ -333,7 +338,7 @@ class SVFinder:
 			       not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
 				adj.in_frame = True
 				self.adjust_for_amino_acid_repeat(adj)
-			
+
 	    if events:
 		events_by_query[query] = events
 		    
