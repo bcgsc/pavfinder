@@ -29,7 +29,8 @@ setup(
         'python-igraph',
         ],
     package_data = {'pavfinder': ['test/*', 'scripts/*']},
-    data_files = [('config', ['pavfinder/cfg/tap.cfg']), 
+    data_files = [('config', ['pavfinder/cfg/tap.cfg',
+                              'pavfinder/cfg/fusion-bloom.profile']), 
                   ('test/genome', ["pavfinder/test/genome/c2g.bam",
                                    "pavfinder/test/genome/r2c.bam",
                                    "pavfinder/test/genome/r2c.bam.bai",
@@ -75,6 +76,7 @@ setup(
                'pavfinder/scripts/map_splice.py',
                'pavfinder/scripts/extract_transcript_sequence.py',
                'pavfinder/scripts/tap.py',
-               'pavfinder/scripts/rescue_fusion.py',
+               'pavfinder/scripts/rescue_fusion.py'
+               'pavfinder/scripts/fusion-bloom',
                ],
 )
