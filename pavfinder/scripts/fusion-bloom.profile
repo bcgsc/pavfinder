@@ -1,0 +1,10 @@
+export JVM_OPTS=-Xmx2g 
+export NUM_THREADS=
+export SAMTOOLS_SORT_MEM=2G
+export GENOME=
+export GMAPDB=/path/to/gmapdb
+export GTF=/path/to/annotation.sorted.gtf.gz
+export TRANSCRIPTS_FASTA=/path/to/annotation.fa
+export GENOME_FASTA=/path/to/genome.fa
+export RNABLOOM_PARAMS=
+export PAVFINDER_PARAMS=

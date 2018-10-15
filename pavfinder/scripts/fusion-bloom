@@ -1,0 +1,72 @@
+#!/usr/bin/make -rRf
+
+SHELL=/bin/bash -o pipefail
+
+.DELETE_ON_ERROR:
+
+self_dir := $(dir $(lastword $(MAKEFILE_LIST)))
+
+ifndef outdir
+	outdir = fusion-bloom.out
+endif
+
+ifndef name
+	name = sample
+endif
+
+assembly_outdir = $(outdir)/rnabloom
+pavfinder_outdir = $(outdir)/pavfinder
+
+all: $(pavfinder_outdir)/sv.bedpe
+
+.PHONY: all clean
+
+# assemble
+$(assembly_outdir)/TRANSCRIPTS.DONE: $(left) $(right)
+	source $(profile) && \
+	mkdir -p $(assembly_outdir) && \
+	time rnabloom -length $(readlen) -l $(left) -r $(right) -o $(assembly_outdir) -n $(name) -t $(NUM_THREADS) --revcomp-right $(RNABLOOM_PARAMS) && \
+	samtools faidx $(assembly_outdir)/$(name).transcripts.fa
+
+# bwa index
+$(assembly_outdir)/$(name).transcripts.fa.sa: $(assembly_outdir)/TRANSCRIPTS.DONE
+	source $(profile) && \
+	bwa index $(assembly_outdir)/$(name).transcripts.fa
+
+# r2c
+$(outdir)/r2c.bam: $(assembly_outdir)/$(name).transcripts.fa.sa
+	source $(profile) && \
+	bwa index $(assembly_outdir)/$(name).transcripts.fa && \
+	bwa mem -t $(NUM_THREADS) $(assembly_outdir)/$(name).transcripts.fa <(zcat $(left)) <(zcat $(right)) | samtools view -bhS - | samtools sort -m $(SAMTOOLS_SORT_MEM) - -o $(outdir)/r2c.bam
+
+# r2c index
+$(outdir)/r2c.bam.bai: $(outdir)/r2c.bam
+	source $(profile) && \
+	samtools index $(outdir)/r2c.bam
+	
+# c2g
+$(outdir)/c2g.bam: $(assembly_outdir)/TRANSCRIPTS.DONE
+	source $(profile) && \
+	time gmap -d $(GENOME) -D $(GMAPDB) $(assembly_outdir)/$(name).transcripts.fa -t $(NUM_THREADS) -f samse -n 0 | samtools view -bhS - -o $(outdir)/c2g.bam
+
+# c2t
+$(outdir)/c2t.bam: $(assembly_outdir)/TRANSCRIPTS.DONE
+	source $(profile) && \
+	time bwa mem -t $(NUM_THREADS) $(TRANSCRIPTS_FASTA) $(assembly_outdir)/$(name).transcripts.fa | samtools view -bhS -o $(outdir)/c2t.bam
+
+# pavfinder
+$(pavfinder_outdir)/sv.bedpe: $(outdir)/c2g.bam $(outdir)/c2t.bam $(outdir)/r2c.bam $(outdir)/r2c.bam.bai
+	source $(profile) && \
+	mkdir -p $(pavfinder_outdir) && \
+	time pavfinder fusion --gbam $(outdir)/c2g.bam --tbam $(outdir)/c2t.bam --transcripts_fasta $(TRANSCRIPTS_FASTA) --genome_index $(GMAPDB) $(GENOME) --r2c $(outdir)/r2c.bam $(assembly_outdir)/$(name).transcripts.fa $(GTF) $(GENOME_FASTA) $(pavfinder_outdir) $(PAVFINDER_PARAMS)
+
+# clean up
+clean:
+	rm -f $(assembly_outdir)/$(name).transcripts.fa.amb \
+			$(assembly_outdir)/$(name).transcripts.fa.ann \
+			$(assembly_outdir)/$(name).transcripts.fa.bwt \
+			$(assembly_outdir)/$(name).transcripts.fa.pac \
+			$(assembly_outdir)/$(name).transcripts.fa.fai
+
+help: 
+	@printf 'fusion-bloom profile=<profile> left=<fastq.gz> right=<fastq2.gz> readlen=<read length> [outdir=output_directory] [name=assembly_prefix]\n'
