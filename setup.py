@@ -76,7 +76,7 @@ setup(
                'pavfinder/scripts/map_splice.py',
                'pavfinder/scripts/extract_transcript_sequence.py',
                'pavfinder/scripts/tap.py',
-               'pavfinder/scripts/rescue_fusion.py'
+               'pavfinder/scripts/rescue_fusion.py',
                'pavfinder/scripts/fusion-bloom',
                ],
 )
