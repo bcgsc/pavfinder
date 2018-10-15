@@ -69,5 +69,7 @@ v0.4.4
 - updated refgenes.sorted.gtf.gz and setup.py to copy ensGenes.sorted.gtf.gz
 
 v1.0
+- added `fusion-bloom`(Make script) for running [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) instead of Trans-ABySS
 - modified `tap.py` to deal with multimatch headers from BBT 2.1.1
 - modified `tap.py` to parse in assembly parameters from cfg file
+- bugfix: extract gene names from c2t.bam even when no adjacency/event is identified
