@@ -65,3 +65,14 @@ pavfinder splice c2g.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to
 ```
 tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
 ```
+
+## fusion-bloom
+* input `transcriptome`
+  * `test_1.fastq.gz`, `test_2.fastq.gz`
+  * `test.profile`
+	* specify full paths to `GMAPDB` and `GENOME_FASTA`(GMAP hg19 index and hg19 fasta file)
+	* specify full paths to `TRANSCRIPTS_FASTA`(`refGene.fa` provided) and `GTF`(`refGene.sorted.gtf.gz` provided)
+* output `transcriptome/expected_output/fusion-bloom.out.tar.gz`
+
+```
+fusion-bloom profile=test.profile left=test_1.fastq.gz right=test_2.fastq.gz readlen=100
