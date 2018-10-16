@@ -41,4 +41,10 @@
   ```
   tap.py <sample> <outdir> --fq_list <file_listing_FASTQ_pairs> --k <space-delimited k values> --readlen <read_length> --nprocs <number_of_processes> --only_assembly
   ```
-  
+
+* Run fusion-bloom for fusion calling
+
+  ```
+  source <fusion-bloom.profile>
+  fusion-bloom profile=<fusion-bloom.profile> left=<fastq.gz> right=<fastq.gz> readlen=<read_length>
+  ```
