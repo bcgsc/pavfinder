@@ -28,5 +28,7 @@ PAVFinder infers variants from non-contiguous (split or gapped) contig sequence 
 
 A pipeline that bundles the 3 analysis steps called `TAP` (*T*ransabyss-*A*lignment-*P*AVFinder) is provided to facilitate whole transcriptome analysis. TAP is also designed to be run in a targeted mode on selected genes. This requires a [Bloom Filter](http://www.bcgsc.ca/platform/bioinfo/software/biobloomtools) of targeted gene sequences to be created beforehand. Whereas the full assembly of a single RNAseq library with over 100 million read pairs requires more than 24 hours to complete, a targeted assembly and analysis of a gene list (e.g. [COSMIC](http://cancer.sanger.ac.uk/census/)) of several hundred can be completed within half an hour.
 
+A new pipeline named `fusion-bloom` coupling PAVFinder with our latest RNA-seq assembler [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) has been added to the repository. We demonstrated that it has higher senstivitiy and specificity than most state-of-the-art fusion callers.    
+
 ### Publication
 Readman Chiu, Ka Ming Nip, Justin Chu and Inanc Birol. **TAP: a targeted clinical genomics pipeline for detecting transcript variants using RNA-seq data**. *BMC Med Genomics* (2018) 11:79 [https://doi.org/10.1186/s12920-018-0402-6](https://doi.org/10.1186/s12920-018-0402-6)
