@@ -42,6 +42,7 @@ class Adjacency:
          ('copy_number_change', None),
          ('repeat_seq', 'repeat_seq'),
          ('in_frame', 'in_frame'),
+         ('splice_motif', 'splice_motif'),
          ('probe', 'probe'),
          ('support_span', 'support_span'),
          ('spanning_reads', 'spanning'),
@@ -89,6 +90,7 @@ class Adjacency:
          ('copy_number_change', None),
          ('repeat_seq', 'repeat_seq'),
          ('in_frame', 'in_frame'),
+         ('splice_motif', 'splice_motif'),
          ('probe', 'probe'),
          ('support_span', 'support_span'),
          ('spanning_reads', 'spanning'),
@@ -109,7 +111,7 @@ class Adjacency:
                  copy_num_change = None, repeat_seq = None,
                  upstream_transcript = None, downstream_transcript = None,
                  exons_oriented = None, exon_bounds_oriented = None,
-                 feature = None, effect = None, in_frame = None, sense_fusion=None,
+                 feature = None, effect = None, in_frame = None, splice_motif=None, sense_fusion=None,
                  support_span=None, spanning=None, flanking=None,
                  probe=None, size=None, link=None):
 	for attr, value in locals().iteritems():
