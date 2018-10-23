@@ -15,6 +15,7 @@ report_items = OrderedDict(
          ('seq_id', 'seq_id'),
          ('seq_breaks', 'seq_breaks'),
          ('in_frame', 'in_frame'),
+         ('splice_motif', 'splice_motif'),
          ('probe', 'probe'),
          ('support_reads', 'spanning'),
          ]
@@ -70,7 +71,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	                chroms = (align.target, align.target),
 	                genome_breaks = (event['pos'][0], event['pos'][1]),
 	                event = event['event'],
-	                size = event['size']
+	                size = event['size'],
 	                )
 
 	if event['event'] == 'skipped_exon':
@@ -90,6 +91,9 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    else:
 		adj.exons = (transcript.exon_num(event['exons'][0]),
 	                     transcript.exon_num(event['exons'][1]))
+
+	if event.has_key('splice_motif'):
+	    adj.splice_motif = event['splice_motif']
 
 	if adj.event == 'retained_intron':
 	    adj.set_probe(query_seq)
@@ -216,6 +220,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	                                     known_juncs = known_juncs,
 	                                     known_exons = known_exons,
 	                                     )
+
 	    if events:
 		for e in events:
 		    e['blocks'] = range(i + 1, j)
@@ -225,6 +230,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	
     adjs = []
     for event in all_events:
+	print 'ddd', event
 	if event['event'] in ('novel_exon', 'retained_intron'):
 	    if event['event'] == 'retained_intron':
 		if align.strand == '+':
@@ -236,6 +242,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    adjs.extend(split_event(event))
 	else:
 	    adjs.append(event_to_adj(event))
+
     return adjs
 	    	
 def report(event, event_id=None):
@@ -334,13 +341,13 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 	    pos = (blocks[0][1], blocks[1][0])
 	    event = None
 	    if gap_size > 0:
-		if gap_size > min_intron_size and\
-	           check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
+		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+		if gap_size > min_intron_size and splice_motif[0]:
 		    event = 'novel_intron'
 		else:
 		    event = 'del'
 	    if event is not None:
-		events.append({'event': event, 'exons': [match2[0]], 'pos':pos, 'size':gap_size})
+		events.append({'event': event, 'exons': [match2[0]], 'pos':pos, 'size':gap_size, 'splice_motif':splice_motif[0]})
 	    
     else:
 	if match2[0] > match1[0] + 1:
@@ -365,23 +372,24 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 	    gap_size = blocks[1][0] - blocks[0][1] - 1
 	    pos = (blocks[0][1], blocks[1][0])
 	    event = None
+	    splice_motif = [None]
 	    if gap_size > 0:
-		if gap_size > min_intron_size and\
-	           check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
+		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+		if gap_size > min_intron_size and splice_motif:
 		    event = 'novel_intron'
 		else:
 		    event = 'del'
 	    elif gap_size == 0:
 		event = 'ins'
-	    
+
 	    if event is not None:
 		if event != 'ins':
-		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos, 'size':gap_size})
+		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos, 'size':gap_size, 'splice_motif':splice_motif[0]})
 		else:
-		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos})
+		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos, 'splice_motif':splice_motif[0]})
 	    
 	# novel donor and acceptor
-	if  match2[1][0] != '=':
+	if match2[1][0] != '=':
 	#if match1[1][1] == '=' and match2[1][0] != '=':
 	    size = abs(blocks[1][0] - transcript.exons[match2[0]][0])
 	    if transcript.strand == '+':
@@ -393,8 +401,9 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		donor_start = blocks[1][0] - 2
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
-	    if check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
-		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size})
+	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+	    if splice_motif[0]:
+		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif[0]})
 		
 	if match1[1][1] != '=':
 	#if match1[1][1] != '=' and match2[1][0] == '=':
@@ -408,8 +417,9 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		donor_start = blocks[1][0] - 2
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
-	    if check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
-		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size})
+	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+	    if splice_motif[0]:
+		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif[0]})
 		    
 	if match2[0] == match1[0] + 1 and\
            match1[1][1] == '=' and\
@@ -425,8 +435,9 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		    acceptor_start = pos[1] + 1
 
 		# check splice motif
-		if check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
-		    events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size})
+		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+		if splice_motif[0]:
+		    events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size, 'splice_motif':splice_motif[0]})
 	    
     # set size to None for event that doesn't have size i.e. 'ins'
     for event in events:
@@ -438,7 +449,69 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
     else:
 	return events
 
-def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta):
+def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, max_diff=1):
+    def find_diff(seq1, seq2):
+	diff = []
+	i = 0
+	for b1, b2 in zip(seq1.lower(), seq2.lower()):
+	    if b1 != b2:
+		diff.append((i, b1, b2))
+	    i += 1
+	return diff
+
+    result = [None]
+
+    # must be at least 1 bp separating the donor and acceptor
+    if abs(acceptor_start - donor_start) < 3:
+	return result
+
+    donor_seq = ref_fasta.fetch(chrom, donor_start - 1, donor_start - 1 + 2)
+    acceptor_seq = ref_fasta.fetch(chrom, acceptor_start - 1, acceptor_start - 1 + 2)
+
+    coords = [donor_start, acceptor_start]
+    seqs = [donor_seq, acceptor_seq]
+    canonicals = ['gt', 'ag']
+    print 'kkk', seqs, canonicals
+    diffs = []
+    for i, seq in enumerate(seqs):
+	if strand == '-':
+	    diff = find_diff(canonicals[i], reverse_complement(seq))
+	else:
+	    diff = find_diff(canonicals[i], seq)
+	diffs.append(diff)
+
+    base_diffs = []
+    print 'ddd', diffs
+    # don't allow both bases to be mutated in donor or acceptor
+    if len(diffs[0]) + len(diffs[1]) <= max_diff and\
+       len(diffs[0]) <= 1 and len(diffs[1]) <= 1:
+	if strand == '-':
+	    motif = (reverse_complement(donor_seq) + reverse_complement(acceptor_seq)).upper()
+	else:
+	    motif = (donor_seq + acceptor_seq).upper()
+
+	# perfect match
+	if not diffs[0] and not diffs[1]:
+	    return motif, None
+
+	# 0 = donor, 1 = acceptor
+	for i, diff in enumerate(diffs):
+	    if not diff:
+		continue
+	    if strand == '+':
+		coord_diff = coords[i] + diff[0][0]
+		base_diff = diff[0][1].upper()
+	    else:
+		coord_diff = coords[i] + 1 - diff[0][0]
+		base_diff = reverse_complement(diff[0][1].upper())
+	    base_diffs.append([coord_diff, base_diff])
+
+	print 'mmm', motif, base_diffs
+	result = motif, base_diffs
+
+    return result
+
+def check_splice_motif2(chrom, donor_start, acceptor_start, strand, ref_fasta, max_diff=1):
     """Check if the 4-base splice motif of a novel junction is canonical (gtag)
 	
     Right now only considers 'gtag' as canonical
@@ -452,9 +525,6 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta):
     Returns:
 	True if it's canonical, False otherwise
     """
-    canonical_motifs = Set()
-    canonical_motifs.add('gtag')
-    
     # must be at least 1 bp separating the donor and acceptor
     if abs(acceptor_start - donor_start) < 3:
 	return False
@@ -466,9 +536,15 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta):
 	motif = donor_seq + acceptor_seq
     else:
 	motif = reverse_complement(acceptor_seq + donor_seq)
-    
-    if motif.lower() in canonical_motifs:
-	return True
+
+    canonical_motif = 'gtag'
+    num_matches = 0
+    for bc, bo in zip(canonical_motif, motif.lower()):
+	if bc == bo:
+	    num_matches += 1
+    print 'kkk', motif, num_matches
+    if len(canonical_motif) - num_matches <= max_diff:
+	return motif.upper()
     else:
 	return False
     
