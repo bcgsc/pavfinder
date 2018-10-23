@@ -318,7 +318,7 @@ class ExonMapper:
         
         return match
     
-    def pick_best_mapping(self, mappings, align, debug=False):
+    def pick_best_mapping(self, mappings, align):
 	"""Selects best mapping among transcripts"""
 	def calc_score(matches):
 	    # points are scored for matching exon boundaries
@@ -391,7 +391,7 @@ class ExonMapper:
 	    metric['txt_size'] = transcript.length()
 	    metrics[tid] = metric
 	    	    
-	    if debug:
+	    if self.debug:
 		sys.stdout.write("mapping %s %s %s\n" % (align.query, tid, metric))
 	    
 	if mappings:
