@@ -231,7 +231,6 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	
     adjs = []
     for event in all_events:
-	print 'ddd', event
 	if event['event'] in ('novel_exon', 'retained_intron'):
 	    if event['event'] == 'retained_intron':
 		if align.strand == '+':
@@ -378,7 +377,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 	    splice_motif = [None]
 	    if gap_size > 0:
 		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
-		if gap_size > min_intron_size and splice_motif:
+		if gap_size > min_intron_size and splice_motif[0]:
 		    event = 'novel_intron'
 		else:
 		    event = 'del'
@@ -405,7 +404,6 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
 	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
-	    print 'zz1', splice_motif
 	    if splice_motif[0]:
 		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 		
@@ -422,7 +420,6 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
 	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
-	    print 'zz2', splice_motif
 	    if splice_motif[0]:
 		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 		    
@@ -462,6 +459,7 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 	    if b1 != b2:
 		diff.append((i, b1, b2))
 	    i += 1
+
 	return diff
 
     result = [None]
@@ -476,7 +474,6 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
     coords = [donor_start, acceptor_start]
     seqs = [donor_seq, acceptor_seq]
     canonicals = ['gt', 'ag']
-    print 'kkk', seqs, canonicals
     diffs = []
     for i, seq in enumerate(seqs):
 	if strand == '-':
@@ -486,7 +483,6 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 	diffs.append(diff)
 
     base_diffs = []
-    print 'ddd', diffs
     # don't allow both bases to be mutated in donor or acceptor
     if len(diffs[0]) + len(diffs[1]) <= max_diff and\
        len(diffs[0]) <= 1 and len(diffs[1]) <= 1:
@@ -511,7 +507,6 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 		base_diff = reverse_complement(diff[0][1].upper())
 	    base_diffs.append([coord_diff, base_diff])
 
-	print 'mmm', motif, base_diffs
 	result = motif, base_diffs
 
     return result
