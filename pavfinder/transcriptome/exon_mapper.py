@@ -158,7 +158,7 @@ class ExonMapper:
 	def create_bedpe_header():
 	    cols = []
 	    for i in {1,2}:
-		for label in {'chrom', 'start', 'end'}:
+		for label in ('chrom', 'start', 'end'):
 		    cols.append('%s%d' % (label, i))
 	    for label in ('name', 'score', 'strand1', 'strand2'):
 		cols.append(label)
