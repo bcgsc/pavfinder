@@ -18,6 +18,7 @@ report_items = OrderedDict(
          ('splice_motif', 'splice_motif'),
          ('probe', 'probe'),
          ('support_reads', 'spanning'),
+         ('genome_support', 'genome_support'),
          ]
     )
 
@@ -278,6 +279,8 @@ def report(event, event_id=None):
 		    
 	elif hasattr(event, label):
 	    val = getattr(event, label)
+	    if label == 'splice_motif' and val is not None:
+		val = val[0]
 	    if val is not None:
 		value = val
 		
@@ -347,7 +350,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		else:
 		    event = 'del'
 	    if event is not None:
-		events.append({'event': event, 'exons': [match2[0]], 'pos':pos, 'size':gap_size, 'splice_motif':splice_motif[0]})
+		events.append({'event': event, 'exons': [match2[0]], 'pos':pos, 'size':gap_size, 'splice_motif':splice_motif})
 	    
     else:
 	if match2[0] > match1[0] + 1:
@@ -384,9 +387,9 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 
 	    if event is not None:
 		if event != 'ins':
-		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos, 'size':gap_size, 'splice_motif':splice_motif[0]})
+		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos, 'size':gap_size, 'splice_motif':splice_motif})
 		else:
-		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos, 'splice_motif':splice_motif[0]})
+		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos, 'splice_motif':splice_motif})
 	    
 	# novel donor and acceptor
 	if match2[1][0] != '=':
@@ -402,8 +405,9 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
 	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+	    print 'zz1', splice_motif
 	    if splice_motif[0]:
-		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif[0]})
+		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 		
 	if match1[1][1] != '=':
 	#if match1[1][1] != '=' and match2[1][0] == '=':
@@ -418,8 +422,9 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
 	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+	    print 'zz2', splice_motif
 	    if splice_motif[0]:
-		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif[0]})
+		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 		    
 	if match2[0] == match1[0] + 1 and\
            match1[1][1] == '=' and\
@@ -437,7 +442,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		# check splice motif
 		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
 		if splice_motif[0]:
-		    events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size, 'splice_motif':splice_motif[0]})
+		    events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 	    
     # set size to None for event that doesn't have size i.e. 'ins'
     for event in events:
@@ -563,3 +568,34 @@ def is_junction_annotated(match1, match2):
 	return True
     
     return False
+
+def corroborate_genome(adjs, genome_bam):
+    """Check if genome has splice-site mutation leading to novel splice site
+
+    Args:
+        adjs: list of adjs
+	genome_bam: genome bam
+    """
+    for adj in adjs:
+	if adj.event in ('novel_acceptor', 'novel_donor') and\
+	   adj.splice_motif and adj.splice_motif[1]:
+	    chrom = adj.chroms[0]
+	    if adj.chroms[0] not in genome_bam.references and\
+	       adj.chroms[0].lstrip('chr') in genome_bam.references:
+		chrom = adj.chroms[0].lstrip('chr')
+
+	    genome_support = []
+	    for pos, base in adj.splice_motif[1]:
+		counts = {'corroborated': 0, 'total': 0}
+		for pileup_col in genome_bam.pileup(chrom, pos - 2, pos - 1):
+		    for pileup_read in pileup_col.pileups:
+			if not pileup_read.is_del and not pileup_read.is_refskip:
+			    if pileup_col.pos == pos - 1:
+				counts['total'] += 1
+				#print 'gg', pileup_col.pos, pileup_read.alignment.query_name, pileup_read.alignment.query_sequence[pileup_read.query_position]
+				if pileup_read.alignment.query_sequence[pileup_read.query_position].upper() == base.upper():
+				    counts['corroborated'] += 1
+
+		genome_support.append('%d/%d' % (counts['corroborated'], counts['total']))
+
+	    adj.genome_support = ','.join(genome_support)
