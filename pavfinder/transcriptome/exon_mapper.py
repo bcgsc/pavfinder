@@ -398,7 +398,7 @@ class ExonMapper:
 	    tids_sorted = sorted(metrics.keys(), key = lambda tid: (-1 * metrics[tid]['score'], 
 		                                                    metrics[tid]['from_edge'], 
 		                                                    metrics[tid]['txt_size']))
-	    if debug:
+	    if self.debug:
 		for tid in tids_sorted:
 		    sys.stdout.write('sorted %s %s\n' % (tid, metrics[tid]))
 		    
