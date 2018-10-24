@@ -18,6 +18,7 @@ report_items = OrderedDict(
          ('splice_motif', 'splice_motif'),
          ('probe', 'probe'),
          ('support_reads', 'spanning'),
+         ('splice_site_variant', 'splice_site_variant'),
          ('genome_support', 'genome_support'),
          ]
     )
@@ -275,11 +276,21 @@ def report(event, event_id=None):
 	    
 	elif item == 'transcript':
 	    value = event.transcripts[0].id
-		    
+
+	elif item == 'splice_site_variant':
+	    val = getattr(event, 'splice_motif')
+	    if val is not None and val[0] is not None and len(val) > 0 and val[1] is not None:
+		variants = []
+		for v in val[1]:
+		    variants.append(v[2])
+		value = ','.join(variants)
+
 	elif hasattr(event, label):
 	    val = getattr(event, label)
+
 	    if label == 'splice_motif' and val is not None:
 		val = val[0]
+
 	    if val is not None:
 		value = val
 		
@@ -501,52 +512,56 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 		continue
 	    if strand == '+':
 		coord_diff = coords[i] + diff[0][0]
+		base_from = diff[0][2].upper()
 		base_diff = diff[0][1].upper()
+		variant = '%s:%d_%s>%s' % (chrom, coord_diff, base_from, base_diff)
 	    else:
 		coord_diff = coords[i] + 1 - diff[0][0]
+		base_from = reverse_complement(diff[0][2].upper())
 		base_diff = reverse_complement(diff[0][1].upper())
-	    base_diffs.append([coord_diff, base_diff])
+		variant = '%s:%d_%s>%s' % (chrom, coord_diff, base_from, base_diff)
+	    base_diffs.append([coord_diff, base_diff, variant])
 
 	result = motif, base_diffs
 
     return result
 
-def check_splice_motif2(chrom, donor_start, acceptor_start, strand, ref_fasta, max_diff=1):
-    """Check if the 4-base splice motif of a novel junction is canonical (gtag)
+#def check_splice_motif2(chrom, donor_start, acceptor_start, strand, ref_fasta, max_diff=1):
+    #"""Check if the 4-base splice motif of a novel junction is canonical (gtag)
 	
-    Right now only considers 'gtag' as canonical
+    #Right now only considers 'gtag' as canonical
     
-    Args:
-	chrom: (str) chromosome
-	donor_start: (int) genomic position of first(smallest) base of donor site (1-based)
-	acceptor_start: (int) genomic position of first(smallest) base of acceptor site (1-based)
-	strand: (str) transcript strand '+' or '-'
-	ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence
-    Returns:
-	True if it's canonical, False otherwise
-    """
-    # must be at least 1 bp separating the donor and acceptor
-    if abs(acceptor_start - donor_start) < 3:
-	return False
+    #Args:
+	#chrom: (str) chromosome
+	#donor_start: (int) genomic position of first(smallest) base of donor site (1-based)
+	#acceptor_start: (int) genomic position of first(smallest) base of acceptor site (1-based)
+	#strand: (str) transcript strand '+' or '-'
+	#ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence
+    #Returns:
+	#True if it's canonical, False otherwise
+    #"""
+    ## must be at least 1 bp separating the donor and acceptor
+    #if abs(acceptor_start - donor_start) < 3:
+	#return False
 
-    donor_seq = ref_fasta.fetch(chrom, donor_start - 1, donor_start - 1 + 2)
-    acceptor_seq = ref_fasta.fetch(chrom, acceptor_start - 1, acceptor_start - 1 + 2)
+    #donor_seq = ref_fasta.fetch(chrom, donor_start - 1, donor_start - 1 + 2)
+    #acceptor_seq = ref_fasta.fetch(chrom, acceptor_start - 1, acceptor_start - 1 + 2)
     
-    if strand == '+':
-	motif = donor_seq + acceptor_seq
-    else:
-	motif = reverse_complement(acceptor_seq + donor_seq)
+    #if strand == '+':
+	#motif = donor_seq + acceptor_seq
+    #else:
+	#motif = reverse_complement(acceptor_seq + donor_seq)
 
-    canonical_motif = 'gtag'
-    num_matches = 0
-    for bc, bo in zip(canonical_motif, motif.lower()):
-	if bc == bo:
-	    num_matches += 1
-    print 'kkk', motif, num_matches
-    if len(canonical_motif) - num_matches <= max_diff:
-	return motif.upper()
-    else:
-	return False
+    #canonical_motif = 'gtag'
+    #num_matches = 0
+    #for bc, bo in zip(canonical_motif, motif.lower()):
+	#if bc == bo:
+	    #num_matches += 1
+    #print 'kkk', motif, num_matches
+    #if len(canonical_motif) - num_matches <= max_diff:
+	#return motif.upper()
+    #else:
+	#return False
     
 def is_junction_annotated(match1, match2):
     """Checks if junction is in gene model
@@ -580,7 +595,7 @@ def corroborate_genome(adjs, genome_bam):
 		chrom = adj.chroms[0].lstrip('chr')
 
 	    genome_support = []
-	    for pos, base in adj.splice_motif[1]:
+	    for pos, base, variant in adj.splice_motif[1]:
 		counts = {'corroborated': 0, 'total': 0}
 		for pileup_col in genome_bam.pileup(chrom, pos - 2, pos - 1):
 		    for pileup_read in pileup_col.pileups:
