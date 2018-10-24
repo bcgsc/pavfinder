@@ -514,12 +514,12 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 		coord_diff = coords[i] + diff[0][0]
 		base_from = diff[0][2].upper()
 		base_diff = diff[0][1].upper()
-		variant = '%s:%d_%s>%s' % (chrom, coord_diff, base_from, base_diff)
+		variant = '%s:%d%s>%s' % (chrom, coord_diff, base_from, base_diff)
 	    else:
 		coord_diff = coords[i] + 1 - diff[0][0]
 		base_from = reverse_complement(diff[0][2].upper())
 		base_diff = reverse_complement(diff[0][1].upper())
-		variant = '%s:%d_%s>%s' % (chrom, coord_diff, base_from, base_diff)
+		variant = '%s:%d%s>%s' % (chrom, coord_diff, base_from, base_diff)
 	    base_diffs.append([coord_diff, base_diff, variant])
 
 	result = motif, base_diffs
