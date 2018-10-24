@@ -525,43 +525,6 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 	result = motif, base_diffs
 
     return result
-
-#def check_splice_motif2(chrom, donor_start, acceptor_start, strand, ref_fasta, max_diff=1):
-    #"""Check if the 4-base splice motif of a novel junction is canonical (gtag)
-	
-    #Right now only considers 'gtag' as canonical
-    
-    #Args:
-	#chrom: (str) chromosome
-	#donor_start: (int) genomic position of first(smallest) base of donor site (1-based)
-	#acceptor_start: (int) genomic position of first(smallest) base of acceptor site (1-based)
-	#strand: (str) transcript strand '+' or '-'
-	#ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence
-    #Returns:
-	#True if it's canonical, False otherwise
-    #"""
-    ## must be at least 1 bp separating the donor and acceptor
-    #if abs(acceptor_start - donor_start) < 3:
-	#return False
-
-    #donor_seq = ref_fasta.fetch(chrom, donor_start - 1, donor_start - 1 + 2)
-    #acceptor_seq = ref_fasta.fetch(chrom, acceptor_start - 1, acceptor_start - 1 + 2)
-    
-    #if strand == '+':
-	#motif = donor_seq + acceptor_seq
-    #else:
-	#motif = reverse_complement(acceptor_seq + donor_seq)
-
-    #canonical_motif = 'gtag'
-    #num_matches = 0
-    #for bc, bo in zip(canonical_motif, motif.lower()):
-	#if bc == bo:
-	    #num_matches += 1
-    #print 'kkk', motif, num_matches
-    #if len(canonical_motif) - num_matches <= max_diff:
-	#return motif.upper()
-    #else:
-	#return False
     
 def is_junction_annotated(match1, match2):
     """Checks if junction is in gene model
