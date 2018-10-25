@@ -21,7 +21,7 @@
 * Run PV to detect novel splice variants (exon_skipping, novel_exon, novel_intron, novel_donor, novel_acceptor, retained_intron)
 
   ```
-  map_splice.py <contigs_to_genome_bam> <contigs_fasta> <gtf> <genome_fasta> <outdir> --r2c <reads_to_contigs_bam> --suppl_annot <supplmental_annotations>
+  map_splice.py <contigs_to_genome_bam> <contigs_fasta> <gtf> <genome_fasta> <outdir> --r2c <reads_to_contigs_bam> [--suppl_annot supplmental.gtf.gz] [--genome_bam genome.bam]
   ```
 
 * Run full (assembly + analysis) TAP in targeted mode

@@ -68,8 +68,13 @@ v0.4.4
 - updated expected output files for tap
 - updated refgenes.sorted.gtf.gz and setup.py to copy ensGenes.sorted.gtf.gz
 
-v1.0
+v1.0.0
 - added `fusion-bloom`(Make script) for running [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) instead of Trans-ABySS
 - modified `tap.py` to deal with multimatch headers from BBT 2.1.1
 - modified `tap.py` to parse in assembly parameters from cfg file
 - bugfix: extract gene names from c2t.bam even when no adjacency/event is identified
+
+v1.1.0
+- allows 1 base to differ from canonical splice site (GTAG) in detecting novel donors or acceptors because of possibility of splice-site mutation
+- can input `genome_bam` to detect support level of splice site variant
+- search through main annotation to make sure novel event is novel; before only supplementary annotations is used for this purpose, and when no supplementary annotation is provided, an erroneous "novel" event may be reported because wrong transcript is assigned for contig

@@ -137,6 +137,7 @@ parser.add_argument('--remove_fq', action='store_true', help='remove intermediat
 parser.add_argument('--only_assembly', action='store_true')
 parser.add_argument('--only_sv', action='store_true')
 parser.add_argument('--only_splicing', action='store_true')
+parser.add_argument('--genome_bam', type=str, help='genome bam(for detecting splice-site variants)')
 parser.add_argument('--params', type=str, help='parameters file')
 assembly = parser.add_argument_group('assembly')
 assembly.add_argument('--k', type=int, nargs='+', help='k sizes for assembly')
@@ -630,8 +631,9 @@ def find_sv(inputs, events_output, nprocs):
        args.gtf,
        args.genome_fasta,
        args.nprocs,
+       args.genome_bam,
        )
-def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs):
+def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, genome_bam):
     """Finds splice_variants, generates coverage and junctions files using PAVFinder_transcriptome"""
     merged_fasta, c2g_bam, r2c_index = inputs
 
@@ -659,6 +661,9 @@ def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs):
                 cmd += ' --suppl_annot %s' % params['annotations']['suppl_annot']
             elif type(params['annotations']['suppl_annot']) is list or type(params['annotations']['suppl_annot']) is tuple:
                 cmd += ' --suppl_annot %s' % ' '.join(params['annotations']['suppl_annot'])
+
+        if genome_bam:
+            cmd += ' --genome_bam %s' % genome_bam
 
         run_cmd(cmd)
     else:

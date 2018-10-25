@@ -158,7 +158,7 @@ class ExonMapper:
 	def create_bedpe_header():
 	    cols = []
 	    for i in {1,2}:
-		for label in {'chrom', 'start', 'end'}:
+		for label in ('chrom', 'start', 'end'):
 		    cols.append('%s%d' % (label, i))
 	    for label in ('name', 'score', 'strand1', 'strand2'):
 		cols.append(label)
@@ -318,7 +318,7 @@ class ExonMapper:
         
         return match
     
-    def pick_best_mapping(self, mappings, align, debug=False):
+    def pick_best_mapping(self, mappings, align):
 	"""Selects best mapping among transcripts"""
 	def calc_score(matches):
 	    # points are scored for matching exon boundaries
@@ -391,14 +391,14 @@ class ExonMapper:
 	    metric['txt_size'] = transcript.length()
 	    metrics[tid] = metric
 	    	    
-	    if debug:
+	    if self.debug:
 		sys.stdout.write("mapping %s %s %s\n" % (align.query, tid, metric))
 	    
 	if mappings:
 	    tids_sorted = sorted(metrics.keys(), key = lambda tid: (-1 * metrics[tid]['score'], 
 		                                                    metrics[tid]['from_edge'], 
 		                                                    metrics[tid]['txt_size']))
-	    if debug:
+	    if self.debug:
 		for tid in tids_sorted:
 		    sys.stdout.write('sorted %s %s\n' % (tid, metrics[tid]))
 		    
