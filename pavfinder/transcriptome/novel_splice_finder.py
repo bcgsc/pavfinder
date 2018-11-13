@@ -240,12 +240,16 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 		else:
 		    event['seq_breaks'][0] -= event['seq_break_offsets'][0]
 		    event['seq_breaks'][1] += event['seq_break_offsets'][1]
+
 	    adjs.extend(split_event(event))
+
+	    if event['event'] == 'retained_intron':
+		check_retained_intron_splice_motif(event, adjs[-2:], query_seq, ref_fasta, align, transcript)
 	else:
 	    adjs.append(event_to_adj(event))
 
     return adjs
-	    	
+
 def report(event, event_id=None):
     data = []
 
@@ -462,17 +466,17 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
     else:
 	return events
 
+def find_diff(seq1, seq2):
+    diff = []
+    i = 0
+    for b1, b2 in zip(seq1.lower(), seq2.lower()):
+	if b1 != b2:
+	    diff.append((i, b1, b2))
+	i += 1
+
+    return diff
+
 def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, max_diff=1):
-    def find_diff(seq1, seq2):
-	diff = []
-	i = 0
-	for b1, b2 in zip(seq1.lower(), seq2.lower()):
-	    if b1 != b2:
-		diff.append((i, b1, b2))
-	    i += 1
-
-	return diff
-
     result = [None]
 
     # must be at least 1 bp separating the donor and acceptor
@@ -525,6 +529,53 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 	result = motif, base_diffs
 
     return result
+
+def check_retained_intron_splice_motif(event, adjs, query_seq, ref_fasta, align, transcript, max_diff=1):
+    # seq_breaks = contig breakpoints, sort for extracting contig sequence in case not sorted
+    seq_breaks_sorted = sorted(event['seq_breaks'])
+    retained_seq_contig = query_seq[seq_breaks_sorted[0]:seq_breaks_sorted[1] - 1]
+    if align.strand == '-':
+	retained_seq_contig = reverse_complement(retained_seq_contig)
+    # assume 'pos' is always sorted
+    retained_seq_genome = ref_fasta.fetch(adjs[0].chroms[0], event['pos'][0], event['pos'][1] - 1)
+    # splice motif from assembled sequence (in contig orientation)
+    splice_motif = retained_seq_contig[:2].upper() + retained_seq_contig[-2:].upper()
+
+    #print 'm2', splice_motif
+    #print retained_seq_contig
+    #print retained_seq_genome
+
+    # motifs[0] = upstream, motifs[1] = downstream, regardless of donor/acceptor
+    motifs = []
+    if transcript.strand == '+':
+	motifs.append(splice_motif[:2])
+	motifs.append(splice_motif[-2:])
+    else:
+	splice_motif = reverse_complement(splice_motif)
+	motifs.append(splice_motif[-2:])
+	motifs.append(splice_motif[:2])
+
+    coords = [event['pos'][0] + 1, event['pos'][1] - 2]
+    seqs = [retained_seq_contig[:2], retained_seq_contig[-2:]]
+    canonicals = [retained_seq_genome[:2], retained_seq_genome[-2:]]
+    diffs = []
+    for i, seq in enumerate(seqs):
+	diff = find_diff(canonicals[i], seq)
+	diffs.append(diff)
+
+    if len(diffs[0]) + len(diffs[1]) <= max_diff and\
+       len(diffs[0]) <= 1 and len(diffs[1]) <= 1:
+	# 0 = donor, 1 = acceptor
+	for i, diff in enumerate(diffs):
+	    if not diff:
+		adjs[i].splice_motif = motifs[i], None
+		continue
+
+	    coord_diff = coords[i] + diff[0][0]
+	    base_from = diff[0][1].upper()
+	    base_diff = diff[0][2].upper()
+	    variant = '%s:%d%s>%s' % (adjs[0].chroms[0], coord_diff, base_from, base_diff)
+	    adjs[i].splice_motif = motifs[i], [[coord_diff, base_diff, variant]]
     
 def is_junction_annotated(match1, match2):
     """Checks if junction is in gene model
@@ -550,7 +601,7 @@ def corroborate_genome(adjs, genome_bam):
 	genome_bam: genome bam
     """
     for adj in adjs:
-	if adj.event in ('novel_acceptor', 'novel_donor') and\
+	if adj.event in ('novel_acceptor', 'novel_donor', 'retained_intron') and\
 	   adj.splice_motif and adj.splice_motif[1]:
 	    chrom = adj.chroms[0]
 	    if adj.chroms[0] not in genome_bam.references and\
