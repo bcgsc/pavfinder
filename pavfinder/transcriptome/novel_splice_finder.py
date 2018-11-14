@@ -79,6 +79,10 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	if event['event'] == 'skipped_exon':
 	    adj.exons = (transcript.coord_to_exon(event['pos'][0]),
 	                 transcript.coord_to_exon(event['pos'][1]))
+
+	    # set up splice_motif field for genome association
+	    check_splice_motif_skipped_exon(adj, transcript, ref_fasta)
+
 	elif event['event'] == 'novel_exon':
 	    exon1 = transcript.coord_to_exon(event['pos'][0])
 	    exon2 = transcript.coord_to_exon(event['pos'][1])
@@ -281,13 +285,18 @@ def report(event, event_id=None):
 	elif item == 'transcript':
 	    value = event.transcripts[0].id
 
-	elif item == 'splice_site_variant':
-	    val = getattr(event, 'splice_motif')
-	    if val is not None and val[0] is not None and len(val) > 0 and val[1] is not None:
-		variants = []
-		for v in val[1]:
-		    variants.append(v[2])
-		value = ','.join(variants)
+	elif item == 'splice_site_variant' and value == 'na':
+	    if hasattr(event, 'splice_site_variant'):
+		value = getattr(event, 'splice_site_variant')
+
+	    elif hasattr(event, 'splice_motif'):
+		val = getattr(event, 'splice_motif')
+		if val is not None and val[0] is not None and len(val) > 0 and val[1] is not None and\
+		   len(val[1][0]) != 2:
+		    variants = []
+		    for v in val[1]:
+			variants.append(v[2])
+		    value = ','.join(variants)
 
 	elif hasattr(event, label):
 	    val = getattr(event, label)
@@ -376,7 +385,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		exon = transcript.exons[e]
 		size += exon[1] - exon[0] + 1
 	    events.append({'event': 'skipped_exon', 'exons': range(match1[0] + 1, match2[0]), 'pos':pos, 'size':size})
-	   
+
 	if match1[0] == match2[0] and\
            match1[1][1] == '<' and match2[1][0] == '>':		
 	    if transcript.strand == '+':
@@ -477,6 +486,22 @@ def find_diff(seq1, seq2):
     return diff
 
 def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, max_diff=1):
+    """Curates splice motif sequence and deviation from canoncial sequence
+
+       Args:
+	    chrom: (str) chromosome
+	    donor_start: (int) in relation to reference, not transcript
+	    acceptor_start: (int) in relation to reference, not transcript
+	    strand: (str) transcript strand, '+' or '-'
+	    ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence, for checking splice motif
+	    max_diff: maximum number of bases deviated from canonical motif
+       Returns:
+	    2-member-tuple: (str) motif sequence observed
+			    (list of tuples): list of deviations from canoncial motif
+			                      each deviation = (genomic coordinate,
+					                       observed base,
+							       variant = chrom:coordBaseFrom>BaseTo)
+    """
     result = [None]
 
     # must be at least 1 bp separating the donor and acceptor
@@ -496,6 +521,7 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 	else:
 	    diff = find_diff(canonicals[i], seq)
 	diffs.append(diff)
+    print 'ww', donor_seq, acceptor_seq, diff
 
     base_diffs = []
     # don't allow both bases to be mutated in donor or acceptor
@@ -576,7 +602,30 @@ def check_retained_intron_splice_motif(event, adjs, query_seq, ref_fasta, align,
 	    base_diff = diff[0][2].upper()
 	    variant = '%s:%d%s>%s' % (adjs[0].chroms[0], coord_diff, base_from, base_diff)
 	    adjs[i].splice_motif = motifs[i], [[coord_diff, base_diff, variant]]
-    
+
+def check_splice_motif_skipped_exon(adj, transcript, ref_fasta):
+    # identify flanking splice-site coordinates of skipped exon(s)
+    flanking_exons = sorted(adj.exons)
+    skipped_exons = sorted(set(xrange(min(flanking_exons), max(flanking_exons))).difference(flanking_exons))
+
+    exon_coords = set()
+    for exon in skipped_exons:
+	bounds = transcript.exon(exon)
+	exon_coords.add(bounds[0])
+	exon_coords.add(bounds[1])
+    sorted_exon_coords = sorted(exon_coords)
+    splice_site_coords = range(sorted_exon_coords[0] - 2, sorted_exon_coords[0]) + range(sorted_exon_coords[1] + 1, sorted_exon_coords[1] + 3)
+
+    # extract coordinates and corresponding bases for find_genome_interruptions()
+    adj.splice_motif = [None, []]
+    for coord in splice_site_coords:
+	adj.splice_motif[1].append([coord, ref_fasta.fetch(transcript.chrom, coord-1, coord).upper()])
+
+    # fills in splice_motif sequence
+    adj.splice_motif[0] = ''.join([b[1] for b in adj.splice_motif[1]])
+    if transcript.strand == '-':
+	adj.splice_motif[0] = reverse_complement(adj.splice_motif[0][-2:] + adj.splice_motif[0][:2])
+
 def is_junction_annotated(match1, match2):
     """Checks if junction is in gene model
     
@@ -600,26 +649,67 @@ def corroborate_genome(adjs, genome_bam):
         adjs: list of adjs
 	genome_bam: genome bam
     """
+    canonical = 'GTAG'
     for adj in adjs:
-	if adj.event in ('novel_acceptor', 'novel_donor', 'retained_intron') and\
-	   adj.splice_motif and adj.splice_motif[1]:
-	    chrom = adj.chroms[0]
-	    if adj.chroms[0] not in genome_bam.references and\
-	       adj.chroms[0].lstrip('chr') in genome_bam.references:
-		chrom = adj.chroms[0].lstrip('chr')
+	if adj.splice_motif is None:
+	    continue
 
-	    genome_support = []
-	    for pos, base, variant in adj.splice_motif[1]:
-		counts = {'corroborated': 0, 'total': 0}
-		for pileup_col in genome_bam.pileup(chrom, pos - 2, pos - 1):
-		    for pileup_read in pileup_col.pileups:
-			if not pileup_read.is_del and not pileup_read.is_refskip:
-			    if pileup_col.pos == pos - 1:
-				counts['total'] += 1
-				#print 'gg', pileup_col.pos, pileup_read.alignment.query_name, pileup_read.alignment.query_sequence[pileup_read.query_position]
-				if pileup_read.alignment.query_sequence[pileup_read.query_position].upper() == base.upper():
-				    counts['corroborated'] += 1
+	if adj.event in ('novel_acceptor', 'novel_donor', 'retained_intron'):
+	    if adj.splice_motif[0] != canonical and adj.splice_motif[1]:
+		find_genome_support(adj, genome_bam)
 
-		genome_support.append('%d/%d' % (counts['corroborated'], counts['total']))
+	if adj.event in ('skipped_exon'):
+	    if adj.splice_motif[0] == canonical and len(adj.splice_motif[1]) == 4 and adj.splice_motif[1]:
+		find_genome_interruptions(adj, genome_bam)
 
-	    adj.genome_support = ','.join(genome_support)
+def find_genome_support(adj, bam):
+    chrom = adj.chroms[0]
+    if adj.chroms[0] not in bam.references and\
+               adj.chroms[0].lstrip('chr') in bam.references:
+	chrom = adj.chroms[0].lstrip('chr')
+
+    genome_support = []
+    for pos, base, variant in adj.splice_motif[1]:
+	counts = {'corroborated': 0, 'total': 0}
+	for pileup_col in bam.pileup(chrom, pos - 2, pos - 1):
+	    for pileup_read in pileup_col.pileups:
+		if not pileup_read.is_del and not pileup_read.is_refskip:
+		    if pileup_col.pos == pos - 1:
+			counts['total'] += 1
+			#print 'gg', pileup_col.pos, pileup_read.alignment.query_name, pileup_read.alignment.query_sequence[pileup_read.query_position]
+			if pileup_read.alignment.query_sequence[pileup_read.query_position].upper() == base.upper():
+			    counts['corroborated'] += 1
+
+	genome_support.append('%d/%d' % (counts['corroborated'], counts['total']))
+
+    adj.genome_support = ','.join(genome_support)
+
+def find_genome_interruptions(adj, bam):
+    chrom = adj.chroms[0]
+    if adj.chroms[0] not in bam.references and\
+               adj.chroms[0].lstrip('chr') in bam.references:
+	chrom = adj.chroms[0].lstrip('chr')
+
+    variants = []
+    supports = []
+    for pos, ref_base in adj.splice_motif[1]:
+	counts = {}
+	for pileup_col in bam.pileup(chrom, pos - 2, pos - 1):
+	    for pileup_read in pileup_col.pileups:
+		if not pileup_read.is_del and not pileup_read.is_refskip:
+		    if pileup_col.pos == pos - 1:
+			base = pileup_read.alignment.query_sequence[pileup_read.query_position].upper()
+			if not counts.has_key(base):
+			    counts[base] = 0
+			counts[base] += 1
+
+	sorted_bases = sorted(counts.keys(), key=lambda b: counts[b], reverse=True)
+	coverage = sum(counts.values())
+
+	if sorted_bases[0].upper() != ref_base.upper():
+	    variants.append('%s:%d%s>%s' % (adj.chroms[0], pos, ref_base.upper(), sorted_bases[0].upper()))
+	    supports.append('%d/%d' % (counts[sorted_bases[0]], coverage))
+
+    if variants:
+	adj.splice_site_variant = ','.join(variants)
+	adj.genome_support = ','.join(supports)
