@@ -744,6 +744,7 @@ class Adjacency:
 	    adj.update_support_span()
 	    merged[adj.key()].append(adj)
 	    
+	merged_mapping = {}
 	merged_adjs = []
 	for key, adjs in merged.iteritems():
 	    if len(adjs) == 1:
@@ -754,6 +755,19 @@ class Adjacency:
 		merged_adj = deepcopy(adjs[0])
 		for attr in ('seq_id', 'seq_breaks', 'support_span', 'probe'):
 		    setattr(merged_adj, attr, merge_attr(adjs, attr))
+		# captures "old" links
+		if hasattr(adjs[0], 'link') and adjs[0].link is not None:
+		    merged_adj.link = [adj.link for adj in adjs]
+
 		merged_adjs.append(merged_adj)
 		
+		for adj in adjs:
+		    merged_mapping[adj] = merged_adj
+
+	# reset "new" link to merged_adj
+	for ma in merged_adjs:
+	    if hasattr(ma, 'link') and ma.link is not None and type(ma.link) is list and merged_mapping.has_key(ma.link[0]):
+		#print 'yy', ma, ma.seq_id, ma.event, ma.link, merged_mapping[ma.link[0]]
+		ma.link = merged_mapping[ma.link[0]]
+
 	return merged_adjs
