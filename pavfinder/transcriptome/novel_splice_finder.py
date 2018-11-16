@@ -35,6 +35,7 @@ def filter_events(events, min_support):
 		    failed.add(event_to_index[events[i].link])
 		else:
 		    print 'cannot find link', events[i].seq_id, events[i].event, events[i].link
+
     for i in sorted(list(failed), reverse=True):
 	del events[i]
     
@@ -90,6 +91,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 		adj.exons = ('na', exon2)
 	    elif exon1 is not None and exon2 is None:
 		adj.exons = (exon1, 'na')
+
 	else:
 	    if len(event['exons']) == 1:
 		adj.exons = (transcript.exon_num(event['exons'][0]),
@@ -107,6 +109,9 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    adj.set_probe(query_seq)
 
 	set_frame(adj)
+
+	if adj.event in ('novel_acceptor', 'novel_donor') and adj.splice_motif[1] is None:
+	    check_splice_motif_novel_site(adj, transcript, ref_fasta)
 
 	return adj
     
@@ -352,7 +357,25 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		                   'seq_break_offsets': (transcript.exons[exons[0]][1] - pos[0],
 		                                         pos[1] - transcript.exons[exons[1]][0]),
 		                   'size':size})
-	      
+
+	# a single block spans multiple exons e.g. [(4, '=>'), (5, '<>'), (6, '<<')]
+	else:
+	    retained_introns = []
+	    new_event = None
+	    for i in range(len(match1) - 1):
+		m1 = match1[i]
+		m2 = match1[i + 1]
+		if m2[0] == m1[0] + 1 and m1[1][1] == '>' and m2[1][0] == '<':
+		    exons = m1[0], m2[0]
+		    size = transcript.exons[exons[1]][0] - transcript.exons[exons[0]][1] - 1
+		    if not known_exons or not (chrom, pos[0], pos[1]) in known_exons:
+			events.append({'event': 'retained_intron',
+			               'exons': exons,
+			               'pos': (transcript.exons[exons[0]][1], transcript.exons[exons[1]][0]),
+			               'seq_break_offsets': (transcript.exons[exons[0]][1] - pos[0],
+			                                     pos[1] - transcript.exons[exons[1]][0]),
+			               'size':size})
+
     # genomic deletion or novel_intron
     elif match1 is None and match2 is not None:
 	if match2[0] == 0 and match2[1] == '<=':
@@ -521,7 +544,6 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 	else:
 	    diff = find_diff(canonicals[i], seq)
 	diffs.append(diff)
-    print 'ww', donor_seq, acceptor_seq, diff
 
     base_diffs = []
     # don't allow both bases to be mutated in donor or acceptor
@@ -534,7 +556,7 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 
 	# perfect match
 	if not diffs[0] and not diffs[1]:
-	    return motif, None
+	    return [motif, None]
 
 	# 0 = donor, 1 = acceptor
 	for i, diff in enumerate(diffs):
@@ -552,7 +574,7 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 		variant = '%s:%d%s>%s' % (chrom, coord_diff, base_from, base_diff)
 	    base_diffs.append([coord_diff, base_diff, variant])
 
-	result = motif, base_diffs
+	result = [motif, base_diffs]
 
     return result
 
@@ -626,6 +648,25 @@ def check_splice_motif_skipped_exon(adj, transcript, ref_fasta):
     if transcript.strand == '-':
 	adj.splice_motif[0] = reverse_complement(adj.splice_motif[0][-2:] + adj.splice_motif[0][:2])
 
+def check_splice_motif_novel_site(adj, transcript, ref_fasta):
+    splice_site_coords = []
+    for exon in adj.exons:
+	splice_site_coords.extend(transcript.exon(exon))
+    sorted_splice_site_coords = sorted(splice_site_coords)
+
+    adj.splice_motif[1] = []
+    for i in range(1,3):
+	if i == 1:
+	    for j in range(1,3):
+		coord = sorted_splice_site_coords[i] + j
+		print i, j, coord
+		adj.splice_motif[1].append([coord, ref_fasta.fetch(transcript.chrom, coord-1, coord).upper()])
+	if i == 2:
+	    for j in range(2,0,-1):
+		coord = sorted_splice_site_coords[i] - j
+		print i, j, coord
+		adj.splice_motif[1].append([coord, ref_fasta.fetch(transcript.chrom, coord-1, coord).upper()])
+
 def is_junction_annotated(match1, match2):
     """Checks if junction is in gene model
     
@@ -658,8 +699,9 @@ def corroborate_genome(adjs, genome_bam):
 	    if adj.splice_motif[0] != canonical and adj.splice_motif[1]:
 		find_genome_support(adj, genome_bam)
 
-	if adj.event in ('skipped_exon'):
-	    if adj.splice_motif[0] == canonical and len(adj.splice_motif[1]) == 4 and adj.splice_motif[1]:
+	if adj.event in ('skipped_exon', 'novel_acceptor', 'novel_donor'):
+	    print 'bb', adj.splice_motif
+	    if adj.splice_motif[0] == canonical and adj.splice_motif[1] and len(adj.splice_motif[1]) == 4:
 		find_genome_interruptions(adj, genome_bam)
 
 def find_genome_support(adj, bam):
@@ -706,9 +748,13 @@ def find_genome_interruptions(adj, bam):
 	sorted_bases = sorted(counts.keys(), key=lambda b: counts[b], reverse=True)
 	coverage = sum(counts.values())
 
-	if sorted_bases[0].upper() != ref_base.upper():
-	    variants.append('%s:%d%s>%s' % (adj.chroms[0], pos, ref_base.upper(), sorted_bases[0].upper()))
-	    supports.append('%d/%d' % (counts[sorted_bases[0]], coverage))
+	for base in sorted_bases:
+	    if base.upper() == ref_base.upper():
+		continue
+	    if counts[base] > coverage / 4:
+		variants.append('%s:%d%s>%s' % (adj.chroms[0], pos, ref_base.upper(), base.upper()))
+		supports.append('%d/%d' % (counts[base], coverage))
+	    break
 
     if variants:
 	adj.splice_site_variant = ','.join(variants)
