@@ -143,6 +143,23 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	adj2.link = adj1
 	return (adj1, adj2)
 
+    def remove_redundant_splice_sites_of_novel_intron(events):
+	"""Remove novel_acceptor and novel_donor corresponding to novel_intron"""
+	novel_introns = [e for e in events if e['event'] == 'novel_intron']
+
+	for ni in novel_introns:
+	    acceptor_index = None
+	    donor_index = None
+	    for i in range(len(events)):
+		if ni['pos'] == events[i]['pos']:
+		    if events[i]['event'] == 'novel_acceptor':
+			acceptor_index = i
+		    elif events[i]['event'] == 'novel_donor':
+			donor_index = i
+	    if acceptor_index is not None and donor_index is not None:
+		for i in sorted([acceptor_index, donor_index], reverse=True):
+		    del events[i]
+
     # find annotated junctions
     annotated = Set()
     # sort multiple exon matches for single exon by exon num
@@ -238,7 +255,10 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 		    e['blocks'] = range(i + 1, j)
 		    e['seq_breaks'] = [align.query_blocks[i][1], align.query_blocks[j][0]]
 		    e['transcript'] = transcript.id
-		all_events.extend(events)	
+		all_events.extend(events)
+
+    # novel acceptor and donor corresponding to novel_intron are called, remove
+    remove_redundant_splice_sites_of_novel_intron(all_events)
 	
     adjs = []
     for event in all_events:
@@ -753,7 +773,7 @@ def corroborate_genome(adjs, genome_bam):
 	if adj.splice_motif is None:
 	    continue
 
-	if adj.event in ('novel_acceptor', 'novel_donor', 'retained_intron'):
+	if adj.event in ('novel_acceptor', 'novel_donor', 'retained_intron', 'novel_intron', 'novel_exon'):
 	    if adj.splice_motif[0] != canonical and adj.splice_motif[1]:
 		find_genome_support(adj, genome_bam)
 
