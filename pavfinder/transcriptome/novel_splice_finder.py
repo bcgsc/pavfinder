@@ -744,11 +744,17 @@ def corroborate_genome(adjs, genome_bam):
 		find_genome_support(adj, genome_bam)
 
 	if adj.event in ('skipped_exon', 'novel_acceptor', 'novel_donor'):
-	    print 'bb', adj.splice_motif
 	    if adj.splice_motif[0] == canonical and adj.splice_motif[1] and len(adj.splice_motif[1]) == 4:
 		find_genome_interruptions(adj, genome_bam)
 
 def find_genome_support(adj, bam):
+    """Reports level of support of novel base change from genome bam file
+
+    Args:
+        adj: (Adjacency) novel_acceptor/donor (non-canonical splice motif in reference observed)
+			 retained_intron (non-canonical splice motif captured in contig)
+        bam: (Pysam bam handle) genome bam
+    """
     chrom = adj.chroms[0]
     if adj.chroms[0] not in bam.references and\
                adj.chroms[0].lstrip('chr') in bam.references:
@@ -771,6 +777,13 @@ def find_genome_support(adj, bam):
     adj.genome_support = ','.join(genome_support)
 
 def find_genome_interruptions(adj, bam):
+    """Search for genomic variants that disrupt splice motifs
+
+    Args:
+        adj: (Adjacency) novel_acceptor/donor (reference splice junction not used, novel junction canonical)
+	                 skipped_exon
+	bam: (Pysam bam handle) genome bam
+    """
     chrom = adj.chroms[0]
     if adj.chroms[0] not in bam.references and\
                adj.chroms[0].lstrip('chr') in bam.references:
