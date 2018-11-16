@@ -579,6 +579,24 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
     return result
 
 def check_retained_intron_splice_motif(event, adjs, query_seq, ref_fasta, align, transcript, max_diff=1):
+    """Looks for base change in splice motif captured by contig in retained_introns
+
+       Args:
+           event: (dict) retained_intron from find_novel_junctions() before splitting event into adjacencies
+	   adjs: (list of Adjacencies) Adjacencies for setting the splice_motif attribute
+	   ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence,
+	              for extracting splice motif
+	   align: (Alignment) for extracting alignment strand in generating retained_intro sequence
+	                      based on genome positive strand
+	   transcript: (Transcript) for orienting splice motif sequences
+	   max_diff: (int) maximum number of base subsitutions to be found in splice_motif
+
+       Returns: None
+                It will reset splice motif of each of the 2 adjacencies to tuple:
+		first: 2-base splice motif observed corresponding to each adjacency
+		second: None if canoncial splice motif observed
+			list of (genoome coordinate, new base, variant) if non-canonical splice motif observed
+    """
     # seq_breaks = contig breakpoints, sort for extracting contig sequence in case not sorted
     seq_breaks_sorted = sorted(event['seq_breaks'])
     retained_seq_contig = query_seq[seq_breaks_sorted[0]:seq_breaks_sorted[1] - 1]
@@ -588,10 +606,6 @@ def check_retained_intron_splice_motif(event, adjs, query_seq, ref_fasta, align,
     retained_seq_genome = ref_fasta.fetch(adjs[0].chroms[0], event['pos'][0], event['pos'][1] - 1)
     # splice motif from assembled sequence (in contig orientation)
     splice_motif = retained_seq_contig[:2].upper() + retained_seq_contig[-2:].upper()
-
-    #print 'm2', splice_motif
-    #print retained_seq_contig
-    #print retained_seq_genome
 
     # motifs[0] = upstream, motifs[1] = downstream, regardless of donor/acceptor
     motifs = []
@@ -626,6 +640,23 @@ def check_retained_intron_splice_motif(event, adjs, query_seq, ref_fasta, align,
 	    adjs[i].splice_motif = motifs[i], [[coord_diff, base_diff, variant]]
 
 def check_splice_motif_skipped_exon(adj, transcript, ref_fasta):
+    """Gathers reference exon splice site coordinates and bases for searching for
+       canonical splice-site disruption - skipped exons
+
+       only checks for splice-motifs in introns
+
+       Args:
+           adj: (Adjacency) skipped_exon
+	   transcript: (Transcript) transcript object for extracting strand, chromosome
+	   ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence,
+	              for extracting splice motif
+       Returns: None
+               It will reset splice_motif attribute to a list of 2
+	       first: splice_motif sequence (should be canonical), will arrange bases according
+	              to transcript strand
+               second: list of [coordinate, base]
+	               (each member of adj.splice_motif[1] should have 2 members)
+    """
     # identify flanking splice-site coordinates of skipped exon(s)
     flanking_exons = sorted(adj.exons)
     skipped_exons = sorted(set(xrange(min(flanking_exons), max(flanking_exons))).difference(flanking_exons))
@@ -649,6 +680,21 @@ def check_splice_motif_skipped_exon(adj, transcript, ref_fasta):
 	adj.splice_motif[0] = reverse_complement(adj.splice_motif[0][-2:] + adj.splice_motif[0][:2])
 
 def check_splice_motif_novel_site(adj, transcript, ref_fasta):
+    """Gathers reference exon splice site coordinates and bases for searching for
+       canonical splice-site disruption - novel_donor/acceptor
+
+       only checks for splice-motifs in introns
+
+       Args:
+           adj: (Adjacency) novel_donor/novel_acceptor
+	        second member of splice_motif attribute (list) should be None
+	   transcript: (Transcript) transcript object for extracting chromosome
+	   ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence,
+	              for extracting splice motif
+      Returns: None
+               Sets the second member of splice_motif attribute to list of [coordinate, base]
+	       (each member of adj.splice_motif[1] should have 2 members)
+    """
     splice_site_coords = []
     for exon in adj.exons:
 	splice_site_coords.extend(transcript.exon(exon))
@@ -659,12 +705,10 @@ def check_splice_motif_novel_site(adj, transcript, ref_fasta):
 	if i == 1:
 	    for j in range(1,3):
 		coord = sorted_splice_site_coords[i] + j
-		print i, j, coord
 		adj.splice_motif[1].append([coord, ref_fasta.fetch(transcript.chrom, coord-1, coord).upper()])
 	if i == 2:
 	    for j in range(2,0,-1):
 		coord = sorted_splice_site_coords[i] - j
-		print i, j, coord
 		adj.splice_motif[1].append([coord, ref_fasta.fetch(transcript.chrom, coord-1, coord).upper()])
 
 def is_junction_annotated(match1, match2):
