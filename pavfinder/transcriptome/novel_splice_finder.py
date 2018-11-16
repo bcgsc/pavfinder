@@ -62,6 +62,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	align: (Alignment) alignment object
 	transcripts_dict: (dictionary) key=transcript_id value=Transcript object
 	ref_fasta: (Pysam.Fastafile) Pysam handle to access reference sequence, for checking splice motif
+	accessary_features: (dict) 'exon' or 'junction': tuples of (chrom, start, end)
     Returns:
 	List of event (dictionary storing type of event, exon indices, genomic coordinates and size)
     """
@@ -375,6 +376,19 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 			               'seq_break_offsets': (transcript.exons[exons[0]][1] - pos[0],
 			                                     pos[1] - transcript.exons[exons[1]][0]),
 			               'size':size})
+
+	# check if retained_intron is known
+	already_known_indices = []
+	if known_exons:
+	    for i in range(len(events)):
+		if events[i]['event'] == 'retained_intron':
+		    encompassing_exons = [e for e in known_exons if e[0] == chrom and\
+			                  e[1] <= events[i]['pos'][0] and\
+			                  e[2] >= events[i]['pos'][1]]
+		    if encompassing_exons:
+			already_known_indices.append(i)
+	    for i in reversed(already_known_indices):
+		del events[i]
 
     # genomic deletion or novel_intron
     elif match1 is None and match2 is not None:
