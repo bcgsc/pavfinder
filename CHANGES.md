@@ -83,3 +83,4 @@ v1.1.1
 - associate novel splicing events with genomic variants given WGS alignments
 - bugfix: retained_intron captured by multiple contigs not reported because `link` attribute is lost after merging adjacencies - fixed
 - bugfix: successive retained introns not captured - fixed
+- bugfix: remove retained_intron called if encompassing exon (not necessarily having exact boundaries) is found in annotation
