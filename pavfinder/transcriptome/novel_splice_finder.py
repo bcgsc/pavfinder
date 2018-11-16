@@ -790,9 +790,13 @@ def find_genome_support(adj, bam):
         bam: (Pysam bam handle) genome bam
     """
     chrom = adj.chroms[0]
-    if adj.chroms[0] not in bam.references and\
-               adj.chroms[0].lstrip('chr') in bam.references:
-	chrom = adj.chroms[0].lstrip('chr')
+    if not adj.chroms[0] in bam.references:
+	if adj.chroms[0][:3] == 'chr':
+	    chrom = adj.chroms[0].lstrip('chr')
+	else:
+	    chrom = 'chr' + adj.chroms[0]
+	if not chrom in bam.references:
+	    return None
 
     genome_support = []
     for pos, base, variant in adj.splice_motif[1]:
@@ -819,9 +823,13 @@ def find_genome_interruptions(adj, bam):
 	bam: (Pysam bam handle) genome bam
     """
     chrom = adj.chroms[0]
-    if adj.chroms[0] not in bam.references and\
-               adj.chroms[0].lstrip('chr') in bam.references:
-	chrom = adj.chroms[0].lstrip('chr')
+    if not adj.chroms[0] in bam.references:
+	if adj.chroms[0][:3] == 'chr':
+	    chrom = adj.chroms[0].lstrip('chr')
+	else:
+	    chrom = 'chr' + adj.chroms[0]
+	if not chrom in bam.references:
+	    return None
 
     variants = []
     supports = []
