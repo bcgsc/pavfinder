@@ -49,7 +49,8 @@ def extract_features(gtfs, feature_types=('exon', 'junction')):
 	    annotated_features[feature_type] = annotated_features[feature_type].union(features[feature_type])
     return annotated_features
 
-def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, accessory_known_features=None):
+def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, accessory_known_features=None,
+                         max_diff=1):
     """Find novel junctions within a single gene/transcript
     
     Args:
@@ -248,6 +249,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	                                     ref_fasta,
 	                                     known_juncs = known_juncs,
 	                                     known_exons = known_exons,
+	                                     max_diff = max_diff,
 	                                     )
 
 	    if events:
@@ -274,7 +276,7 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    adjs.extend(split_event(event))
 
 	    if event['event'] == 'retained_intron':
-		check_retained_intron_splice_motif(event, adjs[-2:], query_seq, ref_fasta, align, transcript)
+		check_splice_motif_retained_intron(event, adjs[-2:], query_seq, ref_fasta, align, transcript, max_diff=max_diff)
 	else:
 	    adjs.append(event_to_adj(event))
 
@@ -338,7 +340,7 @@ def report(event, event_id=None):
     return '\t'.join(map(str, data))
     
 def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta, min_intron_size=20, 
-                            known_juncs=None, known_exons=None, no_indel=True):
+                            known_juncs=None, known_exons=None, no_indel=True, max_diff=1):
     """Classify given junction into different splicing events or indel
     
     Args:
@@ -424,7 +426,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 	    pos = (blocks[0][1], blocks[1][0])
 	    event = None
 	    if gap_size > 0:
-		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta, max_diff=max_diff)
 		if gap_size > min_intron_size and splice_motif[0]:
 		    event = 'novel_intron'
 		else:
@@ -457,7 +459,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 	    event = None
 	    splice_motif = [None]
 	    if gap_size > 0:
-		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta, max_diff=max_diff)
 		if gap_size > min_intron_size and splice_motif[0]:
 		    event = 'novel_intron'
 		else:
@@ -484,7 +486,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		donor_start = blocks[1][0] - 2
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
-	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta, max_diff=max_diff)
 	    if splice_motif[0]:
 		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 		
@@ -500,7 +502,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		donor_start = blocks[1][0] - 2
 		acceptor_start = blocks[0][1] + 1
 	    # check splice motif
-	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+	    splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta, max_diff=max_diff)
 	    if splice_motif[0]:
 		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 		    
@@ -518,7 +520,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		    acceptor_start = pos[1] + 1
 
 		# check splice motif
-		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta)
+		splice_motif = check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta, max_diff=max_diff)
 		if splice_motif[0]:
 		    events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size, 'splice_motif':splice_motif})
 	    
@@ -612,7 +614,7 @@ def check_splice_motif(chrom, donor_start, acceptor_start, strand, ref_fasta, ma
 
     return result
 
-def check_retained_intron_splice_motif(event, adjs, query_seq, ref_fasta, align, transcript, max_diff=1):
+def check_splice_motif_retained_intron(event, adjs, query_seq, ref_fasta, align, transcript, max_diff=1):
     """Looks for base change in splice motif captured by contig in retained_introns
 
        Args:

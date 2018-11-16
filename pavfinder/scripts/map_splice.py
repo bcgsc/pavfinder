@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
     parser.add_argument("--suppl_annot", type=str, nargs="+", help="supplementary annotation file(s) for checking novel splice events")
     parser.add_argument("--genome_bam", type=str, help="genome bam")
+    parser.add_argument("--max_diff_splice", type=int, help="maximum number of base differences in splice motif. Default:1", default=1)
     
     args = parser.parse_args()
     return args
@@ -67,7 +68,8 @@ def main():
     mappings, junc_adjs, events = em.map_aligns(bam,
                                                 query_fasta,
                                                 genome_fasta,
-                                                accessory_known_features=accessory_known_features)
+                                                accessory_known_features=accessory_known_features,
+                                                max_diff=args.max_diff_splice)
     juncs_merged = Adjacency.merge(junc_adjs)
 
     events_merged = Adjacency.merge(events)

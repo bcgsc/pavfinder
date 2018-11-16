@@ -23,7 +23,8 @@ class ExonMapper:
         
 	self.suppl_annots = suppl_annots
 
-    def map_aligns(self, bam, query_fasta, genome_fasta, accessory_known_features=None, find_events=True):
+    def map_aligns(self, bam, query_fasta, genome_fasta, accessory_known_features=None, find_events=True,
+                   max_diff=1):
 	mappings = defaultdict(list)
 	junc_adjs = []
 	events = []
@@ -58,7 +59,8 @@ class ExonMapper:
 			                                       transcript,
 			                                       query_seq,
 			                                       self.genome_fasta,
-			                                       accessory_known_features=accessory_known_features)
+			                                       accessory_known_features=accessory_known_features,
+			                                       max_diff=max_diff)
 			                  )
 	
 	return mappings, junc_adjs, events
