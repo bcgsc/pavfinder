@@ -79,7 +79,7 @@ v1.1.0
 - can input `genome_bam` to detect support level of splice site variant
 - search through main annotation to make sure novel event is novel; before only supplementary annotations is used for this purpose, and when no supplementary annotation is provided, an erroneous "novel" event may be reported because wrong transcript is assigned for contig
 
-v1.1.1
+v1.2.0
 - associate novel splicing events with genomic variants given WGS alignments
 - bugfix: retained_intron captured by multiple contigs not reported because `link` attribute is lost after merging adjacencies - fixed
 - bugfix: successive retained introns not captured - fixed
