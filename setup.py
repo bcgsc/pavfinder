@@ -80,5 +80,6 @@ setup(
                'pavfinder/scripts/tap.py',
                'pavfinder/scripts/rescue_fusion.py',
                'pavfinder/scripts/fusion-bloom',
+               'pavfinder/scripts/tap2.py',
                ],
 )

@@ -85,3 +85,6 @@ v1.2.0
 - bugfix: successive retained introns not captured - fixed
 - bugfix: remove retained_intron called if encompassing exon (not necessarily having exact boundaries) is found in annotation
 - remove redundant novel_acceptor and novel_donor calls of novel_introns
+
+v1.3.0
+- added `tap2.py`, using [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) instead of Trans-ABySS for assembly 

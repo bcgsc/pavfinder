@@ -30,5 +30,7 @@ A pipeline that bundles the 3 analysis steps called `TAP` (*T*ransabyss-*A*lignm
 
 A new pipeline named `fusion-bloom` coupling PAVFinder with our latest RNA-seq assembler [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) has been added to the repository. We demonstrated that it has higher senstivitiy and specificity than most state-of-the-art fusion callers.    
 
+`TAP2`, the next version of `TAP` using RNA-Bloom instead of Trans-ABySS for better transcriptome assembly, has been released.
+
 ### Publication
 Readman Chiu, Ka Ming Nip, Justin Chu and Inanc Birol. **TAP: a targeted clinical genomics pipeline for detecting transcript variants using RNA-seq data**. *BMC Med Genomics* (2018) 11:79 [https://doi.org/10.1186/s12920-018-0402-6](https://doi.org/10.1186/s12920-018-0402-6)
