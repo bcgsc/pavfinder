@@ -80,7 +80,7 @@ def find_support(events, bam_file, query_fasta_file,
 	                   perfect=perfect, 
 	                   get_seq=get_seq, 
 	                   debug=debug)
-	
+
     assign(event_to_coords, support)
 
 def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
@@ -99,9 +99,12 @@ def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
 	
 	if read.qname + str(read.pos) in proper_pairs and read.tlen > 0:
 	    # internal fragment
-	    frag = (read.pos + read.alen, read.pnext)
+	    frag = tuple(sorted([read.pos + read.alen, read.pnext]))
 	 
-	if frag is not None and frag[0] <= breaks[0] - overlap_buffer and frag[1] >= breaks[1] + overlap_buffer:
+	if frag is not None and\
+	   ((frag[0] >= breaks[0] and frag[0] <= breaks[1]) or\
+	    (frag[1] >= breaks[0] and frag[1] <= breaks[1])) :
+	#if frag is not None and frag[0] <= breaks[0] - overlap_buffer and frag[1] >= breaks[1] + overlap_buffer:
 	    uniq_frags.add(frag)
 	    if debug:
 		sys.stdout.write("Accepted flanking pair: %s %s %s %s %s\n" % (breaks, frag, read.query_name, read.pos, read.pnext))
