@@ -87,4 +87,7 @@ v1.2.0
 - remove redundant novel_acceptor and novel_donor calls of novel_introns
 
 v1.3.0
-- added `tap2.py`, using [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) instead of Trans-ABySS for assembly 
+- added `tap2.py`, using [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) instead of Trans-ABySS for assembly
+
+v1.4.0
+- allow fusion flanking_pair support reads to overlap span window (default size 8bp, 4 on either side of breakpoint) so that flanking_pair support of short fragment can also be captured
