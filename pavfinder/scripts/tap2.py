@@ -68,7 +68,7 @@ def get_version(exe):
         # bbt output to stderr, rnabloom to stdout
         if stderr:
             match = re.search(r'(\d+\.\d+\.\d+[a-z]?)', stderr)
-        else:
+        if not match:
             match = re.search(r'(\d+\.\d+\.\d+[a-z]?)', stdout)
         if match:
             version = match.group(1)
@@ -365,10 +365,11 @@ def r2c(index, r2c_bam):
     reads2 = '%s/%s_2.fastq' % (bbt_outdir, gene)
     r2c_bam = os.path.dirname(index) + '/r2c.bam'
     
-    cmd = 'bwa mem %s <(cat %s %s) | samtools view -bhS - | samtools fixmate - %s' % (os.path.splitext(index)[0],
-                                                                                      reads1,
-                                                                                      reads2,
-                                                                                      r2c_bam)
+    cmd = 'bwa mem %s %s %s | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
+                                                             reads1,
+                                                             reads2,
+                                                             r2c_bam)
+    print 'qq', cmd
     run_cmd('/bin/bash -c "%s"' % cmd)
 
 @merge(assemble_single_gene,
@@ -421,8 +422,8 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
     elif len(r2c_bams) == 1:
         source = os.path.relpath(r2c_bams[0], os.path.dirname(r2c_cat_bam))
         cmd = 'samtools sort -m %s %s -o %s' % (params['alignments']['sort_mem'],
-                                                    r2c_bams[0],
-                                                   r2c_cat_bam)
+                                                r2c_bams[0],
+                                                r2c_cat_bam)
     
         run_cmd('/bin/bash -c "%s"' % cmd)        
 
