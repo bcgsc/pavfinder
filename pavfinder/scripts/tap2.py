@@ -369,7 +369,7 @@ def r2c(index, r2c_bam):
                                                              reads1,
                                                              reads2,
                                                              r2c_bam)
-    print 'qq', cmd
+
     run_cmd('/bin/bash -c "%s"' % cmd)
 
 @merge(assemble_single_gene,
