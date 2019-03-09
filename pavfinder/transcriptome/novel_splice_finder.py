@@ -83,8 +83,9 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    adj.exons = (transcript.coord_to_exon(event['pos'][0]),
 	                 transcript.coord_to_exon(event['pos'][1]))
 
-	    # set up splice_motif field for genome association
-	    check_splice_motif_skipped_exon(adj, transcript, ref_fasta)
+	    if event['blocks']:
+		# set up splice_motif field for genome association
+		check_splice_motif_skipped_exon(adj, transcript, ref_fasta)
 
 	elif event['event'] == 'novel_exon':
 	    exon1 = transcript.coord_to_exon(event['pos'][0])
