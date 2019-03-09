@@ -25,7 +25,7 @@ all: $(pavfinder_outdir)/sv.bedpe
 $(assembly_outdir)/TRANSCRIPTS.DONE: $(left) $(right)
 	source $(profile) && \
 	mkdir -p $(assembly_outdir) && \
-	time rnabloom -length $(readlen) -l $(left) -r $(right) -o $(assembly_outdir) -n $(name) -t $(NUM_THREADS) --revcomp-right $(RNABLOOM_PARAMS) && \
+	time rnabloom -l $(left) -r $(right) -o $(assembly_outdir) -n $(name) -t $(NUM_THREADS) --revcomp-right $(RNABLOOM_PARAMS) && \
 	samtools faidx $(assembly_outdir)/$(name).transcripts.fa
 
 # bwa index
@@ -69,4 +69,4 @@ clean:
 			$(assembly_outdir)/$(name).transcripts.fa.fai
 
 help: 
-	@printf 'fusion-bloom profile=<profile> left=<fastq.gz> right=<fastq2.gz> readlen=<read length> [outdir=output_directory] [name=assembly_prefix]\n'
+	@printf 'fusion-bloom profile=<profile> left=<fastq.gz> right=<fastq2.gz> [outdir=output_directory] [name=assembly_prefix]\n'
