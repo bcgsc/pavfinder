@@ -143,6 +143,7 @@ def parse_args():
     parser.add_argument("--version", action='version', version='%s %s' % (pv.__name__, pv.__version__))
     filtering = parser.add_argument_group('filtering')
     filtering.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
+    filtering.add_argument("--min_overhang", type=int, help="minimum overhang for spanning reads. Default:4", default=4)
     filtering.add_argument("--min_indel_size", type=int, help="minimum indel size. Default:3", default=3)
     filtering.add_argument("--min_dup_size", type=int, help="minimum ins size to check for dup classification. Default:15", default=15)
     filtering.add_argument("--min_indel_flanking", type=int, help="minimum flanking contig lengths for indels. Default:10", default=10)
@@ -242,7 +243,7 @@ def main():
 
     # read support
     if args.r2c:
-        find_support(events_merged, args.r2c, args.query_fasta, num_procs=args.nproc, debug=args.debug)
+        find_support(events_merged, args.r2c, args.query_fasta, min_overlap=args.min_overhang, num_procs=args.nproc, debug=args.debug)
         events_filtered = [event for event in events_merged if event.spanning >= args.min_support]
     else:
         events_filtered = events_merged

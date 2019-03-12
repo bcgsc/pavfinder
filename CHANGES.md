@@ -92,4 +92,7 @@ v1.3.0
 v1.4.0
 - allow fusion flanking_pair support reads to overlap span window (default size 8bp, 4 on either side of breakpoint) so that flanking_pair support of short fragment can also be captured
 - changed r2c to run BWA-mem in paired-end mode in `tap2.py`
-- fixed bug in `tap2.py` extracting `RNA-Bloom` version when there is stderr message while running `rnabloom -v' 
+- fixed bug in `tap2.py` extracting `RNA-Bloom` version when there is stderr message while running `rnabloom -v'
+
+v1.5.0
+- added `--min_overhang` (default=4) for changing minimum overhang size for gathering spanning reads from r2c in `find_sv_transcriptome.py`
