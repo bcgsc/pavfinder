@@ -486,7 +486,7 @@ class SVFinder:
 
 		elif 'repeat' not in event_type: 
 		    if event_type == 'fusion':
-			if int(aln.get_tag('NM')) <= 2 and float(aln.query_alignment_length)/probe_length > 0.9:
+			if float(aln.query_alignment_length)/probe_length > 0.9:
 			    failed_reason = 'probe aligned exclusively %d/%d=%.02f' % (aln.query_alignment_length,
 			                                                               probe_length,
 			                                                               float(aln.query_alignment_length)/probe_length)
@@ -519,6 +519,16 @@ class SVFinder:
 
     @classmethod
     def filter_subseqs(cls, events, query_fa, genome_index_dir, genome_index, working_dir, subseq_len=None, debug=False):
+	def pick_sub_seqs(event):
+	    contigs = event.seq_id.split(',')
+	    seq_breaks = [map(int, b.split('-')) for b in event.seq_breaks.split(',')]
+	    seq_lens = [len(query_fa.fetch(s)) for s in contigs]
+
+	    # sort contig so that contig which has the biggest smaller-subseq is chosen
+	    indices_sorted = sorted(range(len(contigs)), key = lambda i: min(seq_breaks[i][0], seq_lens[i] - seq_breaks[i][1]), reverse=True)
+
+	    return contigs[indices_sorted[0]], seq_breaks[indices_sorted[0]]
+
 	def create_query_fasta(events, fa_file, min_size=20):
 	    count = 0
 	    sizes = {}
@@ -528,10 +538,9 @@ class SVFinder:
 		if event.event in ('alt_donor', 'alt_acceptor', 'skipped_exon'):
 		    continue
 
-		seq_id = event.seq_id.split(',')[0]
-		seq_breaks = event.seq_breaks.split(',')[0].split('-')
-		subseqs = event.get_subseqs(query_fa.fetch(seq_id), seq_breaks=seq_breaks, len_on_each_side=subseq_len)
-		
+		seq_id, seq_breaks = pick_sub_seqs(event)
+		subseqs = event.get_subseqs(query_fa.fetch(seq_id), seq_breaks=seq_breaks)
+
 		if 'repeat' in event.event:
 		    continue
 		
@@ -568,7 +577,7 @@ class SVFinder:
 		return None
 	    
 	def is_mapped(aln, size, min_aligned):
-	    if not aln.is_unmapped and int(aln.get_tag('NM')) == 0:
+	    if not aln.is_unmapped:
 		mapped_size = sum([t[1] for t in aln.cigartuples if t[0] == 0])
 		if float(mapped_size)/size >= min_aligned:
 		    return True
@@ -586,8 +595,9 @@ class SVFinder:
 	def parse_and_filter(bam, sizes, window=100):
 	    events_by_query = collections.defaultdict(list)
 	    for i in range(len(events)):
-		seq_id = events[i].seq_id.split(',')[0]
-		events_by_query[seq_id].append(i)
+		# not always the first contig is chosen because of introductin of pick_sub_seqs()
+		for seq_id in events[i].seq_id.split(','):
+		    events_by_query[seq_id].append(i)
     
 	    remove = Set()
 	    subseq_mappings = {}
@@ -632,7 +642,7 @@ class SVFinder:
 		    subseq_mappings[seq_id][key][part] = matched
 
 	    multimapped = [query for query in subseq_align_tallies if subseq_align_tallies[query] > 1]
-			    
+
 	    for seq_id in events_by_query.keys():
 		if subseq_mappings.has_key(seq_id):
 		    for i in events_by_query[seq_id]:
