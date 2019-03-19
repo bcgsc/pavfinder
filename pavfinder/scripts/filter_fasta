@@ -1,0 +1,7 @@
+#!/bin/awk -f
+!/^>/ { next }
+{ getline seq }
+length(seq) >= min { print $0 "\n" seq }
+
+#Code from: http://bioinfofly.wordpress.com/2012/07/09/binawk-f-nex/
+
