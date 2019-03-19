@@ -96,3 +96,5 @@ v1.4.0
 
 v1.5.0
 - added `--min_overhang` (default=4) for changing minimum overhang size for gathering spanning reads from r2c in `find_sv_transcriptome.py`
+- minor changes to subseq and probe filtering in fusion filtering: relax NM to 4 and use longest of shorter subseqs for checking
+- added Q1 filtering for fusion-bloom and other minor changes (re-order steps, time r2c steps, etc)
