@@ -66,9 +66,10 @@ def get_version(exe):
     if cmd is not None:
         stdout, stderr = run_cmd(cmd)
         # bbt output to stderr, rnabloom to stdout
+        match = None
         if stderr:
             match = re.search(r'(\d+\.\d+\.\d+[a-z]?)', stderr)
-        if not match:
+        if not match and stdout:
             match = re.search(r'(\d+\.\d+\.\d+[a-z]?)', stdout)
         if match:
             version = match.group(1)
@@ -210,16 +211,21 @@ def classify(paired_fqs, bbt_output, prefix, bf, nthreads):
             input_fq2 = paired_fqs[1][0]
         else:
             input_fq2 = '<(zcat %s)' % ' '.join(paired_fqs[1])
-        
-        cmd = 'biobloomcategorizer --fq -i -p %s -a 2 -t %d -e -f %s %s %s' % (prefix,
-                                                                               nthreads,
-                                                                               bf,
-                                                                               input_fq1,
-                                                                               input_fq2)
+
+        cmd = 'biobloommicategorizer -t %d -f %s --fq -p %s -e %s %s' % (nthreads,
+                                                                         bf,
+                                                                         prefix,
+                                                                         input_fq1,
+                                                                         input_fq2)
+        stdout, stderr = run_cmd('/bin/bash -c "%s"' % cmd)
+
+        if stdout:
+            with open('%s/%s_reads.fq' % (bbt_outdir, args.sample), 'w') as out:
+                out.write('%s' % stdout)
+
     else:
         cmd = 'touch %s' % bbt_output
-
-    run_cmd('/bin/bash -c "%s"' % cmd)
+        run_cmd('/bin/bash -c "%s"' % cmd)
     
 def format_read_pairs_for_abyss(lines):
     """format reads to '/1' and '/2' for abyss"""
@@ -248,10 +254,13 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
     if args.bf:
         with open(bbt_fastq[0], 'r') as fq:
             for lines in itertools.izip_longest(*[fq]*8):
-                target = lines[0].rstrip().split(' ')[1].split('.')[0]
-                lines = format_read_pairs_for_abyss(list(lines))
-                seqs1[target].extend(lines[:4])
-                seqs2[target].extend(lines[-4:])
+                header_cols = lines[0].rstrip().split('\t')
+                if len(header_cols) == 3:
+                    targets = [hit.split(',')[0].replace('.fa', '') for hit in header_cols[2].split(';')]
+                    lines = format_read_pairs_for_abyss(list(lines))
+                    for target in targets:
+                        seqs1[target].extend(lines[:4])
+                        seqs2[target].extend(lines[-4:])
 
         split_fastqs = output_split_pairs(seqs1, seqs2, bbt_outdir)
 
