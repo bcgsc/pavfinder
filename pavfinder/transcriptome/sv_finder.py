@@ -486,7 +486,7 @@ class SVFinder:
 
 		elif 'repeat' not in event_type: 
 		    if event_type == 'fusion':
-			if int(aln.get_tag('NM')) <= 4 and float(aln.query_alignment_length)/probe_length > 0.9:
+			if int(aln.get_tag('NM')) <= 2 and float(aln.query_alignment_length)/probe_length > 0.9:
 			    failed_reason = 'probe aligned exclusively %d/%d=%.02f' % (aln.query_alignment_length,
 			                                                               probe_length,
 			                                                               float(aln.query_alignment_length)/probe_length)
@@ -577,7 +577,7 @@ class SVFinder:
 		return None
 	    
 	def is_mapped(aln, size, min_aligned):
-	    if not aln.is_unmapped and int(aln.get_tag('NM')) <= 4:
+	    if not aln.is_unmapped and int(aln.get_tag('NM')) == 0:
 		mapped_size = sum([t[1] for t in aln.cigartuples if t[0] == 0])
 		if float(mapped_size)/size >= min_aligned:
 		    return True
