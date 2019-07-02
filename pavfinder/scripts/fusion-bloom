@@ -42,7 +42,7 @@ $(assembly_outdir)/$(name).transcripts.filtered.fa.sa: $(assembly_outdir)/$(name
 # r2c
 $(outdir)/r2c.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa.sa
 	source $(profile) && \
-	time bwa mem -t $(NUM_THREADS) $(assembly_outdir)/$(name).transcripts.filtered.fa <(zcat $(left)) <(zcat $(right)) | samtools view -bhS - | samtools sort -m $(SAMTOOLS_SORT_MEM) - -o $(outdir)/r2c.bam
+	time bwa mem -t $(NUM_THREADS) $(assembly_outdir)/$(name).transcripts.filtered.fa <(zcat $(left)) <(zcat $(right)) | samtools view -uhS - | samtools sort -m $(SAMTOOLS_SORT_MEM) - -o $(outdir)/r2c.bam
 
 # r2c index
 $(outdir)/r2c.bam.bai: $(outdir)/r2c.bam
@@ -57,7 +57,7 @@ $(outdir)/c2g.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa
 # c2t
 $(outdir)/c2t.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa
 	source $(profile) && \
-	time bwa mem -t $(NUM_THREADS) $(TRANSCRIPTS_FASTA) $(assembly_outdir)/$(name).transcripts.filtered.fa | samtools view -bhS -o $(outdir)/c2t.bam
+	time bwa mem -t $(NUM_THREADS) $(TRANSCRIPTS_FASTA) $(assembly_outdir)/$(name).transcripts.filtered.fa | samtools view -bhS - -o $(outdir)/c2t.bam
 
 # pavfinder
 $(pavfinder_outdir)/sv.bedpe: $(outdir)/c2g.bam $(outdir)/c2t.bam $(outdir)/r2c.bam $(outdir)/r2c.bam.bai
