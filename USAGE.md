@@ -46,5 +46,19 @@
 
   ```
   source <fusion-bloom.profile>
-  fusion-bloom profile=<fusion-bloom.profile> left=<fastq.gz> right=<fastq.gz> readlen=<read_length>
+  fusion-bloom profile=<fusion-bloom.profile> left=<fastq.gz> right=<fastq.gz> readlen=<read_length> outdir=<outdir> name=<prefix>
+  ```
+
+  example <fusion-bloom.profile>:
+  ```
+  export JVM_OPTS=-Xmx2g
+  export NUM_THREADS=12
+  export SAMTOOLS_SORT_MEM=20G
+  export GENOME=hg38
+  export GMAPDB=/path/to/gmapdb_sarray/hg38
+  export GTF=/path/to/gencode.v26.annotation.transcripts.sorted.gtf.gz
+  export TRANSCRIPTS_FASTA=/path/to/gencode.v26.annotation.transcripts.sorted.gtf.fa
+  export GENOME_FASTA=/path/to/hg38.fa
+  export RNABLOOM_PARAMS='-chimera -extend'
+  export PAVFINDER_PARAMS='--only_fusions --include_non_exon_bound_fusion --min_support 2'
   ```

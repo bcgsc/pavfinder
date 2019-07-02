@@ -99,3 +99,7 @@ v1.5.0
 - minor changes to subseq and probe filtering in fusion filtering: relax NM to 4 and use longest of shorter subseqs for checking
 - added Q1 filtering for `fusion-bloom` and other minor changes (re-order steps, time r2c steps, etc)
 - `tap.py` works with BBTv2.3.2 using `biobloommicategorizer` now
+
+v1.5.1
+- minor fixes/changes in `samtools` piping in `r2c` and `c2t` commands in `fusion-bloom`
+- updates usage for `fusion-bloom`
