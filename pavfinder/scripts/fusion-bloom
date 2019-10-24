@@ -22,27 +22,22 @@ all: $(pavfinder_outdir)/sv.bedpe
 .PHONY: all clean
 
 # assemble
-$(assembly_outdir)/TRANSCRIPTS.DONE: $(left) $(right)
+$(assembly_outdir)/$(name).transcripts.nr.fa: $(left) $(right)
 	source $(profile) && \
 	mkdir -p $(assembly_outdir) && \
 	time rnabloom -length $(readlen) -l $(left) -r $(right) -o $(assembly_outdir) -n $(name) -t $(NUM_THREADS) --revcomp-right $(RNABLOOM_PARAMS)
 
 # filter contigs with minimum length(Q1)
-$(assembly_outdir)/$(name).transcripts.filtered.fa: $(assembly_outdir)/TRANSCRIPTS.DONE
+$(assembly_outdir)/$(name).transcripts.filtered.fa: $(assembly_outdir)/$(name).transcripts.nr.fa
 	$(eval L := $(shell grep Q1 $(assembly_outdir)/$(name).fragstats | cut -f2 -d':'))
 	@echo $(L)
-	filter_fasta min=$(L) $(assembly_outdir)/$(name).transcripts.fa > $(assembly_outdir)/$(name).transcripts.filtered.fa && \
+	filter_fasta min=$(L) $(assembly_outdir)/$(name).transcripts.nr.fa > $(assembly_outdir)/$(name).transcripts.filtered.fa && \
 	samtools faidx $(assembly_outdir)/$(name).transcripts.filtered.fa
 
-# bwa index
-$(assembly_outdir)/$(name).transcripts.filtered.fa.sa: $(assembly_outdir)/$(name).transcripts.filtered.fa
-	source $(profile) && \
-	time bwa index $(assembly_outdir)/$(name).transcripts.filtered.fa
-
 # r2c
-$(outdir)/r2c.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa.sa
+$(outdir)/r2c.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa
 	source $(profile) && \
-	time bwa mem -t $(NUM_THREADS) $(assembly_outdir)/$(name).transcripts.filtered.fa <(zcat $(left)) <(zcat $(right)) | samtools view -uhS - | samtools sort -m $(SAMTOOLS_SORT_MEM) - -o $(outdir)/r2c.bam
+	time minimap2 -ax sr -t $(NUM_THREADS) $(assembly_outdir)/$(name).transcripts.filtered.fa $(left) $(right) | samtools view -uhS - | samtools sort -m $(SAMTOOLS_SORT_MEM) - -o $(outdir)/r2c.bam
 
 # r2c index
 $(outdir)/r2c.bam.bai: $(outdir)/r2c.bam
@@ -57,7 +52,7 @@ $(outdir)/c2g.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa
 # c2t
 $(outdir)/c2t.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa
 	source $(profile) && \
-	time bwa mem -t $(NUM_THREADS) $(TRANSCRIPTS_FASTA) $(assembly_outdir)/$(name).transcripts.filtered.fa | samtools view -bhS - -o $(outdir)/c2t.bam
+	time bwa mem -t $(NUM_THREADS) $(TRANSCRIPTS_FASTA) $(assembly_outdir)/$(name).transcripts.filtered.fa | samtools view -bhS -o $(outdir)/c2t.bam
 
 # pavfinder
 $(pavfinder_outdir)/sv.bedpe: $(outdir)/c2g.bam $(outdir)/c2t.bam $(outdir)/r2c.bam $(outdir)/r2c.bam.bai
