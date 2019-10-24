@@ -103,3 +103,8 @@ v1.5.0
 v1.5.1
 - minor fixes/changes in `samtools` piping in `r2c` and `c2t` commands in `fusion-bloom`
 - updates usage for `fusion-bloom`
+
+v1.6.0
+- Fusion-Bloom now expects [RNA-Bloom v1.2](https://github.com/bcgsc/RNA-Bloom/releases/tag/v1.2.0) to be used, as it reduces redundancy at its final stage. *.transcripts.nr.fa will be expected to be output of the assembly stage.
+- [Minimap2](https://github.com/lh3/minimap2) replaces BWA MEM as the aligner for r2c
+- BugFix for read-through identification - previous assumption of single transcript at both up and downstream junctions removed, as it is not uncommon to have some "minor" transcript in annotation 
