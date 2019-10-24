@@ -1825,6 +1825,8 @@ class SVFinder:
 
 	upstream_matches = {}
 	downstream_matches = {}
+	upstream_genes = set()
+	downstream_genes = set()
 	for tid, matches in block_matches.iteritems():
 	    for i in range(len(matches) - 1):
 		if matches[i] is None and\
@@ -1835,6 +1837,8 @@ class SVFinder:
 		    if not downstream_matches.has_key(i + 1):
 			downstream_matches[i + 1] = []
 		    downstream_matches[i + 1].append((tid, matches[i + 1][0][0], len([m for m in matches if m is not None])))
+		    downstream_genes.add(self.transcripts_dict[tid].gene)
+
 		elif matches[i + 1] is None and\
 		     matches[i] is not None and \
 		     matches[i][-1][1][1] == '=' and\
@@ -1842,8 +1846,9 @@ class SVFinder:
 		    if not upstream_matches.has_key(i):
 			upstream_matches[i] = []
 		    upstream_matches[i].append((tid, matches[i][-1][0], len([m for m in matches if m is not None])))
-		    
-	if len(upstream_matches.keys()) == 1 and len(downstream_matches.keys()) == 1:
+		    upstream_genes.add(self.transcripts_dict[tid].gene)
+
+	if upstream_matches and downstream_matches and upstream_genes and downstream_genes and not (upstream_genes & downstream_genes):
 	    upstream_block_idx = upstream_matches.keys()[0]
 	    downstream_block_idx = downstream_matches.keys()[0]
 	    
