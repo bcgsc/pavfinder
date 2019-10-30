@@ -12,6 +12,15 @@
   find_sv_genome.py <contigs_to_genome.bam> <contigs_fasta> <genome_fasta> <outdir> --r2c <reads_to_contigs.bam>
   ```
 
+* To generate transcripts fasta for detecting transcriptome structural variants
+
+  ```
+  extract_transcript_sequence.py <tabix-indexed gtf> <output transcripts fasta> <reference genome> --index --only_longest
+  ```
+  * GTF file needs to be gzipped and indexed with [Tabix](http://www.htslib.org/doc/tabix.html)
+  * GTF and reference genome must have the same chromosomes
+  * To create BWA index on fasta for generating contigs-to-transcripts(c2t) bam file, adding `--index`
+
 * Run PV to detect transcriptome structural variants (fusions, read-throughs, ITDs, PTDs, InDels)
 
   ```
