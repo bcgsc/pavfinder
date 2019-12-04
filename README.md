@@ -34,3 +34,5 @@ A new pipeline named `fusion-bloom` coupling PAVFinder with our latest RNA-seq a
 
 ### Publication
 Readman Chiu, Ka Ming Nip, Justin Chu and Inanc Birol. **TAP: a targeted clinical genomics pipeline for detecting transcript variants using RNA-seq data**. *BMC Med Genomics* (2018) 11:79 [https://doi.org/10.1186/s12920-018-0402-6](https://doi.org/10.1186/s12920-018-0402-6)
+
+Readman Chiu, Ka Ming Nip, Inanc Birol. **Fusion-Bloom: fusion detection in assembled transcriptomes**. *Bioinformatics* (2019) btz902 [https://doi.org/10.1093/bioinformatics/btz902](https://doi.org/10.1093/bioinformatics/btz902)
