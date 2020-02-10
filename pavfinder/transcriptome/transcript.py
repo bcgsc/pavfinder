@@ -24,7 +24,7 @@ class Transcript:
 	assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: %s %s' % (self.id, self.strand)
 	
 	if num < 1 or num > len(self.exons):
-	    print 'exon number out of range:%s (1-%d)' % (num, len(self.exons))
+	    print('exon number out of range:%s (1-%d)' % (num, len(self.exons)))
 	    return None
 
 	if not transcript_coord:

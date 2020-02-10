@@ -156,7 +156,7 @@ def run(fasta, output_bam, genome, index_dir=None, num_threads=4):
     """
     cmd = 'bwa mem -a -t %d %s/%s %s | samtools view -bhS - -o %s' % (num_threads, index_dir, genome, fasta, output_bam)
 
-    print cmd
+    print(cmd)
     try:
         returncode = check_call(cmd, shell=True)
     except CalledProcessError, e:

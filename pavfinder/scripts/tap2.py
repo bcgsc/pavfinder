@@ -168,7 +168,7 @@ log_file = '%s/log.%s.txt' % (logs_dir, datetime.datetime.now().strftime("%Y-%m-
 logger, logging_mutex = cmdline.setup_logging(__name__,
                                               log_file,
                                               args.verbose)
-print 'log_file:', log_file
+print('log_file:', log_file)
 
 cmdline.run(args)
 
