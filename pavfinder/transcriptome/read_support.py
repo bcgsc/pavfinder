@@ -25,8 +25,8 @@ def find_support(events, bam_file, query_fasta_file,
 		spans = [s for s in event.support_span.split(',') if '-' in s]
 		
 		if len(seq_ids) != len(spans):
-		    print 'unmatched seq_ids(%s) and support_spans(%s)' % (event.seq_id,
-		                                                           event.support_span)
+		    print('unmatched seq_ids(%s) and support_spans(%s)' % (event.seq_id,
+		                                                           event.support_span))
 		    return None, None
 		else:
 		    support_spans = [map(int, span.split('-')) for span in spans]		
@@ -45,7 +45,7 @@ def find_support(events, bam_file, query_fasta_file,
 		for seq_id, span in event_to_coords[event]:
 		    if not support.has_key(seq_id):
 			if debug:
-			    print '%s no support' % seq_id
+			    print('%s no support' % seq_id)
 			continue
 		    total_spanning += support[seq_id][span][0]
 		    if total_flanking is not None and support[seq_id][span][1] is not None:

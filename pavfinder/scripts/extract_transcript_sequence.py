@@ -40,7 +40,7 @@ def get_transcripts(annot, coding_only, genes=None, only_longest=False, coding_f
         captured_genes = Set([t.gene for t in transcripts])
         
         for gene in genes - Set([t.gene for t in transcripts]):
-            print "can't find %s from gtf" % gene
+            print("can't find %s from gtf" % gene)
                 
     if coding_only:
         transcripts = [t for t in transcripts if t.is_coding()]
@@ -90,7 +90,7 @@ def output_by_gene(out_dir, by_gene, genome_fa, genomic_seq=None):
                 out.write('>%s\n%s\n' % (transcript.gene, genomic_seq[transcript.gene].upper()))
     
 def bwa_index(fa):
-    print 'bwa', 'index', os.path.abspath(fa)
+    print('bwa', 'index', os.path.abspath(fa))
     subprocess.call(['bwa index %s' % fa], shell=True)
 
 def parse_args():

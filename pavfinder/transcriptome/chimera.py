@@ -12,14 +12,14 @@ def find_chimera(aligns, query_seq=None, max_splits=3, debug=False):
 	    adj = call_event(chimeric_aligns[i], chimeric_aligns[i + 1], query_seq=query_seq, no_sort=True)
 	    if adj is not None:
 		if debug:
-		    print 'chimera1', chimeric_aligns[i].query, chimeric_aligns[i].target, \
+		    print('chimera1', chimeric_aligns[i].query, chimeric_aligns[i].target, \
 		          chimeric_aligns[i].tstart, chimeric_aligns[i].tend, \
 		          chimeric_aligns[i].qstart, chimeric_aligns[i].qend, \
-		          chimeric_aligns[i].strand
-		    print 'chimera2', chimeric_aligns[i + 1].query, chimeric_aligns[i + 1].target, \
+		          chimeric_aligns[i].strand)
+		    print('chimera2', chimeric_aligns[i + 1].query, chimeric_aligns[i + 1].target, \
 		          chimeric_aligns[i + 1].tstart, chimeric_aligns[i + 1].tend, \
 		          chimeric_aligns[i + 1].qstart, chimeric_aligns[i + 1].qend, \
-		          chimeric_aligns[i + 1].strand
+		          chimeric_aligns[i + 1].strand)
 		    
 		# check for inverted duplication
 		check_inv_dup(adj, (chimeric_aligns[i], chimeric_aligns[i + 1]))
@@ -105,9 +105,9 @@ def call_event(align1, align2, query_seq=None, no_sort=False, max_inv_target_ola
 	if len(olap) <= max_inv_target_olap:
 	    rearrangement = 'inv'
 	else:
-	    print '%s:potential inv disallowed - target overlap %d bigger than %s' % (aligns[0].query,
+	    print('%s:potential inv disallowed - target overlap %d bigger than %s' % (aligns[0].query,
 	                                                                           len(olap),
-	                                                                           max_inv_target_olap)
+	                                                                           max_inv_target_olap))
     elif orients[0] == 'L' and orients[1] == 'L':
 	rearrangement = 'inv'
     elif orients[0] == 'L' and orients[1] == 'R':

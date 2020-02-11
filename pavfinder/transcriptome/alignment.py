@@ -320,7 +320,7 @@ def search_by_align(query_seq, target_seq, query_name, target_name, outdir, max_
 
     try:
 	if debug:
-	    print cmd
+	    print(cmd)
 	subprocess.call(cmd, shell=True)
     except:
 	# should check whether blastn is in the PATH right off the bet

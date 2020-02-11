@@ -29,7 +29,7 @@ class ExonMapper:
 	junc_adjs = []
 	events = []
 	for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
-	    print 'processing', query
+	    print('processing', query)
 	    aligns = []
 	    for aln in list(group):
 		if not aln.is_unmapped:

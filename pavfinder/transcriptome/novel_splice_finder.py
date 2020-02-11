@@ -30,11 +30,11 @@ def filter_events(events, min_support):
 	if events[i].spanning < min_support:
 	    failed.add(i)
 	    if events[i].link:
-		print 'failed link', events[i].seq_id, events[i].event
+		print('failed link', events[i].seq_id, events[i].event)
 		if event_to_index.has_key(events[i].link):
 		    failed.add(event_to_index[events[i].link])
 		else:
-		    print 'cannot find link', events[i].seq_id, events[i].event, events[i].link
+		    print('cannot find link', events[i].seq_id, events[i].event, events[i].link)
 
     for i in sorted(list(failed), reverse=True):
 	del events[i]

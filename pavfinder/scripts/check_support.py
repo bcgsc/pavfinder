@@ -184,7 +184,7 @@ def get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
         cmd += ' --min_overlap %d' % min_overlap
     if debug:
         cmd += ' --debug'
-    print cmd
+    print(cmd)
     process = subprocess.Popen(cmd, shell=True)
     process.wait()
         
@@ -253,7 +253,7 @@ def gather_and_filter(adjs, variants, vid_to_aid, coords_file, contigs_fa,
                     allow_clipped_support=allow_clipped,
                     support_min_mapped=support_min_mapped,
                     debug=debug)
-        print 'done getting support', bam_file
+        print('done getting support', bam_file)
 
     # filter
     if os.path.exists(support_file):
@@ -313,15 +313,15 @@ def main():
     
     adjs, meta = parse_adjs(args.sv_dir + '/adjacencies.bedpe')
     variants = parse_variants(args.sv_dir + '/variants.vcf')
-    print 'done parsing events'
+    print('done parsing events')
     
     vid_to_aid = link_variants_adjs(variants, adjs)
-    print 'done linking events'
+    print('done linking events')
     
     out_dir = args.sv_dir
     coords_file = '%s/coords.tsv' % out_dir
     create_coords_file(adjs, vid_to_aid, coords_file)
-    print 'done creating coords file'
+    print('done creating coords file')
     
     support_args = [(args.bam, None, args.min_support, args.min_overlap, args.allow_clipped, args.support_min_mapped)]
     if args.normal_bam:

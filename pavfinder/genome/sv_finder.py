@@ -100,7 +100,7 @@ class SVFinder:
 	
 	all_adjs = []
 	for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
-	    print 'contig', contig
+	    print('contig', contig)
 	    alns = list(group)
 	    contig_seq = self.contig_fasta.fetch(contig)
 	    
@@ -318,7 +318,7 @@ class SVFinder:
 	    try:
 		seq = self.ref_fasta.fetch(chrom, max(0,i), i + 100)
 	    except:
-		print "can't extract reference sequence for complexity checking %s:%s-%s" % (chrom, i, i + 100)
+		print("can't extract reference sequence for complexity checking %s:%s-%s" % (chrom, i, i + 100))
 		continue
 	    
 	    repeats = r.findall(seq)
@@ -415,7 +415,7 @@ class SVFinder:
 	elif event == 'ins':
 	    seq = contig_seq[contig_breaks_sorted[0] : contig_breaks_sorted[1] - 1]
 	if seq is None:
-	    print contig, event, 'cannot find seq', seq
+	    print(contig, event, 'cannot find seq', seq)
 	    return None
 	
 	repeat = extract_repeat(seq)
@@ -740,7 +740,7 @@ class SVFinder:
 	if debug:
 	    cmd += ' --debug'
 
-	print cmd
+	print(cmd)
 	process = subprocess.Popen(cmd, shell=True)
 	process.wait()
     

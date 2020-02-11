@@ -84,7 +84,7 @@ class Adjacency:
 	self.repeat_num_change = None
 		
     def debug(self):
-        print '%s %s %s %s %s %s' % (self.rearrangement, self.chroms, self.breaks, self.get_size(), ','.join(self.contigs), self.orients)
+        print('%s %s %s %s %s %s' % (self.rearrangement, self.chroms, self.breaks, self.get_size(), ','.join(self.contigs), self.orients))
 	
     #def sum_support(self, normal=False):
 	#if not normal:
@@ -208,7 +208,7 @@ class Adjacency:
                 if len(bk) == 2:
                     contig_breaks.append('%s-%s' % (bk[0], bk[1]))
                 else:
-                    print 'error'
+                    print('error')
                     
             if len(contig_breaks) == len(self.contigs):
                 for i in range(2):
@@ -619,7 +619,7 @@ class Adjacency:
     def extract_probe_new(cls, contig_seq, contig_breaks, len_on_each_side=50, kmer_size=None, min_buffer=1):
 	probe = 'NA'
 	contig_breaks_sorted = sorted(contig_breaks)
-	print contig_breaks_sorted, min_buffer, kmer_size	
+	print(contig_breaks_sorted, min_buffer, kmer_size)
 	start = contig_breaks_sorted[1] + min_buffer - kmer_size + 1
 	end = contig_breaks_sorted[0] - min_buffer + kmer_size - 1
 	
@@ -722,7 +722,7 @@ class Adjacency:
 			             max(trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend, trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend)
 			
 			if trls[i].aligns[0][0].dubious:
-			    print 'anchor', target_chrom, target_breaks, trls[i].aligns[0][0].target, trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend
+			    print('anchor', target_chrom, target_breaks, trls[i].aligns[0][0].target, trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend)
 			    anchor_dubious = True
 		    else:
 			target_chrom = trls[i].chroms[1]
