@@ -1,6 +1,4 @@
-#!/bin/sh
-# Exec script with awk. Don't remove slash \
-exec awk -f "$0" "$@"
+#!/usr/bin/env -S awk -f
 
 !/^>/ { next }
 { getline seq }
