@@ -53,7 +53,7 @@ def main():
     annot_tabix = create_pysam_tabix(args.gtf)
     genome_bam = None
     if args.genome_bam:
-	genome_bam = create_pysam_bam(args.genome_bam)
+        genome_bam = create_pysam_bam(args.genome_bam)
     
     em = ExonMapper(annot_tabix,
                     transcripts_dict,
@@ -62,7 +62,7 @@ def main():
 
     annots = [args.gtf]
     if args.suppl_annot:
-	annots.extend(args.suppl_annot)
+        annots.extend(args.suppl_annot)
     accessory_known_features = extract_features(annots)
     
     mappings, junc_adjs, events = em.map_aligns(bam,
@@ -75,18 +75,18 @@ def main():
     events_merged = Adjacency.merge(events)
 
     if args.r2c:
-	all_adjs = []
-	if juncs_merged:
-	    all_adjs.extend(juncs_merged)
-	if events_merged:
-	    all_adjs.extend(events_merged)
-	if all_adjs:
-	    find_support(all_adjs, args.r2c, args.query_fasta, num_procs=args.nproc, debug=args.debug)
-	if events_merged:
-	    filter_events(events_merged, args.min_support)
+        all_adjs = []
+        if juncs_merged:
+            all_adjs.extend(juncs_merged)
+        if events_merged:
+            all_adjs.extend(events_merged)
+        if all_adjs:
+            find_support(all_adjs, args.r2c, args.query_fasta, num_procs=args.nproc, debug=args.debug)
+        if events_merged:
+            filter_events(events_merged, args.min_support)
 
     if genome_bam:
-	corroborate_genome(events_merged, genome_bam)
+        corroborate_genome(events_merged, genome_bam)
     
     cmd = ' '.join(sys.argv)
     time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")

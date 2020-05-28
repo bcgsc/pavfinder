@@ -4,7 +4,6 @@ import os
 import datetime
 import pysam
 import sys
-from sets import Set
 import pavfinder as pv
 from pavfinder.transcriptome.transcript import Transcript
 from pavfinder.transcriptome.sv_finder import SVFinder
@@ -43,8 +42,8 @@ def combine_events(events, mappings):
     def same_mapping(query):
         passed = False
         if mappings['via_transcripts'] and mappings['via_genome']:
-            if mappings['via_transcripts'].has_key(query) and\
-               mappings['via_genome'].has_key(query):
+            if query in mappings['via_transcripts'] and\
+               query in mappings['via_genome']:
                 if not mappings['via_transcripts'][query] or not mappings['via_transcripts'][query][0]:
                     print('%s: mapping disagreed transcripts:None genome:%s' % (query,
                                                                                 mappings['via_genome'][query]))
@@ -72,7 +71,7 @@ def combine_events(events, mappings):
         for contig in events_by_contig.keys():
             events.extend(events_by_contig[contig])
         events_merged = Adjacency.merge(events)
-        contigs = Set()
+        contigs = set()
         for event in events_merged:
             if ',' in event.seq_id:
                 for contig in event.seq_id.split(','):
@@ -82,26 +81,26 @@ def combine_events(events, mappings):
     combined_events = []
     contigs_same_genome_event = extract_multiple_contig_events(events['via_genome'])
 
-    for query in Set(events['via_genome'].keys()) | Set(events['via_transcripts'].keys()):
+    for query in set(events['via_genome'].keys()) | set(events['via_transcripts'].keys()):
         if events['via_genome'] and events['via_transcripts'] and not same_mapping(query):
             continue
         
-        if not events['via_transcripts'].has_key(query):
+        if not query in events['via_transcripts']:
             print('onlygenome', query)
             for event in events['via_genome'][query]:
                 #if event.rearrangement == 'fusion' or event.rearrangement == 'read_through':
                 combined_events.append(event)
             #else:
                 #combined_events.extend(events['via_genome'][query])
-        elif not events['via_genome'].has_key(query):
+        elif not query in events['via_genome']:
             print('onlytranscripts', query)
             for event in events['via_transcripts'][query]:
                 combined_events.append(event)
         else:
             events_t = list(events['via_transcripts'][query])
             events_g = list(events['via_genome'][query])
-            used_t = Set()
-            used_g = Set()
+            used_t = set()
+            used_g = set()
             for i in range(len(events_t)):
                 if i in used_t:
                     continue
