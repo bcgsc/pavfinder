@@ -230,7 +230,6 @@ def get_match_len_from_cigar(cigar):
 
 def reverse_complement(seq):
     """Reverse complements sequence string"""
-    #from string import maketrans
     complement = str.maketrans("agtcAGTC", "tcagTCAG")
     return seq[::-1].translate(complement)
 
