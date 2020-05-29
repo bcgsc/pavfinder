@@ -52,7 +52,7 @@ def parse_variants(vcf):
 
 def create_coords_file(adjs, vid_to_aid, out_file):
     align_types = {}
-    for vid, aids in vid_to_aid.iteritems():
+    for vid, aids in vid_to_aid.items():
         #print 'kk', vid, aids
         if len(aids) > 1:
             for aid in aids:
