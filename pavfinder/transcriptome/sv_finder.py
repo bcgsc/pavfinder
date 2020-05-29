@@ -255,8 +255,7 @@ class SVFinder:
         events_by_query = {}
         mappings_by_query = {}
         partial_aligns = []
-        for query, group in groupby(
-                bam.fetch(until_eof=True), lambda aln: aln.query_name):
+        for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
             print('processing', query)
             events = []
             query_seq = query_fasta.fetch(query)
@@ -838,8 +837,7 @@ class SVFinder:
                 adj_aligns = self.map_aligns_to_adj(adj, aligns)
             else:
                 adj_aligns = (aligns[0], aligns[0])
-            transcripts = [self.transcripts_dict[align.target]
-                           for align in adj_aligns]
+            transcripts = [self.transcripts_dict[align.target] for align in adj_aligns]
             if transcripts and len(transcripts) == 2:
                 if transcripts[0] == transcripts[1]:
                     genes = (transcripts[0].gene)
