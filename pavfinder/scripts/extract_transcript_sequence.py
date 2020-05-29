@@ -5,10 +5,9 @@ import subprocess
 import os
 from pavfinder.transcriptome.transcript import Transcript
 from collections import defaultdict
-from sets import Set
 
 def get_genes(list_file):
-    genes = Set()
+    genes = set()
     with open(list_file, 'r') as ff:
         for line in ff:
             genes.add(line.rstrip('\n'))
@@ -35,11 +34,11 @@ def get_transcripts(annot, coding_only, genes=None, only_longest=False, coding_f
     else:
         transcripts = transcripts_dict.values()
     
-    if genes and type(genes) is Set:
+    if genes and type(genes) is set:
         transcripts = [t for t in transcripts if t.gene in genes]
-        captured_genes = Set([t.gene for t in transcripts])
+        captured_genes = set([t.gene for t in transcripts])
         
-        for gene in genes - Set([t.gene for t in transcripts]):
+        for gene in genes - set([t.gene for t in transcripts]):
             print("can't find %s from gtf" % gene)
                 
     if coding_only:
@@ -86,7 +85,7 @@ def output_by_gene(out_dir, by_gene, genome_fa, genomic_seq=None):
                                             transcript.get_sequence(genome_fa).upper()
                                             )
                           )
-            if genomic_seq is not None and genomic_seq.has_key(transcript.gene):
+            if genomic_seq is not None and transcript.gene in genomic_seq:
                 out.write('>%s\n%s\n' % (transcript.gene, genomic_seq[transcript.gene].upper()))
     
 def bwa_index(fa):
