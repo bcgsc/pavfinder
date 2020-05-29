@@ -300,7 +300,7 @@ def find_discordant_pairs(bam, transcripts_dict, genome_fasta, min_pairs=2):
                         
                     key = gene1, genome_break1, orient1, gene2, genome_break2, orient2
                     
-                    if not events.has_key(key):
+                    if not key in events:
                         events[key] = {'txt_breaks': [txt_break1, txt_break2],
                                        'genome_breaks': [genome_break1, genome_break2],
                                        'orients': [orient1, orient2],

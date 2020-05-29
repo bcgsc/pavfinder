@@ -3,7 +3,6 @@ import re
 import sys
 import os
 from collections import OrderedDict, defaultdict
-from sets import Set
 import subprocess
 from pavfinder.genome.read_support import sum_support, filter_support
 
@@ -101,7 +100,7 @@ def parse_support(support_output):
     return support
 
 def filter_events(adjs, variants, vid_to_aid, support, min_support):
-    failed_adjs = Set()
+    failed_adjs = set()
     adjs_by_id = {}
     for adj in adjs:
         adjs_by_id[adj['name']] = adj
@@ -110,7 +109,7 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
                                       adj['contig-break1'].split(','),
                                       adj['contig-break2'].split(',')):
             span = '-'.join(map(str, tuple(sorted((int(start), int(end))))))
-            if support.has_key(contig) and support[contig].has_key(span):
+            if contig in support and span in support[contig]:
                 if type(support[contig][span][0]) is int:
                     spanning.append(support[contig][span][0])
                 if type(support[contig][span][1]) is int:
@@ -126,7 +125,7 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
             failed_adjs.add(adj['name'])
 
       
-    failed_variants = Set()
+    failed_variants = set()
     for i in range(len(variants)):
         if type(variants[i]) is str:
             continue
@@ -136,7 +135,7 @@ def filter_events(adjs, variants, vid_to_aid, support, min_support):
         
         skip = False
         for aid in aids:
-            if not adjs_by_id.has_key(aid):
+            if not aid in adjs_by_id:
                 skip = True
         if skip:
             continue
@@ -272,8 +271,8 @@ def subtract_events(out_dir):
 
     normal_adjs, normal_meta = parse_adjs(out_dir + '/adjacencies_normal_filtered.bedpe')
 
-    tumor_adj_ids = Set([adj['name'] for adj in tumor_adjs])
-    normal_adj_ids = Set([adj['name'] for adj in normal_adjs])
+    tumor_adj_ids = set([adj['name'] for adj in tumor_adjs])
+    normal_adj_ids = set([adj['name'] for adj in normal_adjs])
     germline_adj_ids = tumor_adj_ids & normal_adj_ids
 
     # identify variants

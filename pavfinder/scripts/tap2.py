@@ -81,9 +81,9 @@ def get_params(args, params_file):
     def override(section, names):
         for name in names:
             value = getattr(args, name)
-            if not params.has_key(section):
+            if not section in params:
                 params[section] = {}
-            if not params[section].has_key(name) or value is not None:
+            if not name in params[section] or value is not None:
                 params[section][name] = value
 
     params = {}
@@ -114,18 +114,18 @@ def check_params(args, params):
     """Check if required 'alignments' and 'annotations' parameters are specified"""
     error = None
     if not args.only_assembly:
-        if not params.has_key('alignments'):
+        if not 'alignments' in params:
             error = 'no alignments parameters provided'
-        elif not params['alignments'].has_key('genome_index') or params['alignments']['genome_index'] is None or\
+        elif not 'genome_index' in params['alignments'] or params['alignments']['genome_index'] is None or\
              type(params['alignments']['genome_index']) is not list or len(params['alignments']['genome_index']) != 2:
             error = 'no proper GMAP index provided'
-        elif not params['annotations'].has_key('genome_fasta') or params['annotations']['genome_fasta'] is None:
+        elif not 'genome_fasta' in params['annotations'] or params['annotations']['genome_fasta'] is None:
             error = 'no genome fasta provided'
-        elif not params['annotations'].has_key('gtf') or params['annotations']['gtf'] is None:
+        elif not 'gtf' in params['annotations'] or params['annotations']['gtf'] is None:
             error = 'no gtf provided'
 
         if not args.only_splicing:
-            if not params['alignments'].has_key('transcripts_fasta') or params['alignments']['transcripts_fasta'] is None:
+            if not 'transcripts_fasta' in params['alignments'] or params['alignments']['transcripts_fasta'] is None:
                 error = 'no transcripts fasta provided'
 
     if error is not None:
@@ -324,7 +324,7 @@ def assemble_single_gene(fastqs, gene_fasta, readlen):
                                                                                       prefix,
                                                                                       prefix + '.',
                                                                                       )
-    if params.has_key('assembly'):
+    if 'assembly' in params:
         aps = params['assembly']
         cmd += '%s ' % ' '.join(['-%s %s' % (name, aps[name]) for name in aps.keys() if type(aps[name]) is not bool])
         cmd += '%s ' % ' '.join(['-%s' % name for name in aps.keys() if type(aps[name]) is bool and aps[name] == True])
@@ -521,7 +521,7 @@ def find_sv(inputs, events_output, nprocs):
                                                                                                                              os.path.splitext(r2c_index)[0],
                                                                                                                              nprocs)
 
-        if params.has_key('sv'):
+        if 'sv' in params:
             sparams = params['sv']
             cmd += ' %s' % ' '.join(['--%s %s' % (name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool])
             cmd += ' %s' % ' '.join(['--%s' % name for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True])
@@ -559,12 +559,12 @@ def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, genome_bam):
                                                                     nprocs,
                                                                     )
 
-        if params.has_key('splicing'):
+        if 'splicing' in params:
             sparams = params['splicing']
             cmd += ' %s' % ' '.join(['--%s %s' % (name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool])
             cmd += ' %s' % ' '.join(['--%s' % name for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True])
 
-        if params['annotations'].has_key('suppl_annot') and params['annotations']['suppl_annot'] and\
+        if 'suppl_annot' in params['annotations'] and params['annotations']['suppl_annot'] and\
            params['annotations']['suppl_annot'] is not None:
             if type(params['annotations']['suppl_annot']) is str and not params['annotations']['suppl_annot'].isspace():
                 cmd += ' --suppl_annot %s' % params['annotations']['suppl_annot']
