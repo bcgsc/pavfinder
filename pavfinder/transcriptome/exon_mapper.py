@@ -23,19 +23,12 @@ class ExonMapper:
 
         self.suppl_annots = suppl_annots
 
-    def map_aligns(
-            self,
-            bam,
-            query_fasta,
-            genome_fasta,
-            accessory_known_features=None,
-            find_events=True,
-            max_diff=1):
+    def map_aligns(self, bam, query_fasta, genome_fasta,
+                   accessory_known_features=None, find_events=True, max_diff=1):
         mappings = defaultdict(list)
         junc_adjs = []
         events = []
-        for query, group in groupby(
-                bam.fetch(until_eof=True), lambda aln: aln.query_name):
+        for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
             print('processing', query)
             aligns = []
             for aln in list(group):
@@ -285,7 +278,16 @@ class ExonMapper:
             transcript = self.transcripts_dict[record.transcript_id]
             mapping = self.map_exons(align.blocks, transcript.exons)
             if len([m for m in mapping if m is None]) != len(mapping):
-                mappings[transcript.id] = mapping
+                # new condition: at least one exon has one boundary mapped
+                exon_bounds_matched = 0
+                if len(transcript.exons) > 1:
+                    for m in mapping:
+                        if m is not None:
+                            for mm in m:
+                                if '=' in mm[1]:
+                                    exon_bounds_matched += 1
+                if len(transcript.exons) == 1 or exon_bounds_matched > 0:
+                    mappings[transcript.id] = mapping
 
         return mappings
 
