@@ -1,6 +1,5 @@
 import pysam
 from intspan import intspan
-from sets import Set
 import sys
 import re
 import bwa_mem
@@ -84,7 +83,7 @@ def find_chimera(alns, bam, min_coverage=0.95, check_alt_paths=False, max_splits
 		    return None, None
 
 	    primary_chimera = [primary_aligns[i] for i in primary_paths]
-	    primary_chroms = Set([align.target for align in primary_chimera])
+	    primary_chroms = set([align.target for align in primary_chimera])
 	    for align in primary_chimera:
 		align.dubious = False
 	    
@@ -109,7 +108,7 @@ def find_chimera(alns, bam, min_coverage=0.95, check_alt_paths=False, max_splits
 			                                                                                 ))
 		    primary_replaced = True
 		    primary_chimera = replaced_chimera
-		    primary_chroms = Set([align.target for align in primary_chimera])
+		    primary_chroms = set([align.target for align in primary_chimera])
 		
 	    if debug:
 		for align in primary_chimera:
@@ -131,7 +130,7 @@ def find_chimera(alns, bam, min_coverage=0.95, check_alt_paths=False, max_splits
 	    secondary_paths = find_paths(secondary_aligns, min_coverage=min_coverage, get_all=True, debug=debug)
 	    
 	    # alternative chimera combining primary and secondary aligns: won't work for 3 ways
-	    dubious = Set()
+	    dubious = set()
 	    
 	    if check_alt_paths:
 		for i in range(len(primary_chimera)):
@@ -437,7 +436,7 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False, ma
     for i in range(len(paths)):
 	covered, overlaps = _coverage(paths[i])
 	if _screen(covered, overlaps):
-	    chroms = Set([aligns[j].target for j in paths[i]])
+	    chroms = set([aligns[j].target for j in paths[i]])
 	    path_info[i] = {'path': paths[i], 'covered': covered, 'overlaps': overlaps, 'chroms':chroms}
 	    	
     if path_info:

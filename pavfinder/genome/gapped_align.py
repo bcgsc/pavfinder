@@ -1,5 +1,4 @@
 import re
-from sets import Set
 import pysam
 from alignment import Alignment, reverse_complement
 from adjacency import Adjacency
@@ -37,7 +36,7 @@ def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False, query_fasta
             
         # deletion or indel
         if target_gap > 0:
-            if target_gaps.has_key(gap_count):
+            if gap_count in target_gaps:
 		breaks = (align.blocks[i][1], align.blocks[i + 1][0])
 		contig_breaks = (align.query_blocks[i][1], align.query_blocks[i + 1][0])
 
@@ -131,7 +130,7 @@ def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False, query_fasta
     return adjs
 
 def is_homopolymer(seq):
-    return len(Set(map(''.join, zip(*[iter(seq)] * 1)))) == 1
+    return len(set(map(''.join, zip(*[iter(seq)] * 1)))) == 1
 
 def find_repeat(seq):
     def chop_seq(seq, size):
@@ -141,7 +140,7 @@ def find_repeat(seq):
     size_range = [2,4]
     for size in range(size_range[0], size_range[1] + 1):
 	if len(seq) % size == 0:
-	    uniq_subseqs = Set(chop_seq(seq, size))
+	    uniq_subseqs = set(chop_seq(seq, size))
 	    if len(uniq_subseqs) == 1:
 		return list(uniq_subseqs)[0]
 

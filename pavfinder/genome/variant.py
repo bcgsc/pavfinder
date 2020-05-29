@@ -1,4 +1,3 @@
-from sets import Set
 from alignment import compare_chr, reverse_complement
 
 class Variant:
@@ -42,7 +41,7 @@ class Variant:
     def inversion_as_vcf(self, ref_fasta):
 	info = {}
 	
-	contigs = Set()
+	contigs = set()
 	for i in range(2):
 	    for contig in self.adjs[i].contigs:
 		contigs.add(contig)
@@ -85,7 +84,7 @@ class Variant:
 	assert type(self.pos) is list or type(self.pos) is tuple, '"pos" for big insertion event must be list or tuple'
 	info = {}
 	
-	contigs = Set()
+	contigs = set()
 	for i in range(2):
 	    for contig in self.adjs[i].contigs:
 		contigs.add(contig)

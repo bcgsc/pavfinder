@@ -3,7 +3,6 @@ import re
 import sys
 import os
 import subprocess
-from sets import Set
 from itertools import groupby
 from pavfinder.genome import gapped_align
 from pavfinder.genome import split_align
@@ -42,7 +41,7 @@ class SVFinder:
 	    adjs = gapped_align.find_adjs(align, contig_seq, False, ins_as_ins=ins_as_ins,
 	                                  query_fasta=self.contig_fasta, target_fasta=self.ref_fasta)
 		
-	    repeats = Set()
+	    repeats = set()
 	    for i in range(len(adjs)):
 		adj = adjs[i]
 		
@@ -75,7 +74,7 @@ class SVFinder:
 	    Returns True if overlapped
 	    """
 	    s1, e1 = align.tstart, align.tend
-	    if acen.has_key(align.target):
+	    if align.target in acen:
 		for (start, end) in acen[align.target]:
 		    s2, e2 = int(start) - self.acen_buffer, int(end) + self.acen_buffer
 		    if s1 <= e2 and s2 <= e1:
@@ -85,7 +84,7 @@ class SVFinder:
 	
 	def create_set(list_file):
 	    """Creates set from items in a list"""
-	    subset = Set()
+	    subset = set()
 	    for line in open(list_file, 'r'):
 		subset.add(line.strip('\n'))
 	    return subset
@@ -138,7 +137,7 @@ class SVFinder:
 		
 		    adjs = split_align.find_adjs(chimeric_aligns, contig_seq, dubious=dubious, debug=self.debug)
 		    
-		    bad = Set()
+		    bad = set()
 		    for i in range(len(adjs)):
 			adj = adjs[i]
 			#check if homol is simple repeat
@@ -227,7 +226,7 @@ class SVFinder:
 
 	"""Creates variants from adjacencies"""
 	self.variants = []
-	adjs_ids_used = Set()
+	adjs_ids_used = set()
 
 	split_events = [adj for adj in adjs if not adj.rearrangement in ('trl', 'ins') and adj.align_types[0] == 'split']
 	ins_variants, split_events_remained = Adjacency.extract_interchrom_ins(split_events)
@@ -573,7 +572,7 @@ class SVFinder:
 		query = adj.contigs[0] + name_sep + adj.key()
 		query_to_variant[query] = (i, j)
 		
-	failed_variants = Set()
+	failed_variants = set()
 	for key, group in groupby(bam.fetch(until_eof=True), lambda x: name_sep.join(x.qname.split(name_sep)[:2])):
 	    alns = list(group)
 	    variant_idx = query_to_variant[key][0]
@@ -616,7 +615,7 @@ class SVFinder:
 	    #variants = [variant for variant in variants if variant.somatic]
 
 	source = 'NA'
-	if header is not None and header.has_key('software'):
+	if header is not None and 'software' in header:
 	    source = header['software']
 	self.output_variants(variants, 
                              '%s/variants.vcf' % self.out_dir, 
@@ -757,14 +756,14 @@ class SVFinder:
 	adjs_bed = BedTool(adjs_bed_file)
 	
 	# overlaps adjacencies with bad bed file, keeps breakpoints in Set
-	bad_breaks = Set()
+	bad_breaks = set()
 	regions = BedTool(bad_bed_file)
 	overlaps = regions.intersect(adjs_bed)
 	for olap in overlaps:
 	    bad_breaks.add('%s:%s' % (olap[0], int(olap[1]) + 1))
 	
 	# screen out adjacencies
-	bad_adj_indices = Set()
+	bad_adj_indices = set()
 	for i in range(len(adjs)):
 	    for j in (0,1):
 		breakpt = '%s:%s' % (adjs[i].chroms[j], adjs[i].breaks[j])

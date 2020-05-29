@@ -59,7 +59,7 @@ class VCF:
             elif field == 'INFO':
                 info = []
                 for item in self.meta_info.keys():
-                    if self.info.has_key(item):
+                    if item in self.info:
                         if self.meta_info[item][1] == 'Flag':
                             info.append(item)
                         else:
@@ -87,7 +87,7 @@ class VCF:
         """
         data = []
         for field in cls.info_fields:
-            if info.has_key(field):
+            if field in info:
                 if cls.meta_info[field][1] == 'Flag':
                     data.append(field)
                 else:

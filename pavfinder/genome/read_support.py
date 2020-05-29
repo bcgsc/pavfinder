@@ -3,7 +3,6 @@ import sys
 import re
 from itertools import groupby, chain
 import argparse
-from sets import Set
 import multiprocessing as mp
 from intspan import intspan
 from collections import OrderedDict, defaultdict
@@ -13,7 +12,7 @@ def find_flanking(reads, span, contig_len, overlap_buffer=1, allow_clipped=False
     uniq_frags = defaultdict(list)
 
     tlens = []
-    proper_pairs = Set()
+    proper_pairs = set()
     for read in reads:
 	if read.is_proper_pair and is_fully_mapped(read, contig_len, allow_clipped=allow_clipped, min_ratio_mapped=min_ratio_mapped):
 	    proper_pairs.add(read.qname + str(read.pos))
@@ -45,8 +44,8 @@ def find_spanning(reads, span, contig_seq, overlap_buffer=1, debug=False, perfec
 	       is_break_region_perfect(read, break_seq, (start, end), overlap_buffer)
 
     contig_len = len(contig_seq)
-    pos = Set()
-    names = Set()
+    pos = set()
+    names = set()
     for read in reads:
 	if read.alen:
 	    if check_read(span[0], span[1]):
@@ -173,7 +172,7 @@ def worker(args):
                                    debug=debug)
 
     supports = []
-    for contig, coords in results.iteritems():
+    for contig, coords in results.items():
 	for coord in coords:
 	    start, end = map(int, coord.split('-'))
 	    supports.append([contig, start, end,
@@ -217,7 +216,7 @@ def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=Fals
     tlens_all = []
     count = 0
     window_size = 2000
-    for contig, spans_align_types in coords.iteritems():
+    for contig, spans_align_types in coords.items():
 	count += 1
         results[contig] = {}
 	contig_seq = contig_fasta.fetch(contig)

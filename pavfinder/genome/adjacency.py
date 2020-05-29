@@ -1,4 +1,3 @@
-from sets import Set
 from vcf import VCF
 import sys
 import copy
@@ -75,7 +74,7 @@ class Adjacency:
 	
 	self.partner_contig = None
 	
-	self.stigmas = Set()
+	self.stigmas = set()
 	
 	self.dubious = False
 
@@ -216,7 +215,7 @@ class Adjacency:
 		    	    
 	# external info - overrides given info
 	if info_ext:
-	    for key, value in info_ext.iteritems():
+	    for key, value in info_ext.items():
 		if len(value) == 2:
 		    infos[0][key] = value[0]
 		    infos[1][key] = value[1]
@@ -378,7 +377,7 @@ class Adjacency:
 	    
 	# external info - overrides given info
 	if info_ext:
-	    for key, value in info_ext.iteritems():
+	    for key, value in info_ext.items():
 		if key == 'SVLEN' and value == 'NA':
 		    continue
 		info[key] = value
@@ -578,7 +577,7 @@ class Adjacency:
 	    
     #def sum_support(self, normal=False):
 	#(support, support_total) = (self.support, self.support_total) if not normal else (self.support_normal, self.support_total_normal)
-	#for kind, nums in support.iteritems():
+	#for kind, nums in support.items():
 	    #if kind == 'tiling':
 		#continue
 	    
@@ -696,7 +695,7 @@ class Adjacency:
 	    """
 	    neighborhood= 500
 	    insertions = []
-	    used = Set()
+	    used = set()
 
 	    for i in range(len(trls)):
 		if i in used:
@@ -784,7 +783,7 @@ class Adjacency:
 	"""Group 2 translocation adjacencies into single reciprocal event"""
 	trls = sorted([adj for adj in adjs if not adj.dubious], key=lambda adj: (adj.chroms[0], adj.breaks[0]))
 	
-	grouped_trl_ids = Set()
+	grouped_trl_ids = set()
 	neighborhood = 10000
 	variants = []
 	i = 0
@@ -806,7 +805,7 @@ class Adjacency:
 		else:
 		    i += 1
 
-	grouped_trl_ids = Set()
+	grouped_trl_ids = set()
 	trls_remained = [trl for trl in trls if trl.id not in grouped_trl_ids]
 
 	return variants, trls_remained
@@ -860,8 +859,8 @@ class Adjacency:
 	    return None
 	    
 	insertions = []
-	used_contigs = Set()
-	used_adjs = Set()
+	used_contigs = set()
+	used_adjs = set()
 	for i in range(len(adjs) - 1):	
 	    for j in range(i + 1, len(adjs)):		
 		# same contig - skip
@@ -920,7 +919,7 @@ class Adjacency:
 	for adj in adjs:
 	    key = adj.key(transcriptome=transcriptome)
 
-	    if not keys.has_key(key):
+	    if not key in keys:
 		keys[key] = copy.deepcopy(adj)
 	    else:
 		first_adj = keys[key]
@@ -953,7 +952,7 @@ class Adjacency:
 	# for generating ID
 	count = 1
 	adjs_merged = []
-	for key, adj in sorted(keys.iteritems()):
+	for key, adj in sorted(keys.items()):
 	    adj.id = str(count)
 	    count += 1
 	    adjs_merged.append(adj)

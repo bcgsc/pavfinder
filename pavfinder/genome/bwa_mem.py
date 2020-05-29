@@ -3,7 +3,6 @@ from alignment import Alignment, reverse_complement, target_non_canonical
 from subprocess import check_call, CalledProcessError
 import sys
 from intspan import intspan
-from sets import Set
 
 def find_chimera(alns, bam, debug=False, check_haplotype=True):
     """Determine if given alignments are chimeric
@@ -57,7 +56,7 @@ def replace_haplotype(primary_alns, secondary_alns, bam):
         bam: Pysam bam handle for extracting the chromsome name
     """
     # indices of haplotype primary alignments to remove
-    remove = Set()
+    remove = set()
     for i in range(len(primary_alns)):
         chrom = bam.getrname(primary_alns[i].tid)
         # assume haplotypes have '_'

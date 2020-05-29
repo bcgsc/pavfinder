@@ -1,6 +1,5 @@
 from pybedtools import BedTool, create_interval_from_list
 from itertools import groupby
-from sets import Set
 from intspan import intspan
 import multiprocessing as mp
 import sys
@@ -47,11 +46,11 @@ def update_features(variant, features):
 	    variant.genes[i] = features[i].attrs['gene_name']
 	    variant.transcripts[i] = features[i].attrs['transcript_id']
 	    variant.gene_strands[i] = features[i].strand
-	    if features[i].attrs.has_key('exon_number'):
+	    if 'exon_number' in features[i].attrs:
 		variant.exons[i] = int(features[i].attrs['exon_number'])
-	    if features[i].attrs.has_key('intron_number'):
+	    if 'intron_number' in features[i].attrs:
 		variant.introns[i] = int(features[i].attrs['intron_number'])
-	    if features[i].attrs.has_key('exon_bound'):
+	    if 'exon_bound' in features[i].attrs:
 		if features[i].attrs['exon_bound'] == 'True':
 		    variant.exon_bounds[i] = True
 		else:
@@ -165,7 +164,7 @@ def pick_feature(break_pt, orient, features):
             for feature in exon_bounds:
                 feature.attrs['exon_bound'] = 'True'
                 
-            coding_exons = [exon for exon in exon_bounds if exon.attrs.has_key('gene_biotype') and\
+            coding_exons = [exon for exon in exon_bounds if 'gene_biotype' in exon.attrs and\
                             exon.attrs['gene_biotype'] == 'protein_coding']
             
             if coding_exons:
@@ -188,7 +187,7 @@ def pick_feature(break_pt, orient, features):
         introns = [feature for feature in features if feature[2] == 'intron']
         
         if introns:
-            coding_introns = [intron for intron in introns if intron.attrs.has_key('gene_biotype') and\
+            coding_introns = [intron for intron in introns if 'gene_biotype' in intron.attrs and\
                               intron.attrs['gene_biotype'] == 'protein_coding']
         
             if coding_introns:
@@ -227,7 +226,7 @@ def locate_features(breaks, orients, features):
     
     # categories features where 1, 2, or both breakpoints overlap
     # use Set because there may be redundancy
-    overlaps = {'both':Set(), '1':Set(), '2':Set()}
+    overlaps = {'both':set(), '1':set(), '2':set()}
                           
     for feature in features:        
         feature_span = intspan('%s-%s' %  (feature.start + 1, feature.stop))
@@ -365,7 +364,7 @@ def worker(args):
         Function call to parse_overlaps()
     """
     bed_file, variant_keys = args
-    return parse_overlaps(bed_file, Set(variant_keys))
+    return parse_overlaps(bed_file, set(variant_keys))
         
 def parallel_parse_overlaps(bed_file, variant_keys, num_procs):   
     """Parses annotation overlap results using Multi-processing module
