@@ -12,7 +12,7 @@ import re
 import fileinput
 import datetime
 import itertools
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 
 required_params = {'sv': ['genome_fasta', 'gtf', 'transcripts_fasta', 'genome_index'],
                    'splice': ['genome_fasta', 'gtf']}
