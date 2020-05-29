@@ -56,7 +56,7 @@ def combine_events(events, mappings):
                     print('%s: mapping disagreed transcripts:%s genome:%s' % (query,
                                                                               mappings['via_transcripts'][query],
                                                                               mappings['via_genome'][query]))
-            elif not mappings['via_transcripts'].has_key(query):
+            elif not query in mappings['via_transcripts']:
                 print('%s: mapping disagreed transcripts:None genome:%s' % (query,
                                                                             mappings['via_genome'][query]))
             else:
