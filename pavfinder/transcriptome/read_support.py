@@ -9,17 +9,7 @@ from collections import defaultdict
 
 events_flanking = ('fusion', 'read_through')
 
-
-def find_support(
-        events,
-        bam_file,
-        query_fasta_file,
-        min_overlap=4,
-        multi_mapped=False,
-        perfect=False,
-        get_seq=False,
-        num_procs=1,
-        debug=False):
+def find_support(events, bam_file, query_fasta_file, min_overlap=4, multi_mapped=False, perfect=False, get_seq=False, num_procs=1, debug=False):
     def extract_support_spans(event):
         seq_ids = []
         support_spans = []
@@ -32,7 +22,7 @@ def find_support(
                 spans = [s for s in event.support_span.split(',') if '-' in s]
 
                 if len(seq_ids) != len(spans):
-                    print('unmatched seq_ids(%s) and support_spans(%s)'.format(event.seq_id, event.support_span))
+                    print('unmatched seq_ids({}) and support_spans({})'.format(event.seq_id, event.support_span))
                     return None, None
                 else:
                     support_spans = [list(map(int, span.split('-'))) for span in spans]
@@ -51,7 +41,7 @@ def find_support(
                 for seq_id, span in event_to_coords[event]:
                     if seq_id not in support:
                         if debug:
-                            print('%s no support' % seq_id)
+                            print('{} no support'.format(seq_id))
                         continue
                     total_spanning += support[seq_id][span][0]
                     if total_flanking is not None and support[seq_id][span][1] is not None:
@@ -67,8 +57,7 @@ def find_support(
         for seq_id, support_span in zip(seq_ids, support_spans):
             span = support_span[0] - min_overlap, support_span[1] + min_overlap
             coords[seq_id].append((event.event, span))
-            event_to_coords[event].append(
-                (seq_id, '-'.join(map(str, [span[0], span[1]]))))
+            event_to_coords[event].append((seq_id, '-'.join(map(str, [span[0], span[1]]))))
 
     if len(coords) < 100 or num_procs == 1:
         support = fetch_support(coords,
@@ -116,9 +105,11 @@ def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
             # frag[1] >= breaks[1] + overlap_buffer:
             uniq_frags.add(frag)
             if debug:
-                sys.stdout.write(
-                    "Accepted flanking pair: %s %s %s %s %s\n" %
-                    (breaks, frag, read.query_name, read.pos, read.pnext))
+                sys.stdout.write("Accepted flanking pair: {} {} {} {} {}\n".format((breaks, 
+                                                                                    frag, 
+                                                                                    read.query_name,
+                                                                                    read.pos,
+                                                                                    read.pnext)))
 
     if debug:
         for f in uniq_frags:
@@ -127,17 +118,9 @@ def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
     return len(uniq_frags), tlens
 
 
-def find_spanning(
-        reads,
-        breaks,
-        contig_seq,
-        overlap_buffer=1,
-        debug=False,
-        perfect=False,
-        get_seq=False):
+def find_spanning(reads, breaks, contig_seq, overlap_buffer=1, debug=False, perfect=False, get_seq=False):
     contig_len = len(contig_seq)
-    break_seq = contig_seq[breaks[0] - 1 -
-                           overlap_buffer: breaks[1] + overlap_buffer]
+    break_seq = contig_seq[breaks[0] - 1 - overlap_buffer: breaks[1] + overlap_buffer]
 
     pos = set()
     # cannot use 2 mates of same read as evidence
@@ -162,9 +145,12 @@ def find_spanning(
                         spanning_reads.append((read.qname, read.seq))
 
                     if debug:
-                        sys.stdout.write(
-                            "Accepted spanning read(perfect:%s): %s %s %s %s %s\n" %
-                            (perfect, read.qname, breaks, (read.pos + 1, read.pos + read.alen), read.seq, strand))
+                        sys.stdout.write("Accepted spanning read(perfect:%s): {} {} {} {} {}\n".format(perfect,
+                                                                                                       read.qname,
+                                                                                                       breaks,
+                                                                                                       (read.pos + 1, read.pos + read.alen),
+                                                                                                       read.seq,
+                                                                                                       strand))
 
     return len(pos), spanning_reads
 
@@ -173,10 +159,7 @@ def is_break_region_perfect(read, break_seq, breaks, overlap_buffer):
     start_idx = breaks[0] - read.pos - 1
     if read.cigar[0][0] >= 4 and read.cigar[0][0] <= 5:
         start_idx += read.cigar[0][1]
-    read_break_seq = read.seq[start_idx -
-                              overlap_buffer: start_idx -
-                              overlap_buffer +
-                              len(break_seq)]
+    read_break_seq = read.seq[start_idx - overlap_buffer: start_idx -overlap_buffer + len(break_seq)]
     if read_break_seq.lower() == break_seq.lower():
         return True
     else:
@@ -208,20 +191,15 @@ def check_tiling(reads, breaks, contig_len, debug=False):
             continue
 
         try:
-            span = span.union(
-                intspan(
-                    '%d-%d' %
-                    (read.pos + 1, read.pos + read.alen)))
+            span = span.union(intspan('{}-{}'.format(read.pos + 1, read.pos + read.alen)))
         except BaseException:
-            span = intspan('%d-%d' % (read.pos + 1, read.pos + read.alen))
+            span = intspan('{}-{}'.format(read.pos + 1, read.pos + read.alen))
 
     if span is not None:
-        break_span = intspan('%d-%d' % (breaks[0], breaks[1]))
+        break_span = intspan('{}-{}'.format(breaks[0], breaks[1]))
         # make sure there is no gap in tiling reads and spans the entire
         # breakpoint
-        if len(
-                span.ranges()) == 1 and len(
-                span & break_span) == len(break_span):
+        if len(span.ranges()) == 1 and len(span & break_span) == len(break_span):
             return True
 
     return False
@@ -238,11 +216,7 @@ def is_fully_mapped(read, contig_len, perfect=False):
     """
     # take out rlen==alen condition to allow for insertions and deletion in
     # alignments
-    if not re.search(
-            '[HS]',
-            read.cigarstring) or is_fully_mapped_to_edge(
-            read,
-            contig_len):
+    if not re.search('[HS]', read.cigarstring) or is_fully_mapped_to_edge(read, contig_len):
         if perfect:
             return True if read.opt('NM') == 0 else False
         return True
@@ -254,8 +228,7 @@ def is_fully_mapped_to_edge(read, contig_len):
     if read.cigar:
         if len(read.cigar) == 2:
             # clipped at beginning
-            if (read.cigar[0][0] == 4 or read.cigar[0][0] ==
-                    5) and read.cigar[1][0] == 0 and read.pos == 0 and read.inferred_length == read.rlen:
+            if (read.cigar[0][0] == 4 or read.cigar[0][0] == 5) and read.cigar[1][0] == 0 and read.pos == 0 and read.inferred_length == read.rlen:
                 return True
             # clipped at the end
             elif read.cigar[0][0] == 0 and (read.cigar[1][0] or 4 and read.cigar[1][0] == 5) and read.pos + read.alen == contig_len and read.inferred_length == read.rlen:
@@ -292,16 +265,7 @@ def worker(args):
         debug=debug)
 
 
-def extract_reads(
-        bam,
-        contigs,
-        coords,
-        tids,
-        overlap_buffer,
-        contig_fasta,
-        perfect=False,
-        get_seq=False,
-        debug=False):
+def extract_reads(bam, contigs, coords, tids, overlap_buffer, contig_fasta, perfect=False, get_seq=False, debug=False):
     """Extract read support of given list of contigs
 
     Args:
@@ -342,11 +306,7 @@ def extract_reads(
         support_reads = []
         for event, breaks in coords[contig]:
             # initialization
-            results[breaks] = {
-                'spanning': 0,
-                'flanking': None,
-                'depth': 0,
-                'tiling': False}
+            results[breaks] = {'spanning': 0, 'flanking': None, 'depth': 0, 'tiling': False}
 
             breaks_sorted = sorted(breaks)
             results[breaks]['spanning'], support_reads = find_spanning(reads, breaks_sorted, contig_seq,
@@ -354,20 +314,12 @@ def extract_reads(
                                                                        perfect=perfect,
                                                                        get_seq=get_seq,
                                                                        debug=debug)
-            #results[breaks]['tiling'] = check_tiling(reads, breaks_sorted, contig_len, debug=debug)
             if event in events_flanking:
                 results[breaks]['flanking'], tlens = find_flanking(
                     reads, breaks_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
-            # tlens_all.extend(tlens)
 
         for breaks in results.keys():
-            #support.append((contig, breaks[0], breaks[1], results[breaks]['spanning'], results[breaks]['flanking'], results[breaks]['tiling'], support_reads))
-            support.append(
-                (contig,
-                 breaks[0],
-                    breaks[1],
-                    results[breaks]['spanning'],
-                    results[breaks]['flanking']))
+            support.append((contig, breaks[0], breaks[1], results[breaks]['spanning'], results[breaks]['flanking']))
 
         count += 1
         if count > len(contigs):
@@ -377,16 +329,7 @@ def extract_reads(
     return support
 
 
-def create_batches(
-        bam_file,
-        coords,
-        contigs,
-        size,
-        overlap_buffer,
-        contig_fasta_file,
-        perfect,
-        get_seq,
-        debug=False):
+def create_batches(bam_file, coords, contigs, size, overlap_buffer, contig_fasta_file, perfect, get_seq, debug=False):
     """Iterator to creates list of arguments of processes spawned
 
     Args:
@@ -417,15 +360,7 @@ def create_batches(
                 yield bam_file, contigs[i:i + size], coords, tids[i:i + size], overlap_buffer, contig_fasta_file, perfect, get_seq, debug
 
 
-def scan_all(
-        coords,
-        bam_file,
-        contig_fasta_file,
-        num_procs,
-        overlap_buffer,
-        perfect=False,
-        get_seq=False,
-        debug=False):
+def scan_all(coords, bam_file, contig_fasta_file, num_procs, overlap_buffer, perfect=False, get_seq=False, debug=False):
     """Scans every read in reads to contig bam file for support
 
     Args:
@@ -462,20 +397,13 @@ def scan_all(
             contig, start, stop, spanning, flanking = support
             if contig not in results:
                 results[contig] = {}
-            coords = '%s-%s' % (start, stop)
+            coords = '{}-{}'.format(start, stop)
             results[contig][coords] = spanning, flanking
 
     return results
 
 
-def fetch_support(
-        coords,
-        bam_file,
-        contig_fasta_file,
-        overlap_buffer=0,
-        perfect=False,
-        get_seq=False,
-        debug=False):
+def fetch_support(coords, bam_file, contig_fasta_file, overlap_buffer=0, perfect=False, get_seq=False, debug=False):
     """Fetches read support when number given coords is relatively small
     It will use Pysam's fetch() instead of going through all read alignments
     Args:
@@ -513,33 +441,21 @@ def fetch_support(
             # sort each span
             span_sorted = sorted(span)
             # flanking pairs
-            #flanking = find_flanking_pairs(reads, span_sorted)
             spanning, support_reads = find_spanning(reads, span_sorted, contig_seq, debug=debug,
                                                     overlap_buffer=overlap_buffer,
                                                     perfect=perfect,
                                                     get_seq=get_seq)
-            #tiling = check_tiling(reads, span_sorted, contig_len, debug=debug)
             flanking, tlens = None, None
             if event in events_flanking:
                 flanking, tlens = find_flanking(
                     reads, span_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
-            #results[contig][coords] = (spanning, flanking, tiling, support_reads)
-            # tlens_all.extend(tlens)
 
             results[contig][coords] = spanning, flanking
 
     return results
 
 
-def expand_contig_breaks(
-        chrom,
-        breaks,
-        contig,
-        contig_breaks,
-        event,
-        ref_fasta,
-        contig_fasta,
-        debug=False):
+def expand_contig_breaks(chrom, breaks, contig, contig_breaks, event, ref_fasta, contig_fasta, debug=False):
     def extract_repeat(seq):
         repeat = {'start': None, 'end': None}
         if len(seq) == 1:
@@ -614,9 +530,7 @@ def expand_contig_breaks(
             contig_breaks_expanded[1] += expand
 
     if debug and tuple(contig_breaks_expanded) != contig_breaks:
-        sys.stdout.write(
-            'contig breaks expanded:%s %s -> %s\n' %
-            (contig, contig_breaks, contig_breaks_expanded))
+        sys.stdout.write('contig breaks expanded:{} {} -> {}\n'.format(contig, contig_breaks, contig_breaks_expanded))
 
     return tuple(contig_breaks_expanded)
 
@@ -646,11 +560,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("coords", type=str, help="coords file")
     parser.add_argument("bam", type=str, help="bam file")
-    parser.add_argument(
-        "-n",
-        "--num_procs",
-        help="Number of processes. Default: 5",
-        default=5,
-        type=int)
+    parser.add_argument("-n", "--num_procs", help="Number of processes. Default: 5", default=5, type=int)
     args = parser.parse_args()
     main(args)
