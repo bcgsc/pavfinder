@@ -3,7 +3,6 @@ import re
 import sys
 from math import ceil
 
-
 def get_orfs(sequence, frames=None, only_strand=None, min_size=1):
     def prot2nuc_coord(prot_coord, frame, strand, start=False):
         if prot_coord == 0:
@@ -47,23 +46,19 @@ def get_orfs(sequence, frames=None, only_strand=None, min_size=1):
                 start = 0
                 for stop in stops:
                     orf = translation[start:stop]
-                    seq_start = prot2nuc_coord(
-                        start, frame, strand, start=True)
+                    seq_start = prot2nuc_coord(start, frame, strand, start=True)
                     seq_end = prot2nuc_coord(stop - 1, frame, strand)
                     start = stop + 1
                     if len(orf) > min_size:
-                        all_orfs.append(
-                            (seq_start, seq_end, strand, frame, orf))
+                        all_orfs.append((seq_start, seq_end, strand, frame, orf))
                 if stop + 1 < len(translation):
                     start = stop + 1
                     stop = len(translation)
                     orf = translation[start:stop]
-                    seq_start = prot2nuc_coord(
-                        start, frame, strand, start=True)
+                    seq_start = prot2nuc_coord(start, frame, strand, start=True)
                     seq_end = prot2nuc_coord(stop - 1, frame, strand)
                     if len(orf) > min_size:
-                        all_orfs.append(
-                            (seq_start, seq_end, strand, frame, orf))
+                        all_orfs.append((seq_start, seq_end, strand, frame, orf))
             else:
                 start = 0
                 stop = len(translation)
@@ -77,21 +72,10 @@ def get_orfs(sequence, frames=None, only_strand=None, min_size=1):
     return orfs_sorted
 
 
-def check_frame(
-        query_seq,
-        seq_breaks,
-        genome_breaks,
-        genome_fasta,
-        transcripts,
-        event_type,
-        size):
+def check_frame(query_seq, seq_breaks, genome_breaks, genome_fasta, transcripts, event_type, size):
     in_frame = None
     if transcripts[0].is_coding() and transcripts[1].is_coding():
-        if event_type in (
-            'ins',
-            'del',
-            'repeat-expansion',
-                'repeat-reduction'):
+        if event_type in ('ins', 'del', 'repeat-expansion', 'repeat-reduction'):
             if transcripts[0] == transcripts[1] and\
                     not transcripts[0].within_utr(genome_breaks[0]) and\
                     not transcripts[0].within_utr(genome_breaks[1]):
@@ -124,27 +108,22 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
                   novel_amino acid in between)
     """
     max_aa_len_test = 5
-    orf5 = get_orfs(txt5.get_sequence(genome_fasta, cds_only=True),
-                    frames=[0], only_strand='+')[0][-1]
-    orf3 = get_orfs(txt3.get_sequence(genome_fasta, cds_only=True),
-                    frames=[0], only_strand='+')[0][-1]
+    orf5 = get_orfs(txt5.get_sequence(genome_fasta, cds_only=True), frames=[0], only_strand='+')[0][-1]
+    orf3 = get_orfs(txt3.get_sequence(genome_fasta, cds_only=True), frames=[0], only_strand='+')[0][-1]
 
     query_orfs = get_orfs(query_seq)
     for orf in query_orfs:
         orf_coords = sorted(orf[:2])
 
         if orf[2] == '-':
-            orf_start, orf_end = len(query_seq) - \
-                orf[0], len(query_seq) - orf[1]
-            break_start, break_end = len(
-                query_seq) - query_breaks[1] + 1, len(query_seq) - query_breaks[0] + 1
+            orf_start, orf_end = len(query_seq) - orf[0], len(query_seq) - orf[1]
+            break_start, break_end = len(query_seq) - query_breaks[1] + 1, len(query_seq) - query_breaks[0] + 1
         else:
             orf_start, orf_end = orf[0] + 1, orf[1] + 1
             break_start, break_end = query_breaks[0], query_breaks[1]
 
         if orf_start < break_start and orf_end > break_end:
-            ctg_breaks_aa = int(ceil((break_start - orf_start) / 3.0)
-                                ), int(ceil((break_end - orf_start) / 3.0)) + 1
+            ctg_breaks_aa = int(ceil((break_start - orf_start) / 3.0)), int(ceil((break_end - orf_start) / 3.0)) + 1
             if ctg_breaks_aa[1] - ctg_breaks_aa[0] > 1:
                 novel_aa = orf[-1][ctg_breaks_aa[0]:ctg_breaks_aa[1] - 1]
             else:
@@ -153,16 +132,14 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
             up_orf = orf[-1][:ctg_breaks_aa[0]]
             down_orf = orf[-1][ctg_breaks_aa[1] - 1:]
 
-            if len(up_orf) < max_aa_len_test or len(
-                    down_orf) < max_aa_len_test:
+            if len(up_orf) < max_aa_len_test or len(down_orf) < max_aa_len_test:
                 continue
 
             up_orf_test = up_orf[-1 * min(max_aa_len_test, len(up_orf)):]
             down_orf_test = down_orf[:min(max_aa_len_test, len(down_orf))]
             down_orf_test1 = down_orf[1:][:min(max_aa_len_test, len(down_orf))]
 
-            if up_orf_test in orf5 and (
-                    down_orf_test in orf3 or down_orf_test1 in orf3):
+            if up_orf_test in orf5 and (down_orf_test in orf3 or down_orf_test1 in orf3):
                 match5 = re.search(up_orf_test, orf5)
                 aa5 = match5.end()
 
