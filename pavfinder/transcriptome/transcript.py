@@ -21,12 +21,10 @@ class Transcript:
 
     def exon(self, num, transcript_coord=False):
         assert isinstance(num, int), 'exon number %s not given in int' % num
-        assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: %s %s' % (
-            self.id, self.strand)
+        assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: {} {}'.format(self.id, self.strand)
 
         if num < 1 or num > len(self.exons):
-            print('exon number out of range:%s (1-%d)' %
-                  (num, len(self.exons)))
+            print('exon number out of range:{} (1-{})'.format(num, len(self.exons)))
             return None
 
         if not transcript_coord:
@@ -80,10 +78,8 @@ class Transcript:
             Exon number in int
         """
         assert isinstance(index, int), 'exon index %s not given in int' % index
-        assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: %s %s' % (
-            self.id, self.strand)
-        assert index >= 0 and index < len(
-            self.exons), 'exon index out of range:%s %d' % (index, len(self.exons))
+        assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: {} {}'.format(self.id, self.strand)
+        assert index >= 0 and index < len(self.exons), 'exon index out of range:{} {}'.format(index, len(self.exons))
         if self.strand == '+':
             return index + 1
         else:
@@ -289,12 +285,7 @@ class Transcript:
                     cds.append(exon)
         return cds
 
-    def at_exon_bound(
-            self,
-            genome_coord=None,
-            txt_coord=None,
-            exon_num=None,
-            return_edge=False):
+    def at_exon_bound(self, genome_coord=None, txt_coord=None, exon_num=None, return_edge=False):
         # coord = genomic
         coord = None
         if genome_coord is not None:
