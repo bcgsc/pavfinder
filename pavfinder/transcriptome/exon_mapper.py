@@ -13,9 +13,7 @@ from .novel_splice_finder import find_novel_junctions, report_items, report, ext
 from functools import cmp_to_key
 
 class ExonMapper:
-    def __init__(self, annot, transcripts_dict, genome_fasta,
-                 suppl_annots=None,
-                 debug=False):
+    def __init__(self, annot, transcripts_dict, genome_fasta, suppl_annots=None, debug=False):
         self.transcripts_dict = transcripts_dict
         self.genome_fasta = genome_fasta
         self.annot = annot
@@ -23,8 +21,7 @@ class ExonMapper:
 
         self.suppl_annots = suppl_annots
 
-    def map_aligns(self, bam, query_fasta, genome_fasta,
-                   accessory_known_features=None, find_events=True, max_diff=1):
+    def map_aligns(self, bam, query_fasta, genome_fasta, accessory_known_features=None, find_events=True, max_diff=1):
         mappings = defaultdict(list)
         junc_adjs = []
         events = []
@@ -49,12 +46,10 @@ class ExonMapper:
                     if tid is not None:
                         transcript = self.transcripts_dict[tid]
                         olap = self.overlap(align, transcript)
-                        mappings[query].append(
-                            (transcript.gene, transcript.id, olap))
+                        mappings[query].append((transcript.gene, transcript.id, olap))
 
                         junc_adjs.extend(
-                            self.collect_junctions(
-                                align, transcript, block_matches[tid]))
+                            self.collect_junctions(align, transcript, block_matches[tid]))
 
                         if find_events:
                             events.extend(
@@ -112,32 +107,15 @@ class ExonMapper:
         groups_by_gene = defaultdict(list)
         for query in sorted(mappings.keys()):
             for mapping in mappings[query]:
-                groups_by_gene[mapping[0]].append(
-                    (query, mapping[0], mapping[1], mapping[2]))
+                groups_by_gene[mapping[0]].append((query, mapping[0], mapping[1], mapping[2]))
 
         # ... and sort by coverage
         out = open(out_file, 'w')
-        out.write(
-            '%s\n' %
-            '\t'.join(
-                ('contig',
-                 'gene',
-                 'transcript',
-                 'coverage')))
+        out.write('{}\n'.format('\t'.join(('contig', 'gene', 'transcript', 'coverage'))))
         for gene in sorted(groups_by_gene.keys()):
-            for mapping in sorted(
-                    groups_by_gene[gene],
-                    key=lambda m: m[3],
-                    reverse=True):
+            for mapping in sorted(groups_by_gene[gene], key=lambda m: m[3], reverse=True):
                 query, gene, tid, olap = mapping
-                out.write(
-                    '%s\n' %
-                    '\t'.join(
-                        (query,
-                         gene,
-                         tid,
-                         '%.3f' %
-                         olap)))
+                out.write('{}\n'.format('\t'.join((query, gene, tid, '{:.3f}'.format(olap)))))
         out.close()
 
     @classmethod
@@ -149,8 +127,8 @@ class ExonMapper:
             cols.append(adj.genome_breaks[1])
             label = [adj.transcripts[0].gene,
                      adj.transcripts[0].id,
-                     'E%d' % adj.exons[0],
-                     'E%d' % adj.exons[1],
+                     'E{}'.format(adj.exons[0]),
+                     'E{}'.format(adj.exons[1]),
                      ]
             cols.append('.'.join(map(str, label)))
 
@@ -168,12 +146,12 @@ class ExonMapper:
             cols.append(0)
             cols.append(2)
             cols.append('1,1')
-            cols.append('0,%s' % (adj.genome_breaks[1] - adj.genome_breaks[0]))
+            cols.append('0,{}'.format(adj.genome_breaks[1] - adj.genome_breaks[0]))
             return '\t'.join(map(str, cols))
 
         out = open(out_file, 'w')
         for junc in cls.sort_adjs(juncs):
-            out.write('%s\n' % adj_to_bed(junc))
+            out.write('{}\n'.format(adj_to_bed(junc)))
         out.close()
 
     @classmethod
@@ -182,7 +160,7 @@ class ExonMapper:
             cols = []
             for i in {1, 2}:
                 for label in ('chrom', 'start', 'end'):
-                    cols.append('%s%d' % (label, i))
+                    cols.append('{}{}'.format(label, i))
             for label in ('name', 'score', 'strand1', 'strand2'):
                 cols.append(label)
 
@@ -227,25 +205,25 @@ class ExonMapper:
         out = open(out_file, 'w')
         if header is not None:
             if isinstance(header, str):
-                out.write('#%s\n' % header)
+                out.write('#{}\n'.format(header))
             elif isinstance(header, tuple) or isinstance(header, list):
                 for h in header:
-                    out.write('#%s\n' % h)
-        out.write('%s\n' % '\t'.join(create_bedpe_header()))
+                    out.write('#{}\n'.format(h))
+        out.write('{}\n'.format('\t'.join(create_bedpe_header())))
         events_ordered = group_events()
 
         counter = 1
         for i in range(len(events_ordered)):
             if events_ordered[i].event in ('retained_intron', 'novel_exon'):
                 if i > 0 and events_ordered[i - 1].event == events_ordered[i].event and events_ordered[i - 1].seq_id == events_ordered[i].seq_id:
-                    event_id = '%d.2' % counter
+                    event_id = '{}.2'.format(counter)
                     counter += 1
                 else:
-                    event_id = '%d.1' % counter
+                    event_id = '{}.1'.format(counter)
             else:
                 event_id = counter
 
-            out.write('%s\n' % report(events_ordered[i], event_id=event_id))
+            out.write('{}\n'.format(report(events_ordered[i], event_id=event_id)))
 
             if events_ordered[i].event not in ('retained_intron', 'novel_exon'):
                 counter += 1
@@ -259,9 +237,9 @@ class ExonMapper:
             for block in blocks:
                 if (isinstance(block, tuple) or isinstance(block, list)) and len(block) == 2:
                     if span is None:
-                        span = intspan('%s-%s' % (block[0], block[1]))
+                        span = intspan('{}-{}'.format(block[0], block[1]))
                     else:
-                        span = span.union(intspan('%s-%s' % (block[0], block[1])))
+                        span = span.union(intspan('{}-{}'.format(block[0], block[1])))
             return span
 
         align_span = create_span(align.blocks)
@@ -407,8 +385,7 @@ class ExonMapper:
                     start_exon_num = transcript.num_exons() - matches[0][0][0]
                     end_exon_num = transcript.num_exons() - matches[-1][-1][0]
 
-                from_edge = align.tstart - transcript.exon(start_exon_num)[0] + \
-                    align.tend - transcript.exon(end_exon_num)[1]
+                from_edge = align.tstart - transcript.exon(start_exon_num)[0] + align.tend - transcript.exon(end_exon_num)[1]
             return from_edge
 
         metrics = {}
@@ -417,21 +394,18 @@ class ExonMapper:
             metric = {}
             # points are scored for matching exon boundaries
             metric['score'] = calc_score(matches) - calc_penalty(matches)
-            metric['from_edge'] = calc_from_edge(
-                matches, self.transcripts_dict[tid])
+            metric['from_edge'] = calc_from_edge(matches, self.transcripts_dict[tid])
             metric['txt_size'] = transcript.length()
             metrics[tid] = metric
 
             if self.debug:
-                sys.stdout.write(
-                    "mapping %s %s %s\n" %
-                    (align.query, tid, metric))
+                sys.stdout.write("mapping {} {} {}\n".format(align.query, tid, metric))
 
         if mappings:
             tids_sorted = sorted(metrics.keys(), key=lambda tid: (-1 * metrics[tid]['score'], metrics[tid]['from_edge'], metrics[tid]['txt_size']))
             if self.debug:
                 for tid in tids_sorted:
-                    sys.stdout.write('sorted %s %s\n' % (tid, metrics[tid]))
+                    sys.stdout.write('sorted {} {}\n'.format(tid, metrics[tid]))
 
             return tids_sorted[0]
         return None
@@ -475,8 +449,8 @@ class ExonMapper:
             (len([(a, b) for a, b in zip(exons, exons[1:]) if b == a + 1]) == len(block_matches) - 1 or
              len([(a, b) for a, b in zip(exons, exons[1:]) if b == a - 1]) == len(block_matches) - 1):
             return True
-        if block_matches[0][0][1][1] == '=' and block_matches[-1][0][1][0] == '=' and len(
-                [m for m in block_matches[1:-1] if m[0][1] == '==']) == len(block_matches) - 2:
+        if block_matches[0][0][1][1] == '=' and block_matches[-1][0][1][0] == '=' and\
+           len([m for m in block_matches[1:-1] if m[0][1] == '==']) == len(block_matches) - 2:
             if perfect:
                 if (len([(a, b) for a, b in zip(exons, exons[1:]) if b == a + 1]) == len(block_matches) - 1 or\
                 len([(a, b) for a, b in zip(exons, exons[1:]) if b == a - 1]) == len(block_matches) -1):
