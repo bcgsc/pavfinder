@@ -35,8 +35,7 @@ class Alignment:
         align = cls(query=read.qname, target=target)
         align.strand = '-' if read.is_reverse else '+'
         align.query_len = get_query_len_from_cigar(read.cigar)
-        align.blocks, align.query_blocks = cigar_to_blocks(
-            read.cigar, read.pos + 1, align.strand)
+        align.blocks, align.query_blocks = cigar_to_blocks(read.cigar, read.pos + 1, align.strand)
         align.set_start_end_from_blocks()
         align.cigar = read.cigar
         align.cigarstring = read.cigarstring
@@ -46,15 +45,11 @@ class Alignment:
     def set_start_end_from_blocks(self):
         if self.query_blocks and self.blocks:
             if self.query_blocks[0][0] < self.query_blocks[0][1]:
-                self.qstart, self.qend = sorted(
-                    [self.query_blocks[0][0], self.query_blocks[-1][1]], key=int)
-                self.tstart, self.tend = sorted(
-                    [self.blocks[0][0], self.blocks[-1][1]], key=int)
+                self.qstart, self.qend = sorted([self.query_blocks[0][0], self.query_blocks[-1][1]], key=int)
+                self.tstart, self.tend = sorted([self.blocks[0][0], self.blocks[-1][1]], key=int)
             else:
-                self.qstart, self.qend = sorted(
-                    [self.query_blocks[-1][1], self.query_blocks[0][0]], key=int)
-                self.tstart, self.tend = sorted(
-                    [self.blocks[-1][1], self.blocks[0][0]], key=int)
+                self.qstart, self.qend = sorted([self.query_blocks[-1][1], self.query_blocks[0][0]], key=int)
+                self.tstart, self.tend = sorted([self.blocks[-1][1], self.blocks[0][0]], key=int)
 
     def is_valid(self):
         try:
@@ -110,11 +105,9 @@ class Alignment:
             else:
                 if self.query_blocks[-1][1] > 1:
                     seq = query_seq[:self.query_blocks[-1][1] - 1]
-                    #clipped.append((seq, 'start'))
                     clipped['start'] = seq
                 if self.query_blocks[0][0] < len(query_seq):
                     seq = query_seq[self.query_blocks[0][0]:]
-                    #clipped.append((seq, 'end'))
                     clipped['end'] = seq
             return clipped
 
@@ -135,7 +128,6 @@ class Alignment:
                 for pos in clipped.keys():
                     if is_homopolymer_fragment(clipped[pos]):
                         to_remove.add(pos)
-                        #del clipped[pos]
                 for pos in to_remove:
                     del clipped[pos]
 
@@ -260,13 +252,7 @@ def compare_chr(chr1, chr2):
             return 0
 
 
-def bam2bed(
-        bam,
-        out,
-        name_sorted=True,
-        header=None,
-        min_size=None,
-        no_chimera=True):
+def bam2bed(bam, out, name_sorted=True, header=None, min_size=None, no_chimera=True):
     if header is not None:
         out.write(header + '\n')
     if name_sorted:
@@ -334,14 +320,7 @@ def search_by_regex(query_seq, target_seq):
     return matches
 
 
-def search_by_align(
-        query_seq,
-        target_seq,
-        query_name,
-        target_name,
-        outdir,
-        max_clipped=0,
-        debug=False):
+def search_by_align(query_seq, target_seq, query_name, target_name, outdir, max_clipped=0, debug=False):
     query_fa = '%s/tmp_query.fa' % outdir
     fa = open(query_fa, 'w')
     fa.write('>%s\n%s\n' % (query_name, query_seq))
@@ -364,7 +343,6 @@ def search_by_align(
     except BaseException:
         # should check whether blastn is in the PATH right off the bet
         sys.stderr.write('Failed to run BLAST:%s\n' % cmd)
-        # sys.exit()
 
     matches = []
     if os.path.exists(blast_output):
@@ -418,25 +396,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Module dealing with alignments")
     parser.add_argument_group("bam2bed", "converts BAM file to BED")
-    parser.add_argument(
-        "--bam2bed",
-        action='store_true',
-        help="convert bam to bed")
+    parser.add_argument("--bam2bed", action='store_true', help="convert bam to bed")
     parser.add_argument("--bam", type=open_bam, help="alignment bam output")
-    parser.add_argument(
-        "--output",
-        type=argparse.FileType('w'),
-        help="output file")
-    parser.add_argument(
-        "--header",
-        type=str,
-        help="header for UCSC track e.g. 'track header=\"abc\" color=255,255,255'")
+    parser.add_argument("--output", type=argparse.FileType('w'), help="output file")
+    parser.add_argument("--header", type=str, help="header for UCSC track e.g. 'track header=\"abc\" color=255,255,255'")
     parser.add_argument("--min_size", type=int, help="minimum query size")
     args = parser.parse_args()
 
     if args.bam2bed:
-        bam2bed(
-            args.bam,
-            args.output,
-            header=args.header,
-            min_size=args.min_size)
+        bam2bed(args.bam, args.output, header=args.header, min_size=args.min_size)
