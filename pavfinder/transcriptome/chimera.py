@@ -66,13 +66,7 @@ def check_inv_dup(adj, aligns):
                 adj.orients[1] = 'L'
 
 
-def call_event(
-        align1,
-        align2,
-        query_seq=None,
-        no_sort=False,
-        max_inv_target_olap=30000,
-        debug=False):
+def call_event(align1, align2, query_seq=None, no_sort=False, max_inv_target_olap=30000, debug=False):
     """Curates adj based on info given by primary_aligns alignments
 
     Args:
@@ -149,11 +143,7 @@ def call_event(
                 # deletion of tandem duplicaton
                 if query_breaks[0] >= query_breaks[1]:
                     rearrangement = 'del'
-                    target_breaks = [target_breaks[1] +
-                                     1, target_breaks[0] +
-                                     (query_breaks[0] -
-                                      query_breaks[1] +
-                                      1)]
+                    target_breaks = [target_breaks[1] + 1, target_breaks[0] + (query_breaks[0] - query_breaks[1] + 1)]
                 else:
                     rearrangement = 'ins'
             else:
@@ -169,11 +159,7 @@ def call_event(
             else:
                 # deletion of tandem duplicaton
                 rearrangement = 'del'
-                target_breaks = [target_breaks[1] +
-                                 1, target_breaks[0] +
-                                 (query_breaks[0] -
-                                  query_breaks[1] +
-                                  1)]
+                target_breaks = [target_breaks[1] + 1, target_breaks[0] + (query_breaks[0] - query_breaks[1] + 1)]
 
     elif orients[0] == 'R' and orients[1] == 'R':
         rearrangement = 'inv'
@@ -221,18 +207,9 @@ def call_event(
     return adj
 
 
-def find_paths(
-        aligns,
-        min_coverage=None,
-        use_end_to_end=True,
-        get_all=False,
-        max_nodes=500,
-        max_paths=5,
-        max_ends=50,
-        no_trim=[],
-        same_target=None,
-        from_edge=0.3,
-        debug=False):
+def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False,
+               max_nodes=500, max_paths=5, max_ends=50,
+               no_trim=[], same_target=None, from_edge=0.3, debug=False):
     def _find_end_points():
         starts = []
         ends = []
@@ -339,10 +316,7 @@ def find_paths(
         return paths
 
     def _coverage(path):
-        spans = [
-            intspan(
-                '%d-%d' %
-                (aligns[i].qstart, aligns[i].qend)) for i in path]
+        spans = [intspan('%d-%d' % (aligns[i].qstart, aligns[i].qend)) for i in path]
         covered = spans[0]
         overlaps = []
         for i in range(1, len(spans)):
@@ -360,8 +334,7 @@ def find_paths(
             if not use_end_to_end:
                 coverage = len(covered) / float(aligns[0].query_len)
             else:
-                coverage = (max(covered) - min(covered) + 1) / \
-                    float(aligns[0].query_len)
+                coverage = (max(covered) - min(covered) + 1) / float(aligns[0].query_len)
 
             if coverage < min_coverage:
                 passed = False
@@ -375,12 +348,9 @@ def find_paths(
             if not path_info[i]['overlaps']:
                 overlapped = 0
             else:
-                overlapped = sum([len(olap)
-                                  for olap in path_info[i]['overlaps']])
+                overlapped = sum([len(olap) for olap in path_info[i]['overlaps']])
 
-            if best['index'] is None or\
-               covered > best['covered'] or\
-               overlapped < best['overlapped']:
+            if best['index'] is None or covered > best['covered'] or overlapped < best['overlapped']:
                 best['index'] = i
                 best['covered'] = covered
                 best['overlapped'] = overlapped
