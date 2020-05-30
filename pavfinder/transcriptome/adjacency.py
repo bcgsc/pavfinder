@@ -162,18 +162,14 @@ class Adjacency:
         if self.transcript_breaks and self.transcripts and not self.genome_breaks:
             genome_breaks = []
             for i in range(len(self.transcript_breaks)):
-                genome_breaks.append(
-                    self.transcripts[i].txt_coord_to_genome_coord(
-                        self.transcript_breaks[i]))
+                genome_breaks.append(self.transcripts[i].txt_coord_to_genome_coord(self.transcript_breaks[i]))
             self.genome_breaks = tuple(genome_breaks)
 
     def update_transcript_breaks(self):
         if self.genome_breaks and self.transcripts and not self.transcript_breaks:
             transcript_breaks = []
             for i in range(len(self.genome_breaks)):
-                transcript_breaks.append(
-                    self.transcripts[i].genome_coord_to_txt_coord(
-                        self.genome_breaks[i]))
+                transcript_breaks.append(self.transcripts[i].genome_coord_to_txt_coord(self.genome_breaks[i]))
             self.transcript_breaks = tuple(transcript_breaks)
 
     def update_exons(self, target_type):
@@ -247,8 +243,7 @@ class Adjacency:
         def check_exon_bound(exon_bound_edge, orient):
             exon_bound = False
             if exon_bound_edge is not None:
-                if (orient == 'L' and exon_bound_edge == 3) or\
-                        (orient == 'R' and exon_bound_edge == 5):
+                if (orient == 'L' and exon_bound_edge == 3) or (orient == 'R' and exon_bound_edge == 5):
                     exon_bound = True
             return exon_bound
 
@@ -329,9 +324,7 @@ class Adjacency:
             transcript_ids = (self.transcripts[0].id, self.transcripts[1].id)
             genes = (self.transcripts[0].gene, self.transcripts[1].gene)
         if self.upstream_transcript and self.downstream_transcript:
-            genes_ordered = (
-                self.upstream_transcript.gene,
-                self.downstream_transcript.gene)
+            genes_ordered = (self.upstream_transcript.gene, self.downstream_transcript.gene)
         return ' '.join(attr_values) +\
             ' tids:%s' % ','.join(transcript_ids) +\
             ' genes:%s' % ','.join(genes) +\
@@ -426,8 +419,7 @@ class Adjacency:
             elif hasattr(self, label):
                 val = getattr(self, label)
                 if val is not None:
-                    if (isinstance(val, tuple) or isinstance(val, list)) and\
-                            len(val) == 2:
+                    if (isinstance(val, tuple) or isinstance(val, list)) and len(val) == 2:
                         value = '%s-%s' % (val[0], val[1])
                     else:
                         value = val
@@ -499,8 +491,7 @@ class Adjacency:
             elif hasattr(self, label):
                 val = getattr(self, label)
                 if val is not None:
-                    if (isinstance(val, tuple) or isinstance(val, list)) and\
-                            len(val) == 2:
+                    if (isinstance(val, tuple) or isinstance(val, list)) and len(val) == 2:
                         value = '%s-%s' % (val[0], val[1])
                     else:
                         value = val
@@ -558,12 +549,6 @@ class Adjacency:
             counter = 1
             for event_type in cls.event_types:
                 if event_type in events_grouped:
-                    #events_sorted = sorted(
-                        #events_grouped[event_type],
-                        #cmp=lambda e1,
-                        #e2: compare_event(
-                         #   e1,
-                         #   e2))
                     events_sorted = sorted(events_grouped[event_type], key=cmp_to_key(compare_event))
                     for event in events_sorted:
                         out.write('%s\n' % event.as_bedpe(event_id=counter))
@@ -571,24 +556,13 @@ class Adjacency:
                 else:
                     others.append(event_type)
             for event_type in others:
-                #events_sorted = sorted(
-                 #   events_grouped[event_type],
-                  #  cmp=lambda e1,
-                   # e2: compare_event(
-                    #    e1,
-                     #   e2))
                 events_sorted = sorted(events_grouped[event_type], key=cmp_to_key(compare_event))
                 for event in events_sorted:
                     out.write('%s\n' % event.as_bedpe(event_id=counter))
                     counter += 1
 
         else:
-            events_sorted = sorted(
-                events,
-                cmp=lambda e1,
-                e2: compare_event(
-                    e1,
-                    e2))
+            events_sorted = sorted(events, cmp=lambda e1, e2: compare_event(e1, e2))
             counter = 1
             for event in events_sorted:
                 out.write('%s\n' % event.as_bedpe(event_id=counter))
@@ -639,13 +613,9 @@ class Adjacency:
 
     def get_contig_support_span(self, contig_index):
         try:
-            return (
-                self.homol_coords[contig_index][0],
-                self.homol_coords[contig_index][1])
+            return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
         except BaseException:
-            return (
-                self.contig_breaks[contig_index][0],
-                self.contig_breaks[contig_index][1])
+            return (self.contig_breaks[contig_index][0], self.contig_breaks[contig_index][1])
 
     @classmethod
     def cmp_genome_coords(cls, coord1, coord2):
@@ -685,13 +655,8 @@ class Adjacency:
                 return 0
 
     def is_genome_breaks_sorted(self):
-        if self.cmp_genome_coords(
-            (self.chroms[0],
-             self.genome_breaks[0],
-             self.genome_breaks[1]),
-            (self.chroms[1],
-             self.genome_breaks[1],
-             self.genome_breaks[1])) <= 0:
+        if self.cmp_genome_coords((self.chroms[0], self.genome_breaks[0], self.genome_breaks[1]),
+                                  (self.chroms[1], self.genome_breaks[1], self.genome_breaks[1])) <= 0:
             return True
         else:
             return False
@@ -758,10 +723,8 @@ class Adjacency:
         return '-'.join(map(str, info))
 
     def update_transcript(self, transcript):
-        self.genome_breaks = [
-            transcript.txt_coord_to_genome_coord(coord) for coord in self.breaks]
-        self.exons = [transcript.txt_coord_to_exon(
-            coord) for coord in self.breaks]
+        self.genome_breaks = [transcript.txt_coord_to_genome_coord(coord) for coord in self.breaks]
+        self.exons = [transcript.txt_coord_to_exon(coord) for coord in self.breaks]
 
     def set_probe(self, query_seq, len_on_each_side=50):
         """Sets probe sequence of adjacency
@@ -804,10 +767,8 @@ class Adjacency:
                 subseqs.append(query_seq[:breaks[0]])
                 subseqs.append(query_seq[breaks[1] - 1:])
             else:
-                subseqs.append(
-                    query_seq[max(0, breaks[0] - len_on_each_side): breaks[0]])
-                subseqs.append(
-                    query_seq[breaks[1] - 1: min(len(query_seq), breaks[1] + len_on_each_side - 1)])
+                subseqs.append(query_seq[max(0, breaks[0] - len_on_each_side): breaks[0]])
+                subseqs.append(query_seq[breaks[1] - 1: min(len(query_seq), breaks[1] + len_on_each_side - 1)])
 
         return subseqs
 
@@ -815,11 +776,7 @@ class Adjacency:
         subseqs = []
         aligns = self.aligns[0]
         for i in range(len(aligns)):
-            subseqs.append(
-                contig_fasta.fetch(
-                    self.contigs[0],
-                    aligns[i].qstart - 1,
-                    aligns[i].qend))
+            subseqs.append(contig_fasta.fetch(self.contigs[0], aligns[i].qstart - 1, aligns[i].qend))
 
         return subseqs
 
@@ -873,7 +830,6 @@ class Adjacency:
         # reset "new" link to merged_adj
         for ma in merged_adjs:
             if hasattr(ma, 'link') and ma.link is not None and isinstance(ma.link, list) and ma.link[0] in merged_mapping:
-                # print 'yy', ma, ma.seq_id, ma.event, ma.link,
                 # merged_mapping[ma.link[0]]
                 ma.link = merged_mapping[ma.link[0]]
 
