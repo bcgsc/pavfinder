@@ -20,7 +20,7 @@ class Transcript:
         self.exons.sort(key=lambda e: int(e[0]))
 
     def exon(self, num, transcript_coord=False):
-        assert isinstance(num, int), 'exon number %s not given in int' % num
+        assert isinstance(num, int), 'exon number {} not given in int'.format(num)
         assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: {} {}'.format(self.id, self.strand)
 
         if num < 1 or num > len(self.exons):
@@ -77,7 +77,7 @@ class Transcript:
         Returns:
             Exon number in int
         """
-        assert isinstance(index, int), 'exon index %s not given in int' % index
+        assert isinstance(index, int), 'exon index {} not given in int'.format(index)
         assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: {} {}'.format(self.id, self.strand)
         assert index >= 0 and index < len(self.exons), 'exon index out of range:{} {}'.format(index, len(self.exons))
         if self.strand == '+':
