@@ -44,12 +44,8 @@ def find_chimera(aligns, query_seq=None, max_splits=3, debug=False):
 
 def check_inv_dup(adj, aligns):
     if adj.rearrangement == 'inv':
-        target_span_before_bp = intspan(
-            '%s-%s' %
-            (aligns[0].tstart, aligns[0].tend))
-        target_span_after_bp = intspan(
-            '%s-%s' %
-            (aligns[1].tstart, aligns[1].tend))
+        target_span_before_bp = intspan('{}-{}'.format(aligns[0].tstart, aligns[0].tend))
+        target_span_after_bp = intspan('{}-{}'.format(aligns[1].tstart, aligns[1].tend))
         if target_span_after_bp < target_span_before_bp:
             adj.rearrangement = 'inv-dup'
 
@@ -126,15 +122,15 @@ def call_event(align1, align2, query_seq=None, no_sort=False, max_inv_target_ola
     if aligns[0].target != aligns[1].target:
         rearrangement = 'trl'
     elif orients[0] == orients[1]:
-        span1 = intspan('%s-%s' % (aligns[0].tstart, aligns[0].tend))
-        span2 = intspan('%s-%s' % (aligns[1].tstart, aligns[1].tend))
+        span1 = intspan('{}-{}'.format(aligns[0].tstart, aligns[0].tend))
+        span2 = intspan('{}-{}'.format(aligns[1].tstart, aligns[1].tend))
         olap = span1 & span2
         if len(olap) <= max_inv_target_olap:
             rearrangement = 'inv'
         else:
-            print(
-                '%s:potential inv disallowed - target overlap %d bigger than %s' %
-                (aligns[0].query, len(olap), max_inv_target_olap))
+            print('{}:potential inv disallowed - target overlap {} bigger than {}'.format(aligns[0].query,
+                                                                                          len(olap),
+                                                                                          max_inv_target_olap))
     elif orients[0] == 'L' and orients[1] == 'L':
         rearrangement = 'inv'
     elif orients[0] == 'L' and orients[1] == 'R':
@@ -201,9 +197,12 @@ def call_event(align1, align2, query_seq=None, no_sort=False, max_inv_target_ola
                         )
 
     elif debug:
-        sys.stdout.write(
-            "cannot figure out event of primary_aligns alignment contig:%s targets:%s,%s orients:%s breaks:%s query_breaks:%s\n" %
-            (aligns[0].query, aligns[0].target, aligns[1].target, orients, breaks, query_breaks))
+        sys.stdout.write("cannot figure out event of primary_aligns alignment contig:{} targets:{},{} orients:{} breaks:{} query_breaks:{}\n".format(aligns[0].query,
+                                                                                                                                                     aligns[0].target,
+                                                                                                                                                     aligns[1].target,
+                                                                                                                                                     orients,
+                                                                                                                                                     breaks,
+                                                                                                                                                     query_breaks))
     return adj
 
 
@@ -235,8 +234,7 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False,
             if i in no_trim:
                 continue
 
-            key = '%s-%s:%s' % (aligns[i].qstart,
-                                aligns[i].qend, aligns[i].strand)
+            key = '{}-{}:{}'.format(aligns[i].qstart, aligns[i].qend, aligns[i].strand)
             try:
                 regions[key].append(i)
             except BaseException:
@@ -316,7 +314,7 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False,
         return paths
 
     def _coverage(path):
-        spans = [intspan('%d-%d' % (aligns[i].qstart, aligns[i].qend)) for i in path]
+        spans = [intspan('{}-{}'.format(aligns[i].qstart, aligns[i].qend)) for i in path]
         covered = spans[0]
         overlaps = []
         for i in range(1, len(spans)):
@@ -374,10 +372,7 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False,
 
     if len(graph.keys()) > max_nodes:
         if debug:
-            sys.stdout.write(
-                '%s: too many nodes(%d) to construct path(max:%d)\n' %
-                (aligns[0].query, len(
-                    graph.keys()), max_nodes))
+            sys.stdout.write('{}: too many nodes({}) to construct path(max:{})\n'.format(aligns[0].query, len(graph.keys()), max_nodes))
         return []
 
     # get end points

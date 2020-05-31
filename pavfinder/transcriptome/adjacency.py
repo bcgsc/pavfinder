@@ -315,7 +315,7 @@ class Adjacency:
     def details(self):
         attr_values = []
         for attr, value in self.__dict__.items():
-            attr_values.append('%s:%s' % (attr, value))
+            attr_values.append('{}:{}'.format(attr, value))
 
         transcript_ids = ['NA', 'NA']
         genes = ['NA', 'NA']
@@ -326,9 +326,9 @@ class Adjacency:
         if self.upstream_transcript and self.downstream_transcript:
             genes_ordered = (self.upstream_transcript.gene, self.downstream_transcript.gene)
         return ' '.join(attr_values) +\
-            ' tids:%s' % ','.join(transcript_ids) +\
-            ' genes:%s' % ','.join(genes) +\
-            ' genes_ordered:%s' % ','.join(genes_ordered)
+            ' tids:{}'.format(','.join(transcript_ids)) +\
+            ' genes:{}'.format(','.join(genes)) +\
+            ' genes_ordered:{}'.format(','.join(genes_ordered))
 
     def get_size(self):
         size = 'na'
@@ -420,7 +420,7 @@ class Adjacency:
                 val = getattr(self, label)
                 if val is not None:
                     if (isinstance(val, tuple) or isinstance(val, list)) and len(val) == 2:
-                        value = '%s-%s' % (val[0], val[1])
+                        value = '{}-{}'.format(val[0], val[1])
                     else:
                         value = val
 
@@ -492,7 +492,7 @@ class Adjacency:
                 val = getattr(self, label)
                 if val is not None:
                     if (isinstance(val, tuple) or isinstance(val, list)) and len(val) == 2:
-                        value = '%s-%s' % (val[0], val[1])
+                        value = '{}-{}'.format(val[0], val[1])
                     else:
                         value = val
 
@@ -503,23 +503,13 @@ class Adjacency:
     @classmethod
     def report_events(cls, events, outfile, sort_by_coord=False, header=None):
         def compare_event(e1, e2):
-            cmp_coord_result = cls.cmp_genome_coords(
-                (e1.chroms[0],
-                 e1.genome_breaks[0],
-                 e1.genome_breaks[1]),
-                (e2.chroms[0],
-                 e2.genome_breaks[0],
-                 e2.genome_breaks[1]))
+            cmp_coord_result = cls.cmp_genome_coords((e1.chroms[0], e1.genome_breaks[0], e1.genome_breaks[1]),
+                                                     (e2.chroms[0], e2.genome_breaks[0], e2.genome_breaks[1]))
             if cmp_coord_result != 0:
                 return cmp_coord_result
 
-            cmp_coord_result = cls.cmp_genome_coords(
-                (e1.chroms[1],
-                 e1.genome_breaks[1],
-                 e1.genome_breaks[1]),
-                (e2.chroms[1],
-                 e2.genome_breaks[1],
-                 e2.genome_breaks[1]))
+            cmp_coord_result = cls.cmp_genome_coords((e1.chroms[1], e1.genome_breaks[1], e1.genome_breaks[1]),
+                                                     (e2.chroms[1], e2.genome_breaks[1], e2.genome_breaks[1]))
 
             if cmp_coord_result != 0:
                 return cmp_coord_result
@@ -535,11 +525,11 @@ class Adjacency:
         out = open(outfile, 'w')
         if header is not None:
             if isinstance(header, str):
-                out.write('#%s\n' % header)
+                out.write('#{}\n'.format(header))
             elif isinstance(header, tuple) or isinstance(header, list):
                 for h in header:
-                    out.write('#%s\n' % h)
-        out.write('#%s\n' % '\t'.join(cls.bedpe_items.keys()))
+                    out.write('#{}\n'.format(h))
+        out.write('#{}\n'.format('\t'.join(cls.bedpe_items.keys())))
 
         if not sort_by_coord:
             events_grouped = defaultdict(list)
@@ -551,21 +541,21 @@ class Adjacency:
                 if event_type in events_grouped:
                     events_sorted = sorted(events_grouped[event_type], key=cmp_to_key(compare_event))
                     for event in events_sorted:
-                        out.write('%s\n' % event.as_bedpe(event_id=counter))
+                        out.write('{}\n'.format(event.as_bedpe(event_id=counter)))
                         counter += 1
                 else:
                     others.append(event_type)
             for event_type in others:
                 events_sorted = sorted(events_grouped[event_type], key=cmp_to_key(compare_event))
                 for event in events_sorted:
-                    out.write('%s\n' % event.as_bedpe(event_id=counter))
+                    out.write('{}\n'.format(event.as_bedpe(event_id=counter)))
                     counter += 1
 
         else:
             events_sorted = sorted(events, cmp=lambda e1, e2: compare_event(e1, e2))
             counter = 1
             for event in events_sorted:
-                out.write('%s\n' % event.as_bedpe(event_id=counter))
+                out.write('{}\n'.format(event.as_bedpe(event_id=counter)))
                 counter += 1
 
         out.close()
@@ -794,7 +784,7 @@ class Adjacency:
             for adj in adjs:
                 value = getattr(adj, attr)
                 if isinstance(value, tuple) or isinstance(value, list):
-                    value = '%s-%s' % (value[0], value[1])
+                    value = '{}-{}'.format(value[0], value[1])
                 values.append(value)
             return ','.join(map(str, values))
 

@@ -707,8 +707,7 @@ def check_splice_motif_retained_intron(event, adjs, query_seq, ref_fasta, align,
             coord_diff = coords[i] + diff[0][0]
             base_from = diff[0][1].upper()
             base_diff = diff[0][2].upper()
-            variant = '%s:%d%s>%s' % (
-                adjs[0].chroms[0], coord_diff, base_from, base_diff)
+            variant = '{}:{}{}>{}'.format(adjs[0].chroms[0], coord_diff, base_from, base_diff)
             adjs[i].splice_motif = motifs[i], [
                 [coord_diff, base_diff, variant]]
 

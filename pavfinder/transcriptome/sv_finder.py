@@ -49,16 +49,12 @@ class SVFinder:
 
                 if junc_seq is not None:
                     if len(junc_seq) > max_len:
-                        print(
-                            '%s: filter out %s - %s_seq %s too long' %
-                            (adj.seq_id, adj.event, seq_type, junc_seq))
+                        print('{}: filter out {} - {}_seq {} too long'.format(adj.seq_id, adj.event, seq_type, junc_seq))
                         return False
 
                     if len(junc_seq) > 2 and self.is_homopolymer_fragment(
                             junc_seq, min_pc=100):
-                        print(
-                            '%s: filter out %s - %s_seq %s is homopolymer' %
-                            (adj.seq_id, adj.event, seq_type, junc_seq))
+                        print('{}: filter out {} - {}_seq {} is homopolymer'.format(adj.seq_id, adj.event, seq_type, junc_seq))
                         return False
                 return True
 
@@ -382,17 +378,20 @@ class SVFinder:
             return qname_to_event
 
         def run_align(probes_fa, nthreads=12):
-            aln_bam_file = '%s/probes.bam' % working_dir
+            aln_bam_file = '{}/probes.bam'.format(working_dir)
 
-            cmd = 'gmap -D %s -d %s %s -n0 -f samse -t %d | samtools view -bhS - -o %s' % (
-                genome_index_dir, genome_index, probes_fa, nthreads, aln_bam_file)
+            cmd = 'gmap -D {} -d {} {} -n0 -f samse -t {} | samtools view -bhS - -o {}'.format(genome_index_dir,
+                                                                                               genome_index,
+                                                                                               probes_fa,
+                                                                                               nthreads,
+                                                                                               aln_bam_file)
             failed = False
             try:
                 if debug:
                     print(cmd)
                 subprocess.call(cmd, shell=True)
             except BaseException:
-                sys.stderr.write('Failed to run:%s\n' % cmd)
+                sys.stderr.write('Failed to run:{}\n'.format(cmd))
                 failed = True
 
             failed = False

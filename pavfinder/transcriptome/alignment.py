@@ -275,9 +275,7 @@ def bam2bed(bam, out, name_sorted=True, header=None, min_size=None, no_chimera=T
                 try:
                     output = align.as_bed()
                 except BaseException:
-                    sys.stderr.write(
-                        "can't convert alignment of contig %s to bed\n" %
-                        query)
+                    sys.stderr.write("can't convert alignment of contig {} to bed\n".format(query))
 
                 outputs.append(
                     (align.target, align.tstart, align.tend, output))
@@ -294,12 +292,9 @@ def bam2bed(bam, out, name_sorted=True, header=None, min_size=None, no_chimera=T
             try:
                 out.write(align.as_bed() + '\n')
             except BaseException:
-                sys.stderr.write(
-                    "can't convert alignment of contig %s to bed\n" %
-                    query)
+                sys.stderr.write("can't convert alignment of contig {} to bed\n".format(query))
 
     out.close()
-
 
 def open_bam(bamfile):
     return pysam.AlignmentFile(bamfile, 'rb')
@@ -321,20 +316,19 @@ def search_by_regex(query_seq, target_seq):
 
 
 def search_by_align(query_seq, target_seq, query_name, target_name, outdir, max_clipped=0, debug=False):
-    query_fa = '%s/tmp_query.fa' % outdir
+    query_fa = '{}/tmp_query.fa'.format(outdir)
     fa = open(query_fa, 'w')
-    fa.write('>%s\n%s\n' % (query_name, query_seq))
+    fa.write('>{}\n{}\n'.format(query_name, query_seq))
     fa.close()
 
-    target_fa = '%s/tmp_target.fa' % outdir
+    target_fa = '{}/tmp_target.fa'.format(outdir)
     fa = open(target_fa, 'w')
-    fa.write('>%s\n%s\n' % (target_name, target_seq))
+    fa.write('>{}\n{}\n'.format(target_name, target_seq))
     fa.close()
 
     # run blastn
-    blast_output = '%s/tmp_blastn.tsv' % outdir
-    cmd = 'blastn -query %s -subject %s -outfmt 6 -task blastn -out %s' % (
-        query_fa, target_fa, blast_output)
+    blast_output = '{}/tmp_blastn.tsv'.format(outdir)
+    cmd = 'blastn -query {} -subject {} -outfmt 6 -task blastn -out {}'.format(query_fa, target_fa, blast_output)
 
     try:
         if debug:
@@ -342,7 +336,7 @@ def search_by_align(query_seq, target_seq, query_name, target_name, outdir, max_
         subprocess.call(cmd, shell=True)
     except BaseException:
         # should check whether blastn is in the PATH right off the bet
-        sys.stderr.write('Failed to run BLAST:%s\n' % cmd)
+        sys.stderr.write('Failed to run BLAST:{}\n'.format(cmd))
 
     matches = []
     if os.path.exists(blast_output):
