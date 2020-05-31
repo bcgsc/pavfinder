@@ -113,7 +113,7 @@ def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
 
     if debug:
         for f in uniq_frags:
-            sys.stdout.write("Accepted flanking: %s %s\n" % (breaks, f))
+            sys.stdout.write("Accepted flanking: {} {}\n".format(breaks, f))
 
     return len(uniq_frags), tlens
 
@@ -145,7 +145,7 @@ def find_spanning(reads, breaks, contig_seq, overlap_buffer=1, debug=False, perf
                         spanning_reads.append((read.qname, read.seq))
 
                     if debug:
-                        sys.stdout.write("Accepted spanning read(perfect:%s): {} {} {} {} {}\n".format(perfect,
+                        sys.stdout.write("Accepted spanning read(perfect:{}): {} {} {} {} {}\n".format(perfect,
                                                                                                        read.qname,
                                                                                                        breaks,
                                                                                                        (read.pos + 1, read.pos + read.alen),
