@@ -17,14 +17,7 @@ from functools import cmp_to_key
 
 class SVFinder:
 
-    def __init__(
-            self,
-            genome_fasta,
-            annot,
-            transcripts_dict,
-            working_dir,
-            probe_len=100,
-            debug=False):
+    def __init__(self, genome_fasta, annot, transcripts_dict, working_dir, probe_len=100, debug=False):
         self.genome_fasta = genome_fasta
         self.transcripts_dict = transcripts_dict
         self.annot = annot
@@ -87,75 +80,57 @@ class SVFinder:
                 utrs = [feature for feature in features if 'UTR' in feature]
                 if len(features) == len(utrs):
                     if self.debug:
-                        print(
-                            '%s: %s filtered out - in UTR' %
-                            (adj.seq_id, adj.rearrangement))
+                        print('{}: {} filtered out - in UTR'.format(adj.seq_id, adj.rearrangement))
                     return False
 
-            if adj.transcripts and adj.exons and\
-               (adj.exons[0] is not None and adj.exons[1] is not None):
+            if adj.transcripts and adj.exons and (adj.exons[0] is not None and adj.exons[1] is not None):
                 if gene_mappings is not None:
                     if not screen_genes(adj):
-                        print(
-                            '%s: event not mapped to same external gene' %
-                            adj.seq_id)
+                        print('{}: event not mapped to same external gene'.format(adj.seq_id))
                         return False
 
             if adj.transcripts is None or adj.transcripts[0] is None or adj.transcripts[1] is None:
-                print('%s: cannot map event' % adj.seq_id)
+                print('{}: cannot map event'.foramt(adj.seq_id))
                 return False
 
             if adj.exons is None or adj.exons[0] is None or adj.exons[1] is None:
-                if adj.event not in ('fusion',
-                                     'read_through') or only_exon_bound_fusion:
-                    print('%s: cannot map event to exon' % adj.seq_id)
+                if adj.event not in ('fusion', 'read_through') or only_exon_bound_fusion:
+                    print('{}: cannot map event to exon'.format(adj.seq_id))
                     return False
 
-            if adj.homol_seq is not None and adj.homol_seq != 'na' and not check_junc_seq(
-                    homol=True):
+            if adj.homol_seq is not None and adj.homol_seq != 'na' and not check_junc_seq(homol=True):
                 return False
 
-            if adj.novel_seq is not None and adj.novel_seq != 'na' and not check_junc_seq(
-                    novel=True):
+            if adj.novel_seq is not None and adj.novel_seq != 'na' and not check_junc_seq(novel=True):
                 return False
 
-            if adj.probe is not None and len(
-                    adj.probe) > 0 and self.is_homopolymer_fragment(
-                    adj.probe):
-                print(
-                    '%s: probe sequence high in 1 base %s' %
-                    (adj.seq_id, adj.probe))
+            if adj.probe is not None and len(adj.probe) > 0 and self.is_homopolymer_fragment(adj.probe):
+                print('{}: probe sequence high in 1 base {}'.format(adj.seq_id, adj.probe))
                 return False
 
             if adj.event in ('fusion', 'read_through'):
                 if adj.transcripts[0].gene == adj.transcripts[1].gene:
                     return False
 
-                if adj.genome_breaks[0] >= adj.transcripts[0].txStart() and adj.genome_breaks[0] <= adj.transcripts[0].txEnd(
-                ) and adj.genome_breaks[0] >= adj.transcripts[1].txStart() and adj.genome_breaks[0] <= adj.transcripts[1].txEnd():
+                if adj.genome_breaks[0] >= adj.transcripts[0].txStart() and adj.genome_breaks[0] <= adj.transcripts[0].txEnd() and\
+                   adj.genome_breaks[0] >= adj.transcripts[1].txStart() and adj.genome_breaks[0] <= adj.transcripts[1].txEnd():
                     return False
 
-                if adj.genome_breaks[1] >= adj.transcripts[0].txStart() and adj.genome_breaks[1] <= adj.transcripts[0].txEnd(
-                ) and adj.genome_breaks[1] >= adj.transcripts[1].txStart() and adj.genome_breaks[1] <= adj.transcripts[1].txEnd():
+                if adj.genome_breaks[1] >= adj.transcripts[0].txStart() and adj.genome_breaks[1] <= adj.transcripts[0].txEnd() and\
+                   adj.genome_breaks[1] >= adj.transcripts[1].txStart() and adj.genome_breaks[1] <= adj.transcripts[1].txEnd():
                     return False
 
-                if only_coding_fusion and (
-                        not adj.transcripts[0].is_coding() or not adj.transcripts[1].is_coding()):
+                if only_coding_fusion and (not adj.transcripts[0].is_coding() or not adj.transcripts[1].is_coding()):
                     return False
 
-                if (only_exon_bound_fusion or only_sense_fusion) and\
-                   adj.sense_fusion is not None and not adj.sense_fusion:
-                    print('%s: fusion not sense' % adj.seq_id)
+                if (only_exon_bound_fusion or only_sense_fusion) and adj.sense_fusion is not None and not adj.sense_fusion:
+                    print('{}: fusion not sense'.format(adj.seq_id))
                     return False
 
-                if only_exon_bound_fusion and adj.exon_bounds is not None and (
-                        isinstance(
-                            adj.exon_bounds, tuple) or isinstance(
-                            adj.exon_bounds, list)) and (
-                        not adj.exon_bounds[0] or not adj.exon_bounds[1]):
-                    print(
-                        '%s: not exon-bound fusions %s' %
-                        (adj.seq_id, adj.exon_bounds))
+                if only_exon_bound_fusion and adj.exon_bounds is not None and\
+                   (isinstance(adj.exon_bounds, tuple) or isinstance(adj.exon_bounds, list)) and\
+                   (not adj.exon_bounds[0] or not adj.exon_bounds[1]):
+                    print('{}: not exon-bound fusions {}'.format(adj.seq_id, adj.exon_bounds))
                     return False
 
             return True
@@ -178,36 +153,25 @@ class SVFinder:
                 # filtering out event if sequences overlap too much
                 # otherwise is_fusion() will try to "adjust" exon_bounds to
                 # make it pass
-                if isinstance(
-                        adj.homol_seq, str) and len(
-                        adj.homol_seq) > max_homol_len:
-                    print(
-                        '%s: filter out %s - %s_seq %s too long' %
-                        (adj.seq_id, adj.rearrangement, adj.homol_seq, len(
-                            adj.homol_seq)))
+                if isinstance(adj.homol_seq, str) and len(adj.homol_seq) > max_homol_len:
+                    print('{}: filter out {} - {}_seq {} too long'.format(adj.seq_id,
+                                                                          adj.rearrangement,
+                                                                          adj.homol_seq,
+                                                                          len(adj.homol_seq)))
                     continue
-                self.update_adj(
-                    adj,
-                    aligns,
-                    query_seq,
-                    target_type,
-                    block_matches=block_matches)
+                self.update_adj(adj, aligns, query_seq, target_type, block_matches=block_matches)
                 if genes is not None:
                     add_genes_from_event(genes, adj)
 
                     if len(genes) > 1 and\
                        external_mappings is not None and\
                        adj.seq_id in external_mappings:
-                        if len(
-                                external_mappings[adj.seq_id][0]) == 1 and external_mappings[adj.seq_id][1] == 'full':
-                            print('%s chimera mapped to single gene mapped:%s external:%s' % (
-                                adj.seq_id, genes, external_mappings[adj.seq_id][0]))
+                        if len(external_mappings[adj.seq_id][0]) == 1 and external_mappings[adj.seq_id][1] == 'full':
+                            print('{} chimera mapped to single gene mapped:{} external:{}'.format(adj.seq_id, genes, external_mappings[adj.seq_id][0]))
                             continue
 
-                        if not genes.intersection(
-                                external_mappings[adj.seq_id][0]):
-                            print('%s chimera not agreed mapped:%s external:%s' % (
-                                adj.seq_id, genes, external_mappings[adj.seq_id][0]))
+                        if not genes.intersection(external_mappings[adj.seq_id][0]):
+                            print('{} chimera not agreed mapped:{} external:{}'.format(adj.seq_id, genes, external_mappings[adj.seq_id][0]))
                             continue
 
                 if filter_adj(adj):
@@ -218,12 +182,11 @@ class SVFinder:
         def compile_mapping(mapping, align):
             if target_type == 'genome':
                 chrom = align.target
-                span = intspan('%s-%s' % (align.tstart, align.tend))
+                span = intspan('{}-{}'.format(align.tstart, align.tend))
             elif align.target in self.transcripts_dict:
                 transcript = self.transcripts_dict[align.target]
                 chrom = transcript.chrom
-                span = intspan('%s-%s' %
-                               (transcript.exons[0][0], transcript.exons[-1][1]))
+                span = intspan('{}-{}'.format(transcript.exons[0][0], transcript.exons[-1][1]))
             if chrom not in mapping:
                 mapping[chrom] = []
             mapping[chrom].append(span)
@@ -236,12 +199,9 @@ class SVFinder:
 
         def get_mapping_genes(block_matches, align):
             tids = set([tid for tid in block_matches.keys()])
-            full_matched_tids = [
-                tid for tid in tids if self.exon_mapper.is_full_match(
-                    block_matches[tid], perfect=False)]
+            full_matched_tids = [tid for tid in tids if self.exon_mapper.is_full_match(block_matches[tid], perfect=False)]
             genes = set([self.transcripts_dict[tid].gene for tid in tids])
-            genes_full = set(
-                [self.transcripts_dict[tid].gene for tid in full_matched_tids])
+            genes_full = set([self.transcripts_dict[tid].gene for tid in full_matched_tids])
             if len(genes_full) > 1:
                 tid = self.exon_mapper.pick_best_mapping(block_matches, align)
                 genes = set()
@@ -269,10 +229,6 @@ class SVFinder:
                     # skip align if it's invalid (e.g. begin with softclip) or
                     # query sequence is potentially homopolymer
                     if align.is_valid():
-                        # if align.is_valid() and\
-                       # align.aligned_seq(query_seq) and\
-                       # not
-                       # self.is_homopolymer_fragment(align.aligned_seq(query_seq)):
                         if target_type == 'genome':
                             if align.has_canonical_target():
                                 aligns.append(align)
@@ -289,7 +245,7 @@ class SVFinder:
             else:
                 query_spans = intspan()
                 for align in aligns:
-                    query_spans.add('%s-%s' % (align.qstart, align.qend))
+                    query_spans.add('{}-{}'.format(align.qstart, align.qend))
                 if max(query_spans) - min(query_spans) + 1 < len(query_seq):
                     partially_aligned = True
 
@@ -301,23 +257,16 @@ class SVFinder:
 
                     # cannot map alignment to gene, skip
                     if not block_matches:
-                        print('%s:cannot map to transcript' % aligns[0].query)
+                        print('{}:cannot map to transcript'.format(aligns[0].query))
                         continue
 
                     tids, genes = get_mapping_genes(block_matches, aligns[0])
                     if tids and genes:
                         aligns_mapped = 1
                     if len(genes) > 1:
-                        adj = self.is_read_through_from_single_align(
-                            block_matches, aligns[0])
+                        adj = self.is_read_through_from_single_align(block_matches, aligns[0])
                         if adj is not None:
-                            self.update_adj(
-                                adj,
-                                (aligns[0],
-                                 aligns[0]),
-                                query_seq,
-                                target_type,
-                                block_matches=block_matches)
+                            self.update_adj(adj, (aligns[0], aligns[0]), query_seq, target_type, block_matches=block_matches)
                             if filter_adj(adj):
                                 events.append(adj)
                     elif len(tids) == 1 and not partially_aligned and self.exon_mapper.is_full_match(block_matches[list(tids)[0]]):
@@ -328,8 +277,7 @@ class SVFinder:
                     for align in aligns:
                         block_matches = self.exon_mapper.map_align(align)
                         if block_matches:
-                            tids_align, genes_align = get_mapping_genes(
-                                block_matches, align)
+                            tids_align, genes_align = get_mapping_genes(block_matches, align)
                             if len(genes_align) >= 1:
                                 aligns_mapped += 1
                             genes = genes.union(genes_align)
@@ -342,19 +290,15 @@ class SVFinder:
                         genes.add(self.transcripts_dict[align.target].gene)
 
             if partially_aligned and len(aligns) == 1:
-                if external_mappings is None or\
-                   query not in external_mappings or\
-                   (external_mappings[query] and
-                        external_mappings[query][1] != 'full'):
-                    partial_aligns.append(
-                        (aligns[0], block_matches, partially_aligned))
+                if external_mappings is None or query not in external_mappings or\
+                  (external_mappings[query] and external_mappings[query][1] != 'full'):
+                    partial_aligns.append((aligns[0], block_matches, partially_aligned))
 
             # chimera
             if len(aligns) > 1:
                 aligns_sorted = sorted(aligns, key=lambda a: int(a.qstart))
                 for align1, align2 in zip(aligns_sorted, aligns_sorted[1:]):
-                    events.extend(process_split_aligns(
-                        [align1, align2], query_seq, genes))
+                    events.extend(process_split_aligns([align1, align2], query_seq, genes))
 
             # indels
             if not only_fusions:
@@ -363,31 +307,27 @@ class SVFinder:
                         if align.target in self.transcripts_dict:
                             genes.add(self.transcripts_dict[align.target].gene)
 
-                    adjs = self.find_indels(
-                        align,
-                        query_fasta,
-                        target_fasta,
-                        target_type,
-                        min_size=min_indel_size,
-                        min_dup_size=min_dup_size,
-                        min_flanking=min_indel_flanking,
-                        max_novel_len=max_novel_len,
-                        no_indels=no_indels)
+                    adjs = self.find_indels(align,
+                                            query_fasta,
+                                            target_fasta,
+                                            target_type,
+                                            min_size=min_indel_size,
+                                            min_dup_size=min_dup_size,
+                                            min_flanking=min_indel_flanking,
+                                            max_novel_len=max_novel_len,
+                                            no_indels=no_indels)
                     for adj in adjs:
-                        self.update_adj(
-                            adj, (align, align), query_seq, target_type, block_matches=block_matches)
+                        self.update_adj(adj, (align, align), query_seq, target_type, block_matches=block_matches)
                         if target_type == 'genome' and not genes:
                             add_genes_from_event(genes, adj)
 
                         if filter_adj(adj):
                             events.append(adj)
 
-                        if adj.event in (
-                                'repeat_expansion', 'repeat_contraction'):
-                            if len(
-                                    adj.repeat_seq) == 3 and adj.transcripts and not adj.transcripts[0].within_utr(
-                                    adj.genome_breaks[0]) and not adj.transcripts[0].within_utr(
-                                    adj.genome_breaks[1]):
+                        if adj.event in ('repeat_expansion', 'repeat_contraction'):
+                            if len(adj.repeat_seq) == 3 and adj.transcripts and\
+                               not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
+                               not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
                                 adj.in_frame = True
                                 self.adjust_for_amino_acid_repeat(adj)
 
@@ -401,11 +341,7 @@ class SVFinder:
                     mappings_by_query[query] = genes, 'partial'
 
         if partial_aligns:
-            new_aligns = self.map_partial_aligns(
-                partial_aligns,
-                query_fasta,
-                target_type,
-                max_unaligned_len=max_novel_len)
+            new_aligns = self.map_partial_aligns(partial_aligns, query_fasta, target_type, max_unaligned_len=max_novel_len)
 
             for query, aligns in new_aligns.items():
                 query_seq = query_fasta.fetch(query)
@@ -416,21 +352,13 @@ class SVFinder:
         return events_by_query, mappings_by_query
 
     @classmethod
-    def filter_probes(
-            cls,
-            events,
-            genome_index_dir,
-            genome_index,
-            working_dir,
-            probe_length,
-            debug=False):
+    def filter_probes(cls, events, genome_index_dir, genome_index, working_dir, probe_length, debug=False):
         def create_query_fasta(events, fa_file, min_size=0):
             qname_to_event = {}
             fa = open(fa_file, 'w')
             for event in events:
                 # don't check splicing events
-                if event.event is not None and event.event in (
-                        'alt_donor', 'alt_acceptor', 'skipped_exon'):
+                if event.event is not None and event.event in ('alt_donor', 'alt_acceptor', 'skipped_exon'):
                     continue
 
                 seq_ids = event.seq_id.split(',')
@@ -441,9 +369,8 @@ class SVFinder:
 
                     if isinstance(event.size, str) or event.size >= min_size:
                         if len(probe) > 0:
-                            qname = '%s:%s:%s' % (
-                                seq_id, event.key(), event.size)
-                            fa.write('>%s\n%s\n' % (qname, probe))
+                            qname = '{}:{}:{}'.format(seq_id, event.key(), event.size)
+                            fa.write('>{}\n{}\n'.format(qname, probe))
                             qname_to_event[qname] = event
                         else:
                             print('probe empty', seq_id, event.keys(), probe)
@@ -474,24 +401,15 @@ class SVFinder:
             else:
                 return None
 
-        def parse_and_filter(
-                bam,
-                fasta_file,
-                qname_to_event,
-                indel_size_check=20):
-            def within_same_gene(
-                    alns,
-                    query_seq,
-                    event,
-                    min_mapped=0.9,
-                    window=50):
+        def parse_and_filter(bam, fasta_file, qname_to_event, indel_size_check=20):
+            def within_same_gene(alns, query_seq, event, min_mapped=0.9, window=50):
                 """check if subseq of fusion lie in same gene or do not lie in one of the genes"""
                 query_spans = intspan()
                 aligns = []
                 for aln in alns:
                     if not aln.is_unmapped:
                         align = Alignment.from_alignedRead(aln, bam)
-                        query_spans.add('%s-%s' % (align.qstart, align.qend))
+                        query_spans.add('{}-{}'.format(align.qstart, align.qend))
                         aligns.append(align)
 
                 if float(len(query_spans)) / len(query_seq) > min_mapped:
@@ -501,7 +419,7 @@ class SVFinder:
                             if aligns[i].target == transcript.chrom and\
                                ((aligns[i].tstart >= transcript.exons[0][0] - window and aligns[i].tstart <= transcript.exons[-1][1] + window)
                                 or
-                                    (aligns[i].tend >= transcript.exons[0][0] - window and aligns[i].tend <= transcript.exons[-1][1] + window)):
+                                (aligns[i].tend >= transcript.exons[0][0] - window and aligns[i].tend <= transcript.exons[-1][1] + window)):
                                 mappings[transcript.id].append(i)
                     if not mappings:
                         return 'fusion subseq not mapped to either of the 2 genes'
@@ -524,8 +442,7 @@ class SVFinder:
                                  for i in range(len(events)))
 
             remove = set()
-            for query, group in groupby(
-                    bam.fetch(until_eof=True), lambda aln: aln.query_name):
+            for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
                 alns = list(group)
                 event = qname_to_event[query]
 
@@ -549,21 +466,16 @@ class SVFinder:
                         bad = True
 
                     elif size.isdigit() and int(size) <= indel_size_check:
-                        # if len(alns) > 1:
-                        #failed_reason = 'chimeric probe aligns for simple indel'
-                        #bad = True
                         if not has_same_indel(aln, event_type, int(size)):
-                            failed_reason = '%s %s probe align indel not matched %s' % (
-                                event_type, size, aln.cigarstring)
+                            failed_reason = '{} {} probe align indel not matched {}'.format(event_type, size, aln.cigarstring)
                             bad = True
 
                 elif 'repeat' not in event_type:
                     if event_type == 'fusion':
-                        if int(
-                                aln.get_tag('NM')) <= 2 and float(
-                                aln.query_alignment_length) / probe_length > 0.9:
-                            failed_reason = 'probe aligned exclusively %d/%d=%.02f' % (
-                                aln.query_alignment_length, probe_length, float(aln.query_alignment_length) / probe_length)
+                        if int(aln.get_tag('NM')) <= 2 and float(aln.query_alignment_length) / probe_length > 0.9:
+                            failed_reason = 'probe aligned exclusively {}/{}={:.02f}'.format(aln.query_alignment_length,
+                                                                                             probe_length,
+                                                                                             float(aln.query_alignment_length) / probe_length)
                             bad = True
 
                     if not bad:
@@ -575,13 +487,13 @@ class SVFinder:
                                 bad = True
 
                 if bad:
-                    print('%s probe failed: %s' % (query, failed_reason))
+                    print('{} probe failed: {}'.format(query, failed_reason))
                     remove.add(events_by_key[key])
 
             for i in sorted(list(remove), reverse=True):
                 del events[i]
 
-        query_fa_file = '%s/probes.fa' % working_dir
+        query_fa_file = '{}/probes.fa'.format(working_dir)
         qname_to_event = create_query_fasta(events, query_fa_file)
         if qname_to_event:
             bam = run_align(query_fa_file)
@@ -593,31 +505,15 @@ class SVFinder:
                     os.remove(ff)
 
     @classmethod
-    def filter_subseqs(
-            cls,
-            events,
-            query_fa,
-            genome_index_dir,
-            genome_index,
-            working_dir,
-            subseq_len=None,
-            debug=False):
+    def filter_subseqs(cls, events, query_fa, genome_index_dir, genome_index, working_dir, subseq_len=None, debug=False):
         def pick_sub_seqs(event):
             contigs = event.seq_id.split(',')
-            seq_breaks = [list(map(int, b.split('-')))
-                          for b in event.seq_breaks.split(',')]
+            seq_breaks = [list(map(int, b.split('-'))) for b in event.seq_breaks.split(',')]
             seq_lens = [len(query_fa.fetch(s)) for s in contigs]
 
             # sort contig so that contig which has the biggest smaller-subseq
             # is chosen
-            indices_sorted = sorted(
-                range(
-                    len(contigs)),
-                key=lambda i: min(
-                    seq_breaks[i][0],
-                    seq_lens[i] -
-                    seq_breaks[i][1]),
-                reverse=True)
+            indices_sorted = sorted(range(len(contigs)), key=lambda i: min(seq_breaks[i][0], seq_lens[i] - seq_breaks[i][1]), reverse=True)
 
             return contigs[indices_sorted[0]], seq_breaks[indices_sorted[0]]
 
@@ -627,10 +523,7 @@ class SVFinder:
             fa = open(fa_file, 'w')
             for event in events:
                 # don't check splicing events
-                if event.event in (
-                    'alt_donor',
-                    'alt_acceptor',
-                        'skipped_exon'):
+                if event.event in ('alt_donor', 'alt_acceptor', 'skipped_exon'):
                     continue
 
                 seq_id, seq_breaks = pick_sub_seqs(event)
@@ -641,8 +534,8 @@ class SVFinder:
                     continue
 
                 for i in range(len(subseqs)):
-                    query_name = '%s:%s:%d' % (seq_id, event.key(), i)
-                    fa.write('>%s\n%s\n' % (query_name, subseqs[i]))
+                    query_name = '{}:{}:{}'.format(seq_id, event.key(), i)
+                    fa.write('>{}\n{}\n'.format(query_name, subseqs[i]))
                     sizes[query_name] = len(subseqs[i])
                     count += 1
 
@@ -650,17 +543,20 @@ class SVFinder:
             return count, sizes
 
         def run_align(probes_fa, nthreads=12):
-            aln_bam_file = '%s/subseqs.bam' % working_dir
+            aln_bam_file = '{}/subseqs.bam'.format(working_dir)
 
-            cmd = 'gmap -D %s -d %s %s -f samse -t %d | samtools view -bhS - -o %s' % (
-                genome_index_dir, genome_index, probes_fa, nthreads, aln_bam_file)
+            cmd = 'gmap -D {} -d {} {} -f samse -t {} | samtools view -bhS - -o {}'.format(genome_index_dir,
+                                                                                           genome_index,
+                                                                                           probes_fa,
+                                                                                           nthreads,
+                                                                                           aln_bam_file)
             failed = False
             try:
                 if debug:
                     print(cmd)
                 subprocess.call(cmd, shell=True)
             except BaseException:
-                sys.stderr.write('Failed to run:%s\n' % cmd)
+                sys.stderr.write('Failed to run:{}\n'.format(cmd))
                 failed = True
 
             failed = False
@@ -679,9 +575,7 @@ class SVFinder:
 
         def overlap(chrom1, span1, chrom2, pos2, window):
             """ check 2 genomic positions overlap with a window """
-            if chrom1 == chrom2 and\
-               pos2 >= span1[0] - window and\
-               pos2 <= span1[1] + window:
+            if chrom1 == chrom2 and pos2 >= span1[0] - window and pos2 <= span1[1] + window:
                 return True
             return False
 
@@ -696,20 +590,16 @@ class SVFinder:
             remove = set()
             subseq_mappings = {}
             subseq_align_tallies = {}
-            for query, group in groupby(
-                    bam.fetch(until_eof=True), lambda aln: aln.query_name):
+            for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
                 seq_id, key, part = query.split(':')
-                event_type, chrom1, pos1, orient1, chrom2, pos2, orient2 = key.split(
-                    '-')
+                event_type, chrom1, pos1, orient1, chrom2, pos2, orient2 = key.split('-')
 
                 if event_type in ('ins', 'del'):
                     continue
 
                 alns = list(group)
 
-                mapped_alns = [
-                    aln for aln in alns if is_mapped(
-                        aln, sizes[query], 1.0)]
+                mapped_alns = [aln for aln in alns if is_mapped(aln, sizes[query], 1.0)]
                 if mapped_alns:
                     subseq_align_tallies[query] = 0
                     matched = []
@@ -723,24 +613,15 @@ class SVFinder:
                         if has_canonical_target(target):
                             subseq_align_tallies[query] += 1
 
-                        if overlap(target,
-                                   (aln.reference_start, aln.reference_end),
-                                   chrom1,
-                                   int(pos1),
-                                   window):
+                        if overlap(target, (aln.reference_start, aln.reference_end), chrom1, int(pos1), window):
                             matched.append(1)
 
-                        if overlap(target,
-                                   (aln.reference_start, aln.reference_end),
-                                   chrom2,
-                                   int(pos2),
-                                   window):
+                        if overlap(target, (aln.reference_start, aln.reference_end), chrom2, int(pos2), window):
                             matched.append(2)
 
                     subseq_mappings[seq_id][key][part] = matched
 
-            multimapped = [
-                query for query in subseq_align_tallies if subseq_align_tallies[query] > 1]
+            multimapped = [query for query in subseq_align_tallies if subseq_align_tallies[query] > 1]
 
             for seq_id in events_by_query.keys():
                 if seq_id in subseq_mappings:
@@ -751,24 +632,19 @@ class SVFinder:
                             continue
 
                         # check for multimapping of both subseqs
-                        if '%s:%s:0' % (seq_id, events[i].key()) in multimapped or\
-                           '%s:%s:1' % (seq_id, events[i].key()) in multimapped:
+                        if '{}:{}:0'.format(seq_id, events[i].key()) in multimapped or\
+                           '{}:{}:1'.format(seq_id, events[i].key()) in multimapped:
                             remove.add(i)
-                            if '%s:%s:0' % (seq_id,
-                                            events[i].key()) in multimapped:
-                                print(
-                                    '%s: remove %s - subseq 0 multimap' %
-                                    (seq_id, events[i].key()))
-                            elif '%s:%s:1' % (seq_id, events[i].key()) in multimapped:
-                                print(
-                                    '%s: remove %s - subseq 1 multimap' %
-                                    (seq_id, events[i].key()))
+                            if '{}:{}:0'.format(seq_id, events[i].key()) in multimapped:
+                                print('{}: remove {} - subseq 0 multimap'.format(seq_id, events[i].key()))
+                            elif '{}:{}:1'.format(seq_id, events[i].key()) in multimapped:
+                                print('{}: remove {} - subseq 1 multimap'.format(seq_id, events[i].key()))
                             break
 
             for i in sorted(list(remove), reverse=True):
                 del events[i]
 
-        query_fa_file = '%s/subseqs.fa' % working_dir
+        query_fa_file = '{}/subseqs.fa'.format(working_dir)
         count, sizes = create_query_fasta(events, query_fa_file)
         if count > 0:
             bam = run_align(query_fa_file)
@@ -779,13 +655,7 @@ class SVFinder:
         if not debug:
             os.remove(query_fa_file)
 
-    def update_adj(
-            self,
-            adj,
-            aligns,
-            query_seq,
-            target_type,
-            block_matches=None):
+    def update_adj(self, adj, aligns, query_seq, target_type, block_matches=None):
         def fix_orients():
             if target_type == 'transcripts':
                 orients = []
@@ -816,12 +686,10 @@ class SVFinder:
         if target_type == 'genome':
             if len(aligns) == 1:
                 aligns = [aligns[0], aligns[0]]
-            adj.update_attrs(chroms=adj.targets,
-                             genome_breaks=adj.target_breaks)
+            adj.update_attrs(chroms=adj.targets, genome_breaks=adj.target_breaks)
             # dont want to overwrite for read_through
             if not adj.transcripts:
-                transcripts = self.map_transcripts_to_adj(
-                    adj, aligns, block_matches=block_matches)
+                transcripts = self.map_transcripts_to_adj(adj, aligns, block_matches=block_matches)
                 if transcripts and len(transcripts) == 2:
                     if transcripts[0] == transcripts[1]:
                         genes = (transcripts[0].gene)
@@ -846,16 +714,14 @@ class SVFinder:
 
                 adj.update_attrs(
                     transcripts=transcripts,
-                    chroms=[
-                        transcript.chrom for transcript in transcripts],
+                    chroms=[transcript.chrom for transcript in transcripts],
                     transcript_breaks=adj.target_breaks)
                 adj.update_genome_breaks()
 
         if adj.transcripts:
             adj.update_exons(target_type)
             if genes and len(genes) > 1:
-                self.is_fusion(
-                    adj, (aligns[0].strand, aligns[1].strand), target_type)
+                self.is_fusion(adj, (aligns[0].strand, aligns[1].strand), target_type)
 
             self.update_feature(adj)
             fix_orients()
@@ -927,9 +793,7 @@ class SVFinder:
             aligns_mapped = aligns
         else:
             for i in range(2):
-                align_idx = find_align_from_breakpoint(adj.targets[i],
-                                                       adj.target_breaks[i],
-                                                       adj.orients[i])
+                align_idx = find_align_from_breakpoint(adj.targets[i], adj.target_breaks[i], adj.orients[i])
                 if align_idx is not None:
                     aligns_mapped.append(aligns[align_idx])
 
@@ -942,14 +806,7 @@ class SVFinder:
                 return True
         return False
 
-    def map_transcripts_to_adj(
-        self,
-        adj,
-        aligns,
-        block_matches=None,
-        genes=(
-            None,
-            None)):
+    def map_transcripts_to_adj(self, adj, aligns, block_matches=None, genes=(None, None)):
         def compare_mapping(m1, m2):
             if m1['exon_bound'] and not m2['exon_bound']:
                 return -1
@@ -991,12 +848,11 @@ class SVFinder:
                 transcript = self.transcripts_dict[tid]
                 if gene is not None and transcript.gene != gene:
                     continue
-                metrics[tid] = {
-                    'len': transcript.length(),
-                    'num_exons': len(transcript.exons),
-                    'coding': transcript.is_coding(),
-                    'within_utr': transcript.within_utr(breakpoint[0]) or transcript.within_utr(breakpoint[1]),
-                }
+                metrics[tid] = {'len': transcript.length(),
+                                'num_exons': len(transcript.exons),
+                                'coding': transcript.is_coding(),
+                                'within_utr': transcript.within_utr(breakpoint[0]) or transcript.within_utr(breakpoint[1]),
+                                }
                 metrics[tid]['exon_bound'] = False
                 if (orient == 'L' and matches[-1] is not None and matches[-1][-1][1][1] == '=') or\
                    (orient == 'R' and matches[0] is not None and matches[0][0][1][0] == '='):
@@ -1005,24 +861,11 @@ class SVFinder:
                 metrics[tid]['num_matched_blocks'] = len([m for m in matches if m is not None and len(m) == 1])
                 metrics[tid]['num_perfect_matched_blocks'] = len([m for m in matches if m is not None and len(m) == 1 and m[0][1] == '=='])
 
-            #tids_sorted = sorted(
-                #metrics.keys(),
-                #cmp=lambda m1,
-                #m2: compare_mapping(
-                    #metrics[m1],
-                    #metrics[m2]))
-
             tids_sorted = sorted(metrics.keys(), key=cmp_to_key(cmp_mapping))
 
             return self.transcripts_dict[tids_sorted[0]]
 
-        def map_transcript(
-                align,
-                chrom,
-                genome_break,
-                orient,
-                block_matches=None,
-                gene=None):
+        def map_transcript(align, chrom, genome_break, orient, block_matches=None, gene=None):
             if block_matches is None:
                 block_matches = self.exon_mapper.map_align(align)
             transcript = None
@@ -1030,11 +873,7 @@ class SVFinder:
                 genome_breaks = genome_break
                 if type(genome_break) is int:
                     genome_breaks = [genome_break, genome_break]
-                transcript = pick_best(chrom,
-                                       genome_breaks,
-                                       orient,
-                                       block_matches,
-                                       gene)
+                transcript = pick_best(chrom, genome_breaks, orient, block_matches, gene)
             return transcript
 
         transcripts = [None, None]
@@ -1057,7 +896,7 @@ class SVFinder:
                                                 gene=genes[1],
                                                 )
         else:
-            print('cannot map aligns to adj:%s' % adj.seq_id)
+            print('cannot map aligns to adj:{}'.format(adj.seq_id))
 
         if transcripts[0] is not None and transcripts[1] is not None:
             return tuple(transcripts)
@@ -1093,8 +932,7 @@ class SVFinder:
                     else:
                         start, end = genome_pos - 2 - 1, genome_pos - 1
 
-                bases = self.genome_fasta.fetch(
-                    event.transcripts[0].chrom, start, end)
+                bases = self.genome_fasta.fetch(event.transcripts[0].chrom, start, end)
                 if event.transcripts[0].strand == '-':
                     bases = reverse_complement(bases)
 
@@ -1109,13 +947,7 @@ class SVFinder:
     def is_homopolymer(self, seq):
         return len(set(map(''.join, zip(*[iter(seq)] * 1)))) == 1
 
-    def map_partial_aligns(
-            self,
-            partial_aligns,
-            query_fasta,
-            target_type,
-            max_unaligned_len=10,
-            min_len=15):
+    def map_partial_aligns(self, partial_aligns, query_fasta, target_type, max_unaligned_len=10, min_len=15):
         """attempt to map partial aligns"""
         def extract_clipped_seq(query_seq, query_blocks):
             """Extract sequences that are clipped at the end"""
@@ -1172,15 +1004,13 @@ class SVFinder:
                 target_span = sorted([transcript.txt_coord_to_genome_coord(
                     match[0]), transcript.txt_coord_to_genome_coord(match[1])])
                 target = transcript.chrom
-            return create_alignment(
-                query, query_span, target, target_span, strand)
+            return create_alignment(query, query_span, target, target_span, strand)
 
         def get_transcript(block_matches):
             transcript = None
             if target_type == 'genome':
                 if block_matches:
-                    tid = self.exon_mapper.pick_best_mapping(
-                        block_matches, align)
+                    tid = self.exon_mapper.pick_best_mapping(block_matches, align)
                     if tid and tid in self.transcripts_dict:
                         transcript = self.transcripts_dict[tid]
             else:
@@ -1188,14 +1018,9 @@ class SVFinder:
                     transcript = self.transcripts_dict[align.target]
             return transcript
 
-        def parse_partial_aligns(
-                bam,
-                query_target,
-                query_span,
-                max_unaligned_len=10):
+        def parse_partial_aligns(bam, query_target, query_span, max_unaligned_len=10):
             new_aligns = {}
-            for query_pos, group in groupby(
-                    bam.fetch(until_eof=True), lambda aln: aln.query_name):
+            for query_pos, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
                 alns = list(group)
                 matches = []
                 matches_query = []
@@ -1231,7 +1056,6 @@ class SVFinder:
                         target = align.target
                     align = find_new_align(
                         query, matches_query[0], target, match, transcript)
-                    #align = find_new_align(query, query_span[query], target, match, transcript)
                     if align is not None:
                         new_aligns[query] = align
             return new_aligns
@@ -1242,18 +1066,17 @@ class SVFinder:
             target_seqs = {}
             for align, qid, tid, query_seq, target_seq in jobs:
                 target_seqs[tid] = target_seq
-                query_fa.write('>%s\n%s\n' % (qid, query_seq))
+                query_fa.write('>{}\n{}\n'.format(qid, query_seq))
 
             for tid, seq in target_seqs.items():
-                target_fa.write('>%s\n%s\n' % (tid, seq))
+                target_fa.write('>{}\n{}\n'.format(tid, seq))
 
             query_fa.close()
             target_fa.close()
 
-            aln_bam_file = '%s/partial_aln.bam' % self.working_dir
-            index_cmd = 'bwa index %s' % target_fa_file
-            aln_cmd = 'bwa mem %s %s | samtools view -bhS - -o %s' % (
-                target_fa_file, query_fa_file, aln_bam_file)
+            aln_bam_file = '{}/partial_aln.bam'.format(self.working_dir)
+            index_cmd = 'bwa index {}'.format(target_fa_file)
+            aln_cmd = 'bwa mem {} {} | samtools view -bhS - -o {}'.format(target_fa_file, query_fa_file, aln_bam_file)
             failed = False
             for cmd in (index_cmd, aln_cmd):
                 try:
@@ -1262,7 +1085,7 @@ class SVFinder:
                     subprocess.call(cmd, shell=True)
                 except BaseException:
 
-                    sys.stderr.write('Failed to run:%s\n' % cmd)
+                    sys.stderr.write('Failed to run:{}\n'.format(cmd))
                     failed = True
             if not failed:
                 return pysam.AlignmentFile(aln_bam_file)
@@ -1278,16 +1101,13 @@ class SVFinder:
             target_seq = None
             for pos, clipped_seq in clipped_ends.items():
                 if len(clipped_seq) <= min_len:
-                    print(
-                        '%s:skip partial because it is too short %s %d' %
-                        (align.query, clipped_seq, len(clipped_seq)))
+                    print('{}:skip partial because it is too short {} {}'.foramt(align.query, clipped_seq, len(clipped_seq)))
                     continue
 
                 if pos == 'start':
                     query_spans[align.query] = (1, len(clipped_seq))
                 else:
-                    query_spans[align.query] = (
-                        align.query_len - len(clipped_seq) + 1, align.query_len)
+                    query_spans[align.query] = (align.query_len - len(clipped_seq) + 1, align.query_len)
 
                 if transcript is None:
                     transcript = get_transcript(block_matches)
@@ -1301,27 +1121,24 @@ class SVFinder:
                             target = transcript.chrom
                         else:
                             target = align.target
-                        new_align = find_new_align(
-                            align.query, query_spans[align.query], target, match, transcript)
+                        new_align = find_new_align(align.query, query_spans[align.query], target, match, transcript)
                         if new_align is not None:
                             new_multi_aligns[align.query] = [align, new_align]
                     else:
                         align_jobs.append((align,
-                                           '%s-%s' % (align.query, pos),
+                                           '{}-{}'.format(align.query, pos),
                                            transcript.id,
                                            clipped_seq,
                                            target_seq))
                         query_target[align.query] = transcript.id
 
         if align_jobs:
-            query_fa_file = '%s/partial_query.fa' % self.working_dir
-            target_fa_file = '%s/partial_target.fa' % self.working_dir
+            query_fa_file = '{}/partial_query.fa'.format(self.working_dir)
+            target_fa_file = '{}/partial_target.fa'.format(self.working_dir)
             partial_bam = run_align(align_jobs, query_fa_file, target_fa_file)
             if partial_bam is not None:
-                original_aligns = dict(
-                    (job[0].query, job[0]) for job in align_jobs)
-                new_aligns = parse_partial_aligns(
-                    partial_bam, query_target, query_spans)
+                original_aligns = dict((job[0].query, job[0]) for job in align_jobs)
+                new_aligns = parse_partial_aligns(partial_bam, query_target, query_spans)
 
                 for query, align in new_aligns.items():
                     new_multi_aligns[query] = [original_aligns[query]]
@@ -1335,17 +1152,8 @@ class SVFinder:
 
         return new_multi_aligns
 
-    def find_indels(
-            self,
-            align,
-            query_fasta,
-            target_fasta,
-            target_type,
-            min_size=0,
-            min_dup_size=0,
-            min_flanking=0,
-            max_novel_len=0,
-            no_indels=False):
+    def find_indels(self, align, query_fasta, target_fasta, target_type,
+                    min_size=0, min_dup_size=0, min_flanking=0, max_novel_len=0, no_indels=False):
         def extract_flanking_blocks():
             flanking_blocks = []
             block_idx = -1
@@ -1362,13 +1170,8 @@ class SVFinder:
             return flanking_blocks
 
         def is_del_possibly_intron(target_breaks):
-            motif = target_fasta.fetch(
-                align.target,
-                target_breaks[0],
-                target_breaks[0] + 2) + target_fasta.fetch(
-                align.target,
-                target_breaks[1] - 3,
-                target_breaks[1] - 1)
+            motif = target_fasta.fetch(align.target, target_breaks[0], target_breaks[0] + 2) + \
+                    target_fasta.fetch(align.target, target_breaks[1] - 3, target_breaks[1] - 1)
             if motif.lower() == 'gtag' or motif.lower() == 'ctac':
                 return True
             else:
@@ -1383,17 +1186,11 @@ class SVFinder:
             target_breaks = (align.blocks[i][1], align.blocks[j][0])
             target_gap = align.blocks[j][0] - align.blocks[i][1] - 1
             if align.strand == '+':
-                query_breaks = (
-                    align.query_blocks[i][1],
-                    align.query_blocks[j][0])
-                query_gap = align.query_blocks[j][0] - \
-                    align.query_blocks[i][1] - 1
+                query_breaks = (align.query_blocks[i][1], align.query_blocks[j][0])
+                query_gap = align.query_blocks[j][0] - align.query_blocks[i][1] - 1
             else:
-                query_breaks = (
-                    align.query_blocks[j][0],
-                    align.query_blocks[i][1])
-                query_gap = align.query_blocks[i][1] - \
-                    align.query_blocks[j][0] - 1
+                query_breaks = (align.query_blocks[j][0], align.query_blocks[i][1])
+                query_gap = align.query_blocks[i][1] - align.query_blocks[j][0] - 1
 
             event_type = None
             # del
@@ -1413,28 +1210,18 @@ class SVFinder:
                     target_breaks):
                 continue
 
-            if event_type in (
-                    'ins',
-                    'del') and max(
-                    target_gap,
-                    query_gap) < min_size:
+            if event_type in ('ins', 'del') and max(target_gap, query_gap) < min_size:
                 if self.debug:
-                    print('%s: filter out %s - size too small %d' %
-                          (align.query, event_type, max(target_gap, query_gap)))
+                    print('{}: filter out {} - size too small {}'.format(align.query, event_type, max(target_gap, query_gap)))
                 continue
 
             if event_type in ('ins', 'del') and\
-               (query_breaks[0] < min_flanking or
-                    align.query_len - query_breaks[1] + 1 < min_flanking):
+               (query_breaks[0] < min_flanking or align.query_len - query_breaks[1] + 1 < min_flanking):
                 if self.debug:
-                    print(
-                        '%s: filter out %s - flanking too small %d, %d' %
-                        (align.query,
-                         event_type,
-                         query_breaks[0],
-                            align.query_len -
-                            query_breaks[1] +
-                            1))
+                    print('{}: filter out {} - flanking too small {}, {}'.format(align.query,
+                                                                                 event_type,
+                                                                                 query_breaks[0],
+                                                                                 align.query_len - query_breaks[1] + 1))
                 continue
 
             adj = Adjacency(align.query,
@@ -1446,27 +1233,16 @@ class SVFinder:
                             )
 
             if event_type == 'ins':
-                ins_seq = query_fasta.fetch(
-                    align.query, query_breaks[0], query_breaks[1] - 1)
+                ins_seq = query_fasta.fetch(align.query, query_breaks[0], query_breaks[1] - 1)
                 if align.strand == '-':
                     ins_seq = reverse_complement(ins_seq)
                 adj.ins_seq = ins_seq
-                if not self.is_repeat_number_change(adj,
-                                                    query_fasta,
-                                                    target_fasta,
-                                                    align.strand):
+                if not self.is_repeat_number_change(adj, query_fasta, target_fasta, align.strand):
                     if len(ins_seq) >= min_dup_size:
-                        self.is_duplication(adj,
-                                            query_fasta.fetch(align.query),
-                                            target_fasta,
-                                            align.strand,
-                                            max_novel_len)
+                        self.is_duplication(adj, query_fasta.fetch(align.query), target_fasta, align.strand, max_novel_len)
 
             if event_type == 'del':
-                self.is_repeat_number_change(adj,
-                                             query_fasta,
-                                             target_fasta,
-                                             align.strand)
+                self.is_repeat_number_change(adj, query_fasta, target_fasta, align.strand)
 
             if no_indels and adj.rearrangement in ('ins', 'del'):
                 continue
@@ -1475,15 +1251,7 @@ class SVFinder:
 
         return adjs
 
-    def is_duplication(
-            self,
-            adj,
-            query_seq,
-            target_fasta,
-            strand,
-            max_novel_len,
-            min_size_to_align=20,
-            min_size_for_terminal_snp=20):
+    def is_duplication(self, adj, query_seq, target_fasta, strand, max_novel_len, min_size_to_align=20, min_size_for_terminal_snp=20):
         def update_support_span(dup_is_up_in_target):
             seq_breaks = sorted(adj.seq_breaks)
             if dup_is_up_in_target:
@@ -1498,9 +1266,7 @@ class SVFinder:
                     adj.support_span = (seq_breaks[0], seq_breaks[0] + 1)
 
         query_name = adj.seq_id
-        target_name = '%s:%s-%s' % (adj.targets[0],
-                                    adj.target_breaks[0],
-                                    adj.target_breaks[1])
+        target_name = '{}:{}-{}'.format(adj.targets[0], adj.target_breaks[0], adj.target_breaks[1])
 
         novel_seq = query_seq[adj.seq_breaks[0]: adj.seq_breaks[1] - 1]
         if self.is_homopolymer(novel_seq):
@@ -1509,12 +1275,8 @@ class SVFinder:
             novel_seq = reverse_complement(novel_seq)
 
         try:
-            target_downstream_seq = target_fasta.fetch(
-                adj.targets[0],
-                adj.target_breaks[1] - 1,
-                adj.target_breaks[1] - 1 + len(novel_seq))
-            target_upstream_seq = target_fasta.fetch(
-                adj.targets[0], adj.target_breaks[0] - len(novel_seq), adj.target_breaks[0])
+            target_downstream_seq = target_fasta.fetch(adj.targets[0], adj.target_breaks[1] - 1, adj.target_breaks[1] - 1 + len(novel_seq))
+            target_upstream_seq = target_fasta.fetch(adj.targets[0], adj.target_breaks[0] - len(novel_seq), adj.target_breaks[0])
         except BaseException:
             return
 
@@ -1533,25 +1295,22 @@ class SVFinder:
                     break
 
         # no matches, try alignment, novel_seq has to be "pretty" long (>=15)
-        if not matches_downstream and not matches_upstream and len(
-                novel_seq) - max_novel_len and len(novel_seq) >= 15:
+        if not matches_downstream and not matches_upstream and len(novel_seq) - max_novel_len and len(novel_seq) >= 15:
             print('trying dup', adj.seq_id, len(novel_seq))
-            matches_downstream = search_by_align(
-                novel_seq,
-                target_downstream_seq,
-                query_name,
-                target_name,
-                self.working_dir,
-                max_clipped=max_novel_len,
-                debug=self.debug)
+            matches_downstream = search_by_align(novel_seq, 
+                                                 target_downstream_seq,
+                                                 query_name,
+                                                 target_name,
+                                                 self.working_dir,
+                                                 max_clipped=max_novel_len,
+                                                 debug=self.debug)
             if not matches_downstream:
-                matches_upstream = search_by_align(
-                    novel_seq,
-                    target_upstream_seq,
-                    query_name,
-                    target_name,
-                    self.working_dir,
-                    debug=self.debug)
+                matches_upstream = search_by_align(novel_seq,
+                                                   target_upstream_seq,
+                                                   query_name,
+                                                   target_name,
+                                                   self.working_dir,
+                                                   debug=self.debug)
 
         if matches_downstream:
             matches = matches_downstream
@@ -1571,12 +1330,7 @@ class SVFinder:
                         else:
                             adj.novel_seq = novel_seq[:novel_seq_len]
 
-                    adj.target_breaks = (
-                        adj.target_breaks[1] +
-                        len(novel_seq) -
-                        1 -
-                        novel_seq_len,
-                        adj.target_breaks[1])
+                    adj.target_breaks = (adj.target_breaks[1] + len(novel_seq) - 1 - novel_seq_len, adj.target_breaks[1])
                     adj.orients = ('L', 'R')
                     update_support_span(False)
                 else:
@@ -1584,7 +1338,7 @@ class SVFinder:
                     # than one copy
                     print('repeat_expansion?', adj.seq_id, novel_seq)
             else:
-                print('gap between dup %s %s' % (adj.seq_id, novel_seq))
+                print('gap between dup {} {}'.format(adj.seq_id, novel_seq))
 
         elif matches_upstream:
             matches = matches_upstream
@@ -1603,12 +1357,7 @@ class SVFinder:
                         else:
                             adj.novel_seq = novel_seq[:novel_seq_len]
 
-                    adj.target_breaks = (
-                        adj.target_breaks[0],
-                        adj.target_breaks[0] -
-                        len(novel_seq) +
-                        1 -
-                        novel_seq_len)
+                    adj.target_breaks = (adj.target_breaks[0], adj.target_breaks[0] - len(novel_seq) + 1 - novel_seq_len)
                     adj.orients = ('L', 'R')
                     update_support_span(True)
                 else:
@@ -1616,7 +1365,7 @@ class SVFinder:
                     # than one copy
                     print('repeat_expansion?', adj.seq_id, novel_seq)
             else:
-                print('gap between dup %s %s' % (adj.seq_id, novel_seq))
+                print('gap between dup {} {}'.format(adj.seq_id, novel_seq))
 
     def adjust_for_amino_acid_repeat(self, adj):
         def get_aa_repeat(aa, nt, start=False, end=False):
@@ -1660,16 +1409,7 @@ class SVFinder:
             adj.repeat_seq = repeat_seq.upper()
             adj.copy_num_change = copy_num_change
 
-        def construct_seq(
-                chrom,
-                span,
-                break_start,
-                break_end=None,
-                repeat_size=3,
-                add=False,
-                minus=False,
-                repeat_seq=None,
-                flank=50):
+        def construct_seq(chrom, span, break_start, break_end=None, repeat_size=3, add=False, minus=False, repeat_seq=None, flank=50):
             """start = begining coord of repeat, end = end coord
 
             In some cases an event may come from a genomic contig and lie close to an exon boundary,
@@ -1679,20 +1419,15 @@ class SVFinder:
             """
             if add and repeat_seq is not None:
                 try:
-                    return self.genome_fasta.fetch(
-                        chrom,
-                        span[0] - flank - 1,
-                        break_start).lower() + repeat_seq.upper() + self.genome_fasta.fetch(
-                        chrom,
-                        break_start,
-                        span[1] + flank).lower()
+                    return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start).lower() +\
+                           repeat_seq.upper() +\
+                           self.genome_fasta.fetch(chrom, break_start, span[1] + flank).lower()
                 except BaseException:
                     return None
             elif minus and break_end is not None:
                 try:
-                    return self.genome_fasta.fetch(
-                        chrom, span[0] - flank - 1, break_start - 1).upper() + self.genome_fasta.fetch(
-                        chrom, break_end, span[1] + flank).lower()
+                    return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start - 1).upper() +\
+                           self.genome_fasta.fetch(chrom, break_end, span[1] + flank).lower()
                 except BaseException:
                     return None
 
@@ -1703,24 +1438,18 @@ class SVFinder:
                     after = aa[pos]
 
             aa = adj.transcripts[0].translate(self.genome_fasta)
-            cds = adj.transcripts[0].get_sequence(
-                self.genome_fasta, cds_only=True)
+            cds = adj.transcripts[0].get_sequence(self.genome_fasta, cds_only=True)
 
-            mid_genome_break = (
-                (adj.genome_breaks[0] + 1) + (adj.genome_breaks[1] - 1)) / 2
-            cds_pos = adj.transcripts[0].genome_coord_to_txt_coord(
-                mid_genome_break, cds=True)
+            mid_genome_break = ((adj.genome_breaks[0] + 1) + (adj.genome_breaks[1] - 1)) / 2
+            cds_pos = adj.transcripts[0].genome_coord_to_txt_coord(mid_genome_break, cds=True)
             repeat_spans = []
             if cds_pos is not None:
                 aa_pos = adj.transcripts[0].txt_coord_to_aa_coord(cds_pos)
                 if adj.genome_breaks[1] - adj.genome_breaks[0] < 4:
                     aa_pos -= 1
-                cds_pos_converted = adj.transcripts[0].aa_coord_to_txt_coord(aa_pos)[
-                    1]
-                repeat_down, repeat_down_nt = get_aa_repeat(
-                    aa[aa_pos:], cds[cds_pos_converted:], start=True)
-                repeat_up, repeat_up_nt = get_aa_repeat(
-                    aa[:aa_pos], cds[:cds_pos_converted], end=True)
+                cds_pos_converted = adj.transcripts[0].aa_coord_to_txt_coord(aa_pos)[1]
+                repeat_down, repeat_down_nt = get_aa_repeat(aa[aa_pos:], cds[cds_pos_converted:], start=True)
+                repeat_up, repeat_up_nt = get_aa_repeat(aa[:aa_pos], cds[:cds_pos_converted], end=True)
 
                 # identify amino acid repeat start and end
                 repeat_start = None
@@ -1735,8 +1464,7 @@ class SVFinder:
 
                         else:
                             if len(repeat_down) > 1:
-                                repeat_end = aa_pos + 1 + \
-                                    (len(repeat_down) - 1)
+                                repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
                                 repeat_start = aa_pos + 1
                                 repeat_spans.append((repeat_start, repeat_end))
 
@@ -1760,19 +1488,14 @@ class SVFinder:
             return []
 
         def shift_coord(repeat_start, repeat_end):
-            repeat_track_genome = (
-                adj.transcripts[0].aa_coord_to_genome_coord(repeat_start),
-                adj.transcripts[0].aa_coord_to_genome_coord(repeat_end))
+            repeat_track_genome = (adj.transcripts[0].aa_coord_to_genome_coord(repeat_start), adj.transcripts[0].aa_coord_to_genome_coord(repeat_end))
             repeat_track_sorted = sorted([repeat_track_genome[0][0],
                                           repeat_track_genome[0][1],
                                           repeat_track_genome[1][0],
                                           repeat_track_genome[1][1]])
             repeat_start, repeat_end = repeat_track_sorted[0], repeat_track_sorted[-1]
             repeat_start_genome_sorted = sorted(repeat_track_genome[0])
-            repeat_seq = self.genome_fasta.fetch(
-                adj.chroms[0],
-                repeat_start_genome_sorted[0] - 1,
-                repeat_start_genome_sorted[1])
+            repeat_seq = self.genome_fasta.fetch(adj.chroms[0], repeat_start_genome_sorted[0] - 1, repeat_start_genome_sorted[1])
             copy_num_ref = int((repeat_end - repeat_start + 1) / len(repeat_seq))
             copy_num_change = int(adj.size / len(repeat_seq))
             if adj.event == 'repeat_expansion':
@@ -1785,24 +1508,17 @@ class SVFinder:
                     break_start = repeat_end
                 else:
                     break_start = repeat_start - 1
-                new_seq = construct_seq(
-                    adj.chroms[0],
-                    (repeat_start,
-                     repeat_end),
-                    break_start=break_start,
-                    repeat_seq=repeat_seq * int(copy_num_change),
-                    add=True)
+                new_seq = construct_seq(adj.chroms[0],
+                                        (repeat_start, repeat_end),
+                                        break_start=break_start,
+                                        repeat_seq=repeat_seq * int(copy_num_change),
+                                        add=True)
                 if old_seq is not None and new_seq is not None and old_seq.lower() == new_seq.lower():
-                    return (
-                        repeat_start,
-                        repeat_end,
-                        repeat_seq,
-                        (break_start,
-                         break_start +
-                         1),
-                        (copy_num_ref,
-                         copy_num_ref +
-                         copy_num_change))
+                    return (repeat_start,
+                            repeat_end,
+                            repeat_seq,
+                            (break_start, break_start + 1),
+                            (copy_num_ref, copy_num_ref + copy_num_change))
 
             elif adj.event == 'repeat_contraction':
                 old_seq = construct_seq(adj.chroms[0],
@@ -1822,15 +1538,11 @@ class SVFinder:
                                         break_end=break_end,
                                         minus=True)
                 if old_seq is not None and new_seq is not None and old_seq.lower() == new_seq.lower():
-                    return (
-                        repeat_start,
-                        repeat_end,
-                        repeat_seq,
-                        (break_start,
-                         break_end),
-                        (copy_num_ref,
-                         copy_num_ref -
-                         copy_num_change))
+                    return (repeat_start,
+                            repeat_end,
+                            repeat_seq,
+                            (break_start, break_end),
+                            (copy_num_ref, copy_num_ref - copy_num_change))
             return None
 
         aa_repeat_spans = identify_aa_repeat()
@@ -1841,17 +1553,10 @@ class SVFinder:
                 if adj.event == 'repeat_expansion':
                     update_adj(breaks, repeat_seq, copy_num_change)
                 elif adj.event == 'repeat_contraction':
-                    update_adj((breaks[0] - 1, breaks[1] + 1),
-                               repeat_seq, copy_num_change)
+                    update_adj((breaks[0] - 1, breaks[1] + 1), repeat_seq, copy_num_change)
                 break
 
-    def is_repeat_number_change(
-            self,
-            adj,
-            query_fasta,
-            target_fasta,
-            strand,
-            max_size=30):
+    def is_repeat_number_change(self, adj, query_fasta, target_fasta, strand, max_size=30):
         def chop_seq(seq, size):
             """chop seq into equal size sub-strings"""
             return map(''.join, zip(*[iter(seq)] * size))
@@ -1901,23 +1606,17 @@ class SVFinder:
         elif adj.rearrangement == 'del':
             target_breaks_sorted = sorted(adj.target_breaks)
             # don't need to reverse-complement because target sequence is used
-            changed_seq = target_fasta.fetch(
-                adj.targets[0],
-                target_breaks_sorted[0],
-                target_breaks_sorted[1] - 1)
+            changed_seq = target_fasta.fetch(adj.targets[0], target_breaks_sorted[0], target_breaks_sorted[1] - 1)
 
-        if len(changed_seq) <= max_size and (
-                len(changed_seq) %
-                2 == 0 or len(changed_seq) %
-                3 == 0) and not self.is_homopolymer(changed_seq):
+        if len(changed_seq) <= max_size and\
+           (len(changed_seq) % 2 == 0 or len(changed_seq) % 3 == 0) and\
+           not self.is_homopolymer(changed_seq):
             repeat = find_repeat(changed_seq)
             if repeat is not None:
                 changed_copy_num = len(changed_seq) / len(repeat)
                 target_breaks_sorted = sorted(adj.target_breaks)
-                copy_num_upstream = get_copy_num(
-                    adj.targets[0], target_breaks_sorted[0], repeat, '-')
-                copy_num_downstream = get_copy_num(
-                    adj.targets[0], target_breaks_sorted[1], repeat, '+')
+                copy_num_upstream = get_copy_num(adj.targets[0], target_breaks_sorted[0], repeat, '-')
+                copy_num_downstream = get_copy_num(adj.targets[0], target_breaks_sorted[1], repeat, '+')
 
                 if copy_num_upstream > 0 or copy_num_downstream > 0:
                     original_copy_num = copy_num_upstream + copy_num_downstream
@@ -1941,13 +1640,11 @@ class SVFinder:
                     if strand == '+':
                         adj.support_span = (max(1,
                                                 seq_breaks_sorted[0] - expansion_upstream),
-                                            min(len(query_fasta.fetch(adj.seq_id)),
-                                                seq_breaks_sorted[1] + expansion_downstream))
+                                                min(len(query_fasta.fetch(adj.seq_id)), seq_breaks_sorted[1] + expansion_downstream))
                     else:
                         adj.support_span = (max(1,
                                                 seq_breaks_sorted[0] - expansion_downstream),
-                                            min(len(query_fasta.fetch(adj.seq_id)),
-                                                seq_breaks_sorted[1] + expansion_upstream))
+                                                min(len(query_fasta.fetch(adj.seq_id)), seq_breaks_sorted[1] + expansion_upstream))
 
                     return True
 
@@ -2042,22 +1739,19 @@ class SVFinder:
             return
 
         # find interval between genes
-        interval = adj.transcripts[0].exons[-1][1] + \
-            1, adj.transcripts[1].exons[0][0] - 1
+        interval = adj.transcripts[0].exons[-1][1] + 1, adj.transcripts[1].exons[0][0] - 1
         if adj.transcripts[0].strand == '+':
             if adj.transcripts[0].exons[0][0] < adj.transcripts[1].exons[0][0]:
                 transcripts = adj.transcripts
             else:
                 transcripts = adj.transcripts[::-1]
-            interval = transcripts[0].exons[-1][1] + \
-                1, transcripts[1].exons[0][0] - 1
+            interval = transcripts[0].exons[-1][1] + 1, transcripts[1].exons[0][0] - 1
         if adj.transcripts[0].strand == '-':
             if adj.transcripts[0].exons[-1][1] > adj.transcripts[1].exons[-1][1]:
                 transcripts = adj.transcripts
             else:
                 transcripts = adj.transcripts[::-1]
-            interval = transcripts[1].exons[-1][1] + \
-                1, transcripts[0].exons[0][0] - 1
+            interval = transcripts[1].exons[-1][1] + 1, transcripts[0].exons[0][0] - 1
 
         # if gene1 and gene2 overlaps
         if not interval[0] < interval[1]:
@@ -2067,8 +1761,7 @@ class SVFinder:
         else:
             genes_in_between = set()
             gene_previous = None
-            for feature in self.annot.fetch(
-                    adj.chroms[0], interval[0], interval[1]):
+            for feature in self.annot.fetch(adj.chroms[0], interval[0], interval[1]):
                 if 'exon' not in str(feature):
                     continue
 
@@ -2134,9 +1827,9 @@ class SVFinder:
 
                     if i + 1 not in downstream_matches:
                         downstream_matches[i + 1] = []
-                    downstream_matches[i +
-                                       1].append((tid, matches[i +
-                                                               1][0][0], len([m for m in matches if m is not None])))
+                    downstream_matches[i + 1].append((tid,
+                                                      matches[i + 1][0][0],
+                                                      len([m for m in matches if m is not None])))
                     downstream_genes.add(self.transcripts_dict[tid].gene)
 
                 elif matches[i + 1] is None and\
@@ -2145,38 +1838,28 @@ class SVFinder:
                         check_matches(matches, i + 1, after=True):
                     if i not in upstream_matches:
                         upstream_matches[i] = []
-                    upstream_matches[i].append(
-                        (tid, matches[i][-1][0], len([m for m in matches if m is not None])))
+                    upstream_matches[i].append((tid, matches[i][-1][0], len([m for m in matches if m is not None])))
                     upstream_genes.add(self.transcripts_dict[tid].gene)
 
-        if upstream_matches and downstream_matches and upstream_genes and downstream_genes and not (
-                upstream_genes & downstream_genes):
+        if upstream_matches and downstream_matches and upstream_genes and downstream_genes and not (upstream_genes & downstream_genes):
             upstream_block_idx = list(upstream_matches.keys())[0]
             downstream_block_idx = list(downstream_matches.keys())[0]
 
             # allows novel exon in the junction
             if downstream_block_idx > upstream_block_idx:
-                upstream_matches_sorted = sorted(
-                    upstream_matches[upstream_block_idx], key=itemgetter(2), reverse=True)
-                downstream_matches_sorted = sorted(
-                    downstream_matches[downstream_block_idx], key=itemgetter(2), reverse=True)
+                upstream_matches_sorted = sorted(upstream_matches[upstream_block_idx], key=itemgetter(2), reverse=True)
+                downstream_matches_sorted = sorted(downstream_matches[downstream_block_idx], key=itemgetter(2), reverse=True)
                 upstream_transcript = self.transcripts_dict[upstream_matches_sorted[0][0]]
                 downstream_transcript = self.transcripts_dict[downstream_matches_sorted[0][0]]
 
                 upstream_gene = upstream_transcript.gene
                 downstream_gene = downstream_transcript.gene
 
-                upstream_exon = upstream_transcript.exon_num(
-                    upstream_matches_sorted[0][1])
-                downstream_exon = downstream_transcript.exon_num(
-                    downstream_matches_sorted[0][1])
+                upstream_exon = upstream_transcript.exon_num(upstream_matches_sorted[0][1])
+                downstream_exon = downstream_transcript.exon_num(downstream_matches_sorted[0][1])
                 exons = [upstream_exon, downstream_exon]
-                seq_breaks = [
-                    align.query_blocks[upstream_block_idx][1],
-                    align.query_blocks[downstream_block_idx][0]]
-                target_breaks = [
-                    align.blocks[upstream_block_idx][1],
-                    align.blocks[downstream_block_idx][0]]
+                seq_breaks = [align.query_blocks[upstream_block_idx][1], align.query_blocks[downstream_block_idx][0]]
+                target_breaks = [align.blocks[upstream_block_idx][1], align.blocks[downstream_block_idx][0]]
                 orients = ['L', 'R']
 
                 adj = Adjacency(align.query,
@@ -2184,7 +1867,6 @@ class SVFinder:
                                 seq_breaks,
                                 target_breaks,
                                 event='read_through',
-                                #transcripts = transcripts,
                                 exons=exons,
                                 exon_bounds=(True, True),
                                 chroms=(align.target, align.target),
@@ -2193,9 +1875,10 @@ class SVFinder:
                                 sense_fusion=True,
                                 )
 
-                adj.transcripts = self.map_transcripts_to_adj(
-                    adj, (align, align), block_matches=block_matches, genes=(
-                        upstream_gene, downstream_gene))
+                adj.transcripts = self.map_transcripts_to_adj(adj,
+                                                              (align, align),
+                                                              block_matches=block_matches, 
+                                                              genes=(upstream_gene, downstream_gene))
                 if adj.transcripts[0].strand == '+':
                     adj.upstream_transcript = adj.transcripts[0]
                     adj.downstream_transcript = adj.transcripts[1]
@@ -2205,8 +1888,7 @@ class SVFinder:
                     adj.upstream_transcript = adj.transcripts[1]
                     adj.downstream_transcript = adj.transcripts[0]
                     adj.exons_oriented = tuple(reversed(list(adj.exons)))
-                    adj.exon_bounds_oriented = tuple(
-                        reversed(list(adj.exon_bounds)))
+                    adj.exon_bounds_oriented = tuple(reversed(list(adj.exon_bounds)))
                 adj.update_transcript_breaks()
 
                 return adj
@@ -2221,15 +1903,12 @@ class SVFinder:
 
             seq_id = adj.seq_id.split(',')[0]
             query_seq = query_fasta.fetch(seq_id)
-            seq_breaks = sorted(
-                map(int, adj.seq_breaks.split(',')[0].split('-')))
+            seq_breaks = sorted(map(int, adj.seq_breaks.split(',')[0].split('-')))
             genome_breaks = sorted(map(int, list(adj.genome_breaks)))
 
             transcripts = adj.transcripts
             if adj.upstream_transcript and adj.downstream_transcript:
-                transcripts = (
-                    adj.upstream_transcript,
-                    adj.downstream_transcript)
+                transcripts = (adj.upstream_transcript, adj.downstream_transcript)
 
             if transcripts:
                 in_frame = check_frame(query_seq,
