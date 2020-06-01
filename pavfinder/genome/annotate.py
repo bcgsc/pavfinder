@@ -30,7 +30,7 @@ def get_acen_coords(cytobands_file):
                         acen_coords[chrom] = [(start, end)]
 
     except BaseException:
-        sys.stderr.write("can't open cytobands file:%s\n" % cytobands_file)
+        sys.stderr.write("can't open cytobands file:{}\n".format(cytobands_file))
 
     return acen_coords
 
@@ -59,8 +59,7 @@ def update_features(variant, features):
 
 
 def annotate_rna_event(variant):
-    if variant.genes[0] != 'NA' and\
-       variant.genes[1] != 'NA':
+    if variant.genes[0] != 'NA' and variant.genes[1] != 'NA':
         if variant.genes[0] != variant.genes[1]:
             variant.rna_event = 'gene_fusion'
         elif variant.exons[0] != 'NA' and variant.exons[0] == variant.exons[1] and variant.rearrangement == 'dup':
@@ -69,8 +68,6 @@ def annotate_rna_event(variant):
                 variant.exon_bounds[0] and variant.exon_bounds[1] and\
                 (variant.rearrangement == 'dup' or variant.rearrangement == 'trp'):
             variant.rna_event = 'PTD'
-        # else:
-            #variant.rna_event = 'chimera'
 
 
 def annotate_gene_fusion(variant):
@@ -160,10 +157,8 @@ def pick_feature(break_pt, orient, features):
         for feature in exons:
             feature.attrs['exon_bound'] = 'False'
 
-        exon_bounds = [exon for exon in exons if
-                       (break_pt[1] == exon.start + 1 and orient == 'R')
-                       or
-                       (break_pt[1] == exon.end and orient == 'L')]
+        exon_bounds = [exon for exon in exons if (break_pt[1] == exon.start + 1 and orient == 'R') or
+                                                 (break_pt[1] == exon.end and orient == 'L')]
 
         if exon_bounds:
             for feature in exon_bounds:
@@ -181,13 +176,8 @@ def pick_feature(break_pt, orient, features):
             best_features = exons
 
         if len(best_features) > 1:
-            by_transcript_id = sorted(
-                best_features, key=lambda feature: feature['transcript_id'])
-            by_exon_num = sorted(
-                by_transcript_id,
-                key=lambda feature: int(
-                    feature['exon_number']),
-                reverse=True)
+            by_transcript_id = sorted(best_features, key=lambda feature: feature['transcript_id'])
+            by_exon_num = sorted(by_transcript_id, key=lambda feature: int(feature['exon_number']), reverse=True)
             return by_exon_num[0]
 
         elif len(best_features) == 1:
@@ -206,11 +196,8 @@ def pick_feature(break_pt, orient, features):
                 best_features = introns
 
         if len(best_features) > 1:
-            by_transcript_id = sorted(
-                best_features, key=lambda feature: feature['transcript_id'])
-            by_intron_num = sorted(
-                by_transcript_id, key=lambda feature: int(
-                    feature['intron_number']), reverse=True)
+            by_transcript_id = sorted(best_features, key=lambda feature: feature['transcript_id'])
+            by_intron_num = sorted(by_transcript_id, key=lambda feature: int(feature['intron_number']), reverse=True)
             return by_intron_num[0]
 
         elif len(best_features) == 1:
@@ -235,15 +222,15 @@ def locate_features(breaks, orients, features):
         can be (None, None) if nothing is found)
     """
     # use intspan to intersect individual breakpoint with feature coodinates
-    break1_span = intspan('%s-%s' % (breaks[0][1], breaks[0][1]))
-    break2_span = intspan('%s-%s' % (breaks[1][1], breaks[1][1]))
+    break1_span = intspan('{}-{}'.format(breaks[0][1], breaks[0][1]))
+    break2_span = intspan('{}-{}'.format(breaks[1][1], breaks[1][1]))
 
     # categories features where 1, 2, or both breakpoints overlap
     # use Set because there may be redundancy
     overlaps = {'both': set(), '1': set(), '2': set()}
 
     for feature in features:
-        feature_span = intspan('%s-%s' % (feature.start + 1, feature.stop))
+        feature_span = intspan('{}-{}'.format(feature.start + 1, feature.stop))
 
         overlap1 = True if feature.chrom == breaks[0][0] and feature_span & break1_span else False
         overlap2 = True if feature.chrom == breaks[1][0] and feature_span & break2_span else False
@@ -344,8 +331,7 @@ def parse_overlaps(bed_file, variant_keys=None):
 
             result = None, None
             if features:
-                result = locate_features(
-                    (break1, break2), (orient1, orient2), features)
+                result = locate_features((break1, break2), (orient1, orient2), features)
 
             results.append((variant_key, result))
     f.close()
@@ -400,12 +386,7 @@ def parallel_parse_overlaps(bed_file, variant_keys, num_procs):
         A dictionary of results with the variant key as the key
         and a tuple of Interval objects as the value
     """
-    batches = list(
-        create_batches(
-            bed_file,
-            variant_keys,
-            len(variant_keys) /
-            num_procs))
+    batches = list(create_batches(bed_file, variant_keys, len(variant_keys) / num_procs))
     pool = mp.Pool(processes=num_procs)
     batch_results = pool.map(worker, batches)
     pool.close()

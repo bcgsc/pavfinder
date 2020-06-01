@@ -7,14 +7,7 @@ from .adjacency import Adjacency
 from .alignment import compare_chr, Alignment, target_non_canonical
 
 
-def find_chimera(
-        alns,
-        bam,
-        min_coverage=0.95,
-        check_alt_paths=False,
-        max_splits=3,
-        check_haplotype=True,
-        debug=False):
+def find_chimera(alns, bam, min_coverage=0.95, check_alt_paths=False, max_splits=3, check_haplotype=True, debug=False):
     """Finds primary_aligns alignments corresponding to chimera
 
     Args:
@@ -33,11 +26,9 @@ def find_chimera(
             primary_edit_distance = 0
             secondary_edit_distance = 0
             for align in primary_chimera:
-                primary_edit_distance += bwa_mem.effective_edit_distance(
-                    align.sam)
+                primary_edit_distance += bwa_mem.effective_edit_distance(align.sam)
             for align in secondary_chimera:
-                secondary_edit_distance += bwa_mem.effective_edit_distance(
-                    align.sam)
+                secondary_edit_distance += bwa_mem.effective_edit_distance(align.sam)
             if secondary_edit_distance <= primary_edit_distance:
                 return True
             else:
@@ -55,50 +46,39 @@ def find_chimera(
     def _replace_trl(primary_aligns, secondary_aligns, max_span=1000000):
         alt_paths = []
         for primary_align in primary_aligns:
-            aligns = [align for align in secondary_aligns if align.target ==
-                      primary_align.target] + [primary_align]
+            aligns = [align for align in secondary_aligns if align.target == primary_align.target] + [primary_align]
             alt_paths = [path for path in find_paths(aligns, min_coverage=min_coverage, max_ends=50, get_all=True, debug=debug)
                          if len(path) == 2 and abs(aligns[path[0]].tstart - aligns[path[1]].tstart) < max_span]
 
             if alt_paths:
-                alt_paths.sort(key=lambda path: abs(
-                    aligns[path[0]].tstart - aligns[path[1]].tstart))
+                alt_paths.sort(key=lambda path: abs(aligns[path[0]].tstart - aligns[path[1]].tstart))
                 return [aligns[i] for i in alt_paths[0]]
 
         return None
 
-    primary_aligns, secondary_aligns = bwa_mem.find_chimera(
-        alns, bam, check_haplotype=check_haplotype, debug=debug)
-    # primary_aligns, secondary_aligns = {
-    # 'bwa_mem': bwa_mem.find_chimera,
-    # }[aligner](alns, bam, check_haplotype=check_haplotype, debug=debug)
+    primary_aligns, secondary_aligns = bwa_mem.find_chimera(alns, bam, check_haplotype=check_haplotype, debug=debug)
 
     if primary_aligns:
         if len(primary_aligns) > max_splits:
             if debug:
-                sys.stdout.write(
-                    '%s number of primary split alignments(%d) exceeds maximum:%d\n' %
-                    (primary_aligns[0].query, len(primary_aligns), max_splits))
+                sys.stdout.write('{} number of primary split alignments({}) exceeds maximum:{}\n'.format(primary_aligns[0].query,
+                                                                                                         len(primary_aligns),
+                                                                                                         max_splits))
             return None, None
 
-        primary_paths = find_paths(
-            primary_aligns,
-            min_coverage=min_coverage,
-            debug=debug)
+        primary_paths = find_paths(primary_aligns, min_coverage=min_coverage, debug=debug)
 
         if primary_paths:
             if secondary_aligns:
                 align = _has_end_to_end_secondary_align(secondary_aligns)
                 if align:
                     if debug:
-                        sys.stdout.write(
-                            'filter out chimera %s(%sbp) because of end-to-end secondary alignment %s:%s-%s %s\n' %
-                            (align.query,
-                             align.query_len,
-                             align.target,
-                             align.tstart,
-                             align.tend,
-                             align.sam.cigarstring))
+                        sys.stdout.write('filter out chimera {} ({}bp) because of end-to-end secondary alignment {}:{}-{} {}\n'.format(align.query,
+                                                                                                                                       align.query_len,
+                                                                                                                                       align.target,
+                                                                                                                                       align.tstart,
+                                                                                                                                       align.tend,
+                                                                                                                                       align.sam.cigarstring))
                     return None, None
 
             primary_chimera = [primary_aligns[i] for i in primary_paths]
@@ -112,26 +92,22 @@ def find_chimera(
                     primary_aligns, secondary_aligns)
                 if replaced_chimera:
                     if debug:
-                        sys.stdout.write(
-                            'replaced %s trl %s:%s-%s %s:%s-%s with %s:%s-%s %s:%s-%s\n' %
-                            (alns[0].qname,
-                             primary_chimera[0].target,
-                                primary_chimera[0].tstart,
-                                primary_chimera[0].tend,
-                                primary_chimera[1].target,
-                                primary_chimera[1].tstart,
-                                primary_chimera[1].tend,
-                                replaced_chimera[0].target,
-                                replaced_chimera[0].tstart,
-                                replaced_chimera[0].tend,
-                                replaced_chimera[1].target,
-                                replaced_chimera[1].tstart,
-                                replaced_chimera[1].tend,
-                             ))
+                        sys.stdout.write('replaced {} trl {}:{}-{} {}:{}-{} with {}:{}-{} {}:{}-{}\n'.format(alns[0].qname,
+                                                                                                             primary_chimera[0].target,
+                                                                                                             primary_chimera[0].tstart,
+                                                                                                             primary_chimera[0].tend,
+                                                                                                             primary_chimera[1].target,
+                                                                                                             primary_chimera[1].tstart,
+                                                                                                             primary_chimera[1].tend,
+                                                                                                             replaced_chimera[0].target,
+                                                                                                             replaced_chimera[0].tstart,
+                                                                                                             replaced_chimera[0].tend,
+                                                                                                             replaced_chimera[1].target,
+                                                                                                             replaced_chimera[1].tstart,
+                                                                                                             replaced_chimera[1].tend,))
                     primary_replaced = True
                     primary_chimera = replaced_chimera
-                    primary_chroms = set(
-                        [align.target for align in primary_chimera])
+                    primary_chroms = set([align.target for align in primary_chimera])
 
             if debug:
                 for align in primary_chimera:
@@ -143,18 +119,14 @@ def find_chimera(
                                                      align.tend,
                                                      align.sam.cigarstring,
                                                      align.strand]))
-                    sys.stdout.write('%s\n' % output_line)
+                    sys.stdout.write('{}\n'.format(output_line))
 
             # remove alignments to non-canonical chromosomes
             for align in secondary_aligns[:]:
                 if target_non_canonical(align.target):
                     secondary_aligns.remove(align)
 
-            secondary_paths = find_paths(
-                secondary_aligns,
-                min_coverage=min_coverage,
-                get_all=True,
-                debug=debug)
+            secondary_paths = find_paths(secondary_aligns, min_coverage=min_coverage, get_all=True, debug=debug)
 
             # alternative chimera combining primary and secondary aligns: won't
             # work for 3 ways
@@ -167,18 +139,15 @@ def find_chimera(
                         if j != i:
                             aligns.append(primary_chimera[j])
                     aligns.extend(secondary_aligns)
-                    alt_paths_candidates = find_paths(
-                        aligns, min_coverage=min_coverage, get_all=True, no_trim=[0], debug=debug)
+                    alt_paths_candidates = find_paths(aligns, min_coverage=min_coverage, get_all=True, no_trim=[0], debug=debug)
 
                     if alt_paths_candidates:
                         if debug:
-                            sys.stdout.write(
-                                '%s primary alignment %s:%s-%s is dubious, can be replaced by %d secondary alignments\n' %
-                                (primary_chimera[i].query,
-                                 primary_chimera[i].target,
-                                    primary_chimera[i].tstart,
-                                    primary_chimera[i].tend,
-                                    len(alt_paths_candidates)))
+                            sys.stdout.write('{} primary alignment {}:{}-{} is dubious, can be replaced by {} secondary alignments\n'.format(primary_chimera[i].query,
+                                                                                                                                             primary_chimera[i].target,
+                                                                                                                                             primary_chimera[i].tstart,
+                                                                                                                                             primary_chimera[i].tend,
+                                                                                                                                             len(alt_paths_candidates)))
                         dubious.add(i)
 
             # use secondary alignments to filter primary split alignments
@@ -189,9 +158,7 @@ def find_chimera(
                     if _is_secondary_chimera_better(
                             primary_chimera, secondary_chimera):
                         if debug:
-                            sys.stdout.write(
-                                'Filter out %s as alternative chimera can be formed in seconday alignments\n' %
-                                alns[0].qname)
+                            sys.stdout.write('Filter out {} as alternative chimera can be formed in seconday alignments\n'.format(alns[0].qname))
                         passed = False
                         break
 
@@ -204,12 +171,7 @@ def find_chimera(
     return None, None
 
 
-def screen_subseq_alns(
-        adj_aligns,
-        subseq_alns,
-        realign_bam,
-        name_sep,
-        debug=False):
+def screen_subseq_alns(adj_aligns, subseq_alns, realign_bam, name_sep, debug=False):
     """Screens subsequence alignments against original primary_aligns alignments to weed out false-positives
 
     Args:
@@ -229,20 +191,14 @@ def screen_subseq_alns(
         for aln in subseq_alns:
             # check this, otherwise getrname() will fail
             # if alignment target is not canonical
-            if aln.is_unmapped or re.search(
-                    '[-_.]', realign_bam.getrname(aln.tid)):
+            if aln.is_unmapped or re.search('[-_.]', realign_bam.getrname(aln.tid)):
                 continue
 
             idx = int(aln.qname.split(name_sep)[-1])
 
             # if end-to-end match
-            if re.match(
-                    r'\d+.*M$',
-                    aln.cigarstring) and not re.search(
-                    '[SH]',
-                    aln.cigarstring):
-                if realign_bam.getrname(
-                        aln.tid) == adj_aligns[idx].target and aln.pos + 1 == adj_aligns[idx].tstart:
+            if re.match(r'\d+.*M$', aln.cigarstring) and not re.search('[SH]', aln.cigarstring):
+                if realign_bam.getrname(aln.tid) == adj_aligns[idx].target and aln.pos + 1 == adj_aligns[idx].tstart:
                     matched[idx] = aln
                 else:
                     try:
@@ -254,47 +210,32 @@ def screen_subseq_alns(
             if matched[i] is not None:
                 if alt_alns[i]:
                     for alt_aln in alt_alns[i]:
-                        if int(alt_aln.opt('NM')) - \
-                                int(matched[i].opt('NM')) <= ambiguous_NM:
+                        if int(alt_aln.opt('NM')) - int(matched[i].opt('NM')) <= ambiguous_NM:
                             if debug:
-                                sys.stdout.write(
-                                    'ambigous subseq aln: %s %s %s %s NM:%s\n' %
-                                    (alt_aln.qname,
-                                     realign_bam.getrname(
-                                         alt_aln.tid),
-                                        alt_aln.pos,
-                                        alt_aln.cigarstring,
-                                        alt_aln.opt('NM')))
+                                sys.stdout.write('ambigous subseq aln: {} {} {} {} NM:{}\n'.format(alt_aln.qname,
+                                                                                                   realign_bam.getrname(alt_aln.tid),
+                                                                                                   alt_aln.pos,
+                                                                                                   alt_aln.cigarstring,
+                                                                                                   alt_aln.opt('NM')))
                             passed[i] = False
                             break
 
             else:
                 if debug:
-                    sys.stdout.write(
-                        'Failed to map subseq end-to-end %s:%s-%d %s:%s-%s\n' %
-                        (adj_aligns[i].query,
-                         adj_aligns[i].qstart,
-                            adj_aligns[i].qend,
-                            adj_aligns[i].target,
-                            adj_aligns[i].tstart,
-                            adj_aligns[i].tend))
+                    sys.stdout.write('Failed to map subseq end-to-end {}:{}-{} {}:{}-{}\n'.format(adj_aligns[i].query,
+                                                                                                  adj_aligns[i].qstart,
+                                                                                                  adj_aligns[i].qend,
+                                                                                                  adj_aligns[i].target,
+                                                                                                  adj_aligns[i].tstart,
+                                                                                                  adj_aligns[i].tend))
                 passed[i] = False
 
     return passed
 
 
-def find_paths(
-        aligns,
-        min_coverage=None,
-        use_end_to_end=True,
-        get_all=False,
-        max_nodes=500,
-        max_paths=5,
-        max_ends=50,
-        no_trim=[],
-        same_target=None,
-        from_edge=0.02,
-        debug=False):
+def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False,
+               max_nodes=500, max_paths=5, max_ends=50,
+               no_trim=[], same_target=None, from_edge=0.02, debug=False):
     def _find_end_points():
         starts = []
         ends = []
@@ -328,8 +269,7 @@ def find_paths(
             if i in no_trim:
                 continue
 
-            key = '%s-%s:%s' % (aligns[i].qstart,
-                                aligns[i].qend, aligns[i].strand)
+            key = '{}-{}:{}'.format(aligns[i].qstart, aligns[i].qend, aligns[i].strand)
             try:
                 regions[key].append(i)
             except BaseException:
@@ -409,10 +349,7 @@ def find_paths(
         return paths
 
     def _coverage(path):
-        spans = [
-            intspan(
-                '%d-%d' %
-                (aligns[i].qstart, aligns[i].qend)) for i in path]
+        spans = [intspan('{}-{}'.format(aligns[i].qstart, aligns[i].qend)) for i in path]
         covered = spans[0]
         overlaps = []
         for i in range(1, len(spans)):
@@ -430,8 +367,7 @@ def find_paths(
             if not use_end_to_end:
                 coverage = len(covered) / float(aligns[0].query_len)
             else:
-                coverage = (max(covered) - min(covered) + 1) / \
-                    float(aligns[0].query_len)
+                coverage = (max(covered) - min(covered) + 1) / float(aligns[0].query_len)
 
             if coverage < min_coverage:
                 passed = False
@@ -445,8 +381,7 @@ def find_paths(
             if not path_info[i]['overlaps']:
                 overlapped = 0
             else:
-                overlapped = sum([len(olap)
-                                  for olap in path_info[i]['overlaps']])
+                overlapped = sum([len(olap) for olap in path_info[i]['overlaps']])
 
             if best['index'] is None or\
                covered > best['covered'] or\
@@ -475,10 +410,9 @@ def find_paths(
 
     if len(graph.keys()) > max_nodes:
         if debug:
-            sys.stdout.write(
-                '%s: too many nodes(%d) to construct path(max:%d)\n' %
-                (aligns[0].query, len(
-                    graph.keys()), max_nodes))
+            sys.stdout.write('{}: too many nodes({}) to construct path(max:{})\n'.format(aligns[0].query,
+                                                                                         len(graph.keys()),
+                                                                                         max_nodes))
         return []
 
     # get end points
@@ -507,11 +441,7 @@ def find_paths(
         covered, overlaps = _coverage(paths[i])
         if _screen(covered, overlaps):
             chroms = set([aligns[j].target for j in paths[i]])
-            path_info[i] = {
-                'path': paths[i],
-                'covered': covered,
-                'overlaps': overlaps,
-                'chroms': chroms}
+            path_info[i] = {'path': paths[i], 'covered': covered, 'overlaps': overlaps, 'chroms': chroms}
 
     if path_info:
         if get_all:
@@ -531,12 +461,9 @@ def get_contig_coverage(aligns, end_to_end=False):
     Returns:
         Fraction corresponding to coverage
     """
-    span = intspan('%d-%d' % (aligns[0].qstart, aligns[0].qend))
+    span = intspan('{}-{}'.formt(aligns[0].qstart, aligns[0].qend))
     for i in range(1, len(aligns)):
-        span = span.union(
-            intspan(
-                '%d-%d' %
-                (aligns[i].qstart, aligns[i].qend)))
+        span = span.union(intspan('{}-{}'.format(aligns[i].qstart, aligns[i].qend)))
 
     if not end_to_end:
         return len(span) / float(aligns[0].query_len)
@@ -559,10 +486,8 @@ def find_adjs(aligns, contig_seq, dubious=None, debug=False):
     """
     adjs = []
     for i in range(1, len(aligns)):
-        homol_seq, homol_coords = bwa_mem.find_microhomology(
-            (aligns[i - 1], aligns[i]), contig_seq)
-        novel_seq = bwa_mem.find_untemplated_sequence(
-            (aligns[i - 1], aligns[i]), contig_seq)
+        homol_seq, homol_coords = bwa_mem.find_microhomology((aligns[i - 1], aligns[i]), contig_seq)
+        novel_seq = bwa_mem.find_untemplated_sequence((aligns[i - 1], aligns[i]), contig_seq)
         adj = call_event(aligns[i - 1], aligns[i],
                          homol_seq=homol_seq,
                          homol_coords=homol_coords,
@@ -585,16 +510,7 @@ def find_adjs(aligns, contig_seq, dubious=None, debug=False):
     return adjs
 
 
-def call_event(
-        align1,
-        align2,
-        homol_seq=None,
-        homol_coords=None,
-        novel_seq='-',
-        contig_seq=None,
-        no_sort=False,
-        probe_side_len=25,
-        debug=False):
+def call_event(align1, align2, homol_seq=None, homol_coords=None, novel_seq='-', contig_seq=None, no_sort=False, probe_side_len=25, debug=False):
     """Curates adj based on info given by primary_aligns alignments
 
     Args:
@@ -615,25 +531,17 @@ def call_event(
     if align1.qstart < align2.qstart:
         aligns = [align1, align2]
         breaks[0] = align1.tend if align1.strand == '+' else align1.tstart
-        orients[0] = 'L' if max(
-            align1.tstart,
-            align1.tend) == breaks[0] else 'R'
+        orients[0] = 'L' if max(align1.tstart, align1.tend) == breaks[0] else 'R'
         breaks[1] = align2.tstart if align2.strand == '+' else align2.tend
-        orients[1] = 'L' if max(
-            align2.tstart,
-            align2.tend) == breaks[1] else 'R'
+        orients[1] = 'L' if max(align2.tstart, align2.tend) == breaks[1] else 'R'
         contig_breaks = [align1.qend, align2.qstart]
 
     else:
         aligns = [align2, align1]
         breaks[0] = align2.tend if align2.strand == '+' else align2.tstart
-        orients[0] = 'L' if max(
-            align2.tstart,
-            align2.tend) == breaks[0] else 'R'
+        orients[0] = 'L' if max(align2.tstart, align2.tend) == breaks[0] else 'R'
         breaks[1] = align1.tstart if align1.strand == '+' else align1.tend
-        orients[1] = 'L' if max(
-            align1.tstart,
-            align1.tend) == breaks[1] else 'R'
+        orients[1] = 'L' if max(align1.tstart, align1.tend) == breaks[1] else 'R'
         contig_breaks = [align2.qend, align1.qstart]
 
     if not no_sort:
@@ -654,8 +562,7 @@ def call_event(
                 # deletion of tandem duplicaton
                 if contig_breaks[0] >= contig_breaks[1]:
                     rearrangement = 'del'
-                    breaks = [breaks[1] + 1, breaks[0] +
-                              (contig_breaks[0] - contig_breaks[1] + 1)]
+                    breaks = [breaks[1] + 1, breaks[0] + (contig_breaks[0] - contig_breaks[1] + 1)]
                     homol_seq = None
                     homol_coords = None
                 else:
@@ -680,8 +587,7 @@ def call_event(
             else:
                 # deletion of tandem duplicaton
                 rearrangement = 'del'
-                breaks = [breaks[1] + 1, breaks[0] +
-                          (contig_breaks[0] - contig_breaks[1] + 1)]
+                breaks = [breaks[1] + 1, breaks[0] + (contig_breaks[0] - contig_breaks[1] + 1)]
                 homol_seq = None
                 homol_coords = None
 
@@ -712,14 +618,14 @@ def call_event(
                         )
 
         if contig_seq is not None:
-            adj.probes.append(
-                Adjacency.extract_probe(
-                    contig_seq,
-                    contig_breaks,
-                    len_on_each_side=probe_side_len)[0])
+            adj.probes.append(Adjacency.extract_probe(contig_seq, contig_breaks, len_on_each_side=probe_side_len)[0])
 
     elif debug:
         sys.stdout.write(
-            "cannot figure out event of primary_aligns alignment contig:%s targets:%s,%s orients:%s breaks:%s contig_breaks:%s\n" %
-            (aligns[0].query, aligns[0].target, aligns[1].target, orients, breaks, contig_breaks))
+            "cannot figure out event of primary_aligns alignment contig:{} targets:{},{} orients:{} breaks:{} contig_breaks:{}\n".format(aligns[0].query,
+                                                                                                                                         aligns[0].target,
+                                                                                                                                         aligns[1].target,
+                                                                                                                                         orients,
+                                                                                                                                         breaks,
+                                                                                                                                         contig_breaks))
     return adj
