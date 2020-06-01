@@ -199,7 +199,7 @@ class Adjacency:
         # contig and contig breakpoints
         if self.contigs:
             for i in range(2):
-                infos[i]['BKPTID'] = ','.join(self.contigs)
+                infos[i]['BKPTID'] = ','.join(sorted(self.contigs))
 
         if self.contig_breaks and len(self.contig_breaks) == len(self.contigs):
             contig_breaks = []
