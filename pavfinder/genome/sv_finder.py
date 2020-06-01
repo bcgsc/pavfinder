@@ -569,7 +569,7 @@ class SVFinder:
         try:
             bam = pysam.Samfile(realign_bam_file, 'rb')
         except BaseException:
-            sys.exit('Error parsing realignment BAM:%s' % realign_bam_file)
+            sys.exit('Error parsing realignment BAM:{}'.format(realign_bam_file))
 
         # creates mapping from query to variant and Adjacency
         query_to_variant = {}
@@ -751,7 +751,7 @@ class SVFinder:
         def create_bed(outfile):
             out = open(outfile, 'w')
             for adj in adjs:
-                out.write('%s\n' % adj.as_bed())
+                out.write('{}\n'.format(adj.as_bed()))
             out.close()
 
         # creates bed file for all adjacencies

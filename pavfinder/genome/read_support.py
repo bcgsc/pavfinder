@@ -9,60 +9,35 @@ from collections import OrderedDict, defaultdict
 from operator import itemgetter
 
 
-def find_flanking(
-        reads,
-        span,
-        contig_len,
-        overlap_buffer=1,
-        allow_clipped=False,
-        min_ratio_mapped=None,
-        debug=False):
+def find_flanking(reads, span, contig_len, overlap_buffer=1, allow_clipped=False, min_ratio_mapped=None, debug=False):
     uniq_frags = defaultdict(list)
 
     tlens = []
     proper_pairs = set()
     for read in reads:
-        if read.is_proper_pair and is_fully_mapped(
-                read,
-                contig_len,
-                allow_clipped=allow_clipped,
-                min_ratio_mapped=min_ratio_mapped):
+        if read.is_proper_pair and is_fully_mapped(read, contig_len, allow_clipped=allow_clipped, min_ratio_mapped=min_ratio_mapped):
             proper_pairs.add(read.qname + str(read.pos))
-            # if read.tlen > 0:
-            # tlens.append(read.tlen)
 
     for read in [r for r in reads if not r.is_unmapped and r.tlen > 0]:
         if read.qname + str(read.pos) in proper_pairs:
             # internal fragment
             frag = (read.pos + read.alen, read.pnext)
 
-            if frag is not None and frag[0] <= span[0] - \
-                    overlap_buffer and frag[1] >= span[1] + overlap_buffer:
+            if frag is not None and frag[0] <= span[0] - overlap_buffer and frag[1] >= span[1] + overlap_buffer:
                 uniq_frags[frag].append(read.qname)
 
     num_frags = len(uniq_frags.keys())
 
     if debug:
         for f in uniq_frags.keys():
-            sys.stdout.write("Accepted flanking: %s %s %s\n" %
-                             (span, f, ','.join(uniq_frags[f])))
+            sys.stdout.write("Accepted flanking: {} {} {}\n".format(span, f, ','.join(uniq_frags[f])))
 
     return num_frags, tlens
 
 
-def find_spanning(
-        reads,
-        span,
-        contig_seq,
-        overlap_buffer=1,
-        debug=False,
-        perfect=False,
-        get_seq=False,
-        allow_clipped=False,
-        min_ratio_mapped=None):
+def find_spanning(reads, span, contig_seq, overlap_buffer=1, debug=False, perfect=False, get_seq=False, allow_clipped=False, min_ratio_mapped=None):
     def check_read(start, end):
-        break_seq = contig_seq[start - 1 -
-                               overlap_buffer: end + overlap_buffer]
+        break_seq = contig_seq[start - 1 - overlap_buffer: end + overlap_buffer]
         return read.pos < start - overlap_buffer and\
             read.pos + read.alen >= end + overlap_buffer and\
             is_fully_mapped(read, contig_len, perfect=perfect, allow_clipped=allow_clipped, min_ratio_mapped=min_ratio_mapped) and\
@@ -86,9 +61,12 @@ def find_spanning(
                     names.add(read.qname)
 
                     if debug:
-                        sys.stdout.write(
-                            "Accepted spanning read(perfect:%s): %s %s %s %s %s\n" %
-                            (perfect, read.qname, span, (read.pos + 1, read.pos + read.alen), read.seq, strand))
+                        sys.stdout.write("Accepted spanning read(perfect:{}): {} {} {} {} {}\n".format(perfect,
+                                                                                                       read.qname,
+                                                                                                       span,
+                                                                                                       (read.pos + 1, read.pos + read.alen),
+                                                                                                       read.seq,
+                                                                                                       strand))
     num_frags = len(pos)
 
     return num_frags
@@ -98,10 +76,7 @@ def is_break_region_perfect(read, break_seq, breaks, overlap_buffer):
     start_idx = breaks[0] - read.pos - 1
     if read.cigar[0][0] >= 4 and read.cigar[0][0] <= 5:
         start_idx += read.cigar[0][1]
-    read_break_seq = read.seq[start_idx -
-                              overlap_buffer: start_idx -
-                              overlap_buffer +
-                              len(break_seq)]
+    read_break_seq = read.seq[start_idx - overlap_buffer: start_idx - overlap_buffer + len(break_seq)]
     if read_break_seq.lower() == break_seq.lower():
         return True
     else:
@@ -133,45 +108,28 @@ def check_tiling(reads, breaks, contig_len, debug=False):
             continue
 
         try:
-            span = span.union(
-                intspan(
-                    '%d-%d' %
-                    (read.pos + 1, read.pos + read.alen)))
+            span = span.union(intspan('{}-{}'.format(read.pos + 1, read.pos + read.alen)))
         except BaseException:
-            span = intspan('%d-%d' % (read.pos + 1, read.pos + read.alen))
+            span = intspan('{}-{}'.format(read.pos + 1, read.pos + read.alen))
 
     if span is not None:
-        break_span = intspan('%d-%d' % (breaks[0], breaks[1]))
+        break_span = intspan('{}-{}'.format(breaks[0], breaks[1]))
         # make sure there is no gap in tiling reads and spans the entire
         # breakpoint
-        if len(
-                span.ranges()) == 1 and len(
-                span & break_span) == len(break_span):
+        if len(span.ranges()) == 1 and len(span & break_span) == len(break_span):
             return True
 
     return False
 
 
-def is_fully_mapped(
-        read,
-        contig_len,
-        perfect=False,
-        allow_clipped=False,
-        min_ratio_mapped=None):
-    if not re.search(
-            '[HS]',
-            read.cigarstring) or is_fully_mapped_to_edge(
-            read,
-            contig_len):
+def is_fully_mapped(read, contig_len, perfect=False, allow_clipped=False, min_ratio_mapped=None):
+    if not re.search('[HS]', read.cigarstring) or is_fully_mapped_to_edge(read, contig_len):
         if perfect:
             return True if read.opt('NM') == 0 else False
         return True
 
-    elif allow_clipped and\
-            min_ratio_mapped is not None and\
-            len(read.cigar) == 2 and\
-            re.search('S', read.cigarstring) and\
-            float(read.alen) / read.inferred_length >= min_ratio_mapped:
+    elif allow_clipped and min_ratio_mapped is not None and len(read.cigar) == 2 and re.search('S', read.cigarstring) and\
+         float(read.alen) / read.inferred_length >= min_ratio_mapped:
         if perfect:
             return True if read.opt('NM') == 0 else False
         return True
@@ -183,11 +141,11 @@ def is_fully_mapped_to_edge(read, contig_len):
     if read.cigar:
         if len(read.cigar) == 2:
             # clipped at beginning
-            if (read.cigar[0][0] == 4 or read.cigar[0][0] ==
-                    5) and read.cigar[1][0] == 0 and read.pos == 0 and read.inferred_length == read.rlen:
+            if (read.cigar[0][0] == 4 or read.cigar[0][0] == 5) and read.cigar[1][0] == 0 and read.pos == 0 and read.inferred_length == read.rlen:
                 return True
             # clipped at the end
-            elif read.cigar[0][0] == 0 and (read.cigar[1][0] or 4 and read.cigar[1][0] == 5) and read.pos + read.alen == contig_len and read.inferred_length == read.rlen:
+            elif read.cigar[0][0] == 0 and (read.cigar[1][0] or 4 and read.cigar[1][0] == 5) and\
+                 read.pos + read.alen == contig_len and read.inferred_length == read.rlen:
                 return True
         elif len(read.cigar) == 3 and\
                 read.pos == 0 and read.pos + read.alen == contig_len and\
@@ -440,7 +398,7 @@ def main(args):
                 continue
 
             contig, start, stop, spanning, flanking, tiling, support_reads = support
-            coords = '%s-%s' % (start, stop)
+            coords = '{}-{}'.format(start, stop)
             try:
                 results[contig][coords] = (
                     spanning, flanking, tiling, support_reads)
@@ -452,8 +410,7 @@ def main(args):
     with open(args.outfile, 'w') as out:
         for contig in results.keys():
             for coords in results[contig]:
-                out.write('%s\n' % '\t'.join(map(
-                    str, [contig, coords, results[contig][coords][0], results[contig][coords][1]])))
+                out.write('{}\n'.format('\t'.join(map(str, [contig, coords, results[contig][coords][0], results[contig][coords][1]]))))
 
 
 if __name__ == '__main__':

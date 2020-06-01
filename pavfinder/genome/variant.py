@@ -91,7 +91,7 @@ class Variant:
         if self.adjs[0].insertion_size and self.adjs[0].insertion_size > 0:
             info['SVLEN'] = self.adjs[0].insertion_size
         if self.pos[1] != self.pos[0]:
-            info['CIPOS'] = '0,%d' % (self.pos[1] - self.pos[0])
+            info['CIPOS'] = '0,{}'.format(self.pos[1] - self.pos[0])
 
         info['READSUPPORT'] = self.final_support
 
