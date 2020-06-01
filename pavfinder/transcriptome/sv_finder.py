@@ -86,7 +86,7 @@ class SVFinder:
                         return False
 
             if adj.transcripts is None or adj.transcripts[0] is None or adj.transcripts[1] is None:
-                print('{}: cannot map event'.foramt(adj.seq_id))
+                print('{}: cannot map event'.format(adj.seq_id))
                 return False
 
             if adj.exons is None or adj.exons[0] is None or adj.exons[1] is None:
@@ -1100,7 +1100,7 @@ class SVFinder:
             target_seq = None
             for pos, clipped_seq in clipped_ends.items():
                 if len(clipped_seq) <= min_len:
-                    print('{}:skip partial because it is too short {} {}'.foramt(align.query, clipped_seq, len(clipped_seq)))
+                    print('{}:skip partial because it is too short {} {}'.format(align.query, clipped_seq, len(clipped_seq)))
                     continue
 
                 if pos == 'start':
