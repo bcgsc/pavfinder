@@ -14,19 +14,9 @@ from pavfinder.genome.vcf import VCF
 
 
 class SVFinder:
-    def __init__(
-            self,
-            bam_file,
-            contig_fasta,
-            genome_fasta,
-            out_dir,
-            genome=None,
-            index_dir=None,
-            num_procs=0,
-            skip_simple_repeats=False,
-            cytobands_file=None,
-            acen_buffer=0,
-            debug=False):
+    def __init__(self, bam_file, contig_fasta, genome_fasta, out_dir,
+                 genome=None, index_dir=None, num_procs=0, skip_simple_repeats=False,
+                 cytobands_file=None, acen_buffer=0, debug=False):
         self.bam = pysam.Samfile(bam_file, 'rb')
         self.contig_fasta_file = contig_fasta
         self.contig_fasta = pysam.Fastafile(contig_fasta)
@@ -44,46 +34,32 @@ class SVFinder:
         self.avg_tlen = None
         self.avg_tlen_normal = None
 
-    def find_adjs(
-            self,
-            min_ctg_cov,
-            max_size=None,
-            min_size=None,
-            ins_as_ins=False,
-            skip_acen=False,
-            check_alt_paths=False,
-            min_ctg_size=0,
-            bad_coords=None,
-            skip_contigs_file=None):
+    def find_adjs(self, min_ctg_cov, max_size=None, min_size=None, ins_as_ins=False,
+                  skip_acen=False, check_alt_paths=False, min_ctg_size=0, bad_coords=None, skip_contigs_file=None):
         """Main method to go through the BAM file, extract split and gapped alignments, and calls
         the respective modules to identify adjs"""
         def find_events_in_single_align(align):
             """Implement as sub-function so that small-scale events can be found on split alignments too"""
-            adjs = gapped_align.find_adjs(
-                align,
-                contig_seq,
-                False,
-                ins_as_ins=ins_as_ins,
-                query_fasta=self.contig_fasta,
-                target_fasta=self.ref_fasta)
+            adjs = gapped_align.find_adjs(align,
+                                          contig_seq,
+                                          False,
+                                          ins_as_ins=ins_as_ins,
+                                          query_fasta=self.contig_fasta,
+                                          target_fasta=self.ref_fasta)
 
             repeats = set()
             for i in range(len(adjs)):
                 adj = adjs[i]
 
-                if self.skip_simple_repeats and self.break_region_has_low_complexity(
-                        adj.chroms[0], adj.breaks):
+                if self.skip_simple_repeats and self.break_region_has_low_complexity(adj.chroms[0], adj.breaks):
                     repeats.add(i)
                     if self.debug:
-                        sys.stdout.write(
-                            "remove contig %s %s potential simple-repeat %s:%s-%s\n" %
-                            (adj.contigs[0], adj.rearrangement, adj.chroms[0], adj.breaks[0], adj.breaks[1]))
+                        sys.stdout.write("remove contig {} {} potential simple-repeat {}:{}-{}\n".format(adj.contigs[0],
+                                                                                                         adj.rearrangement,
+                                                                                                         adj.chroms[0],
+                                                                                                         adj.breaks[0],
+                                                                                                         adj.breaks[1]))
                     continue
-
-                # seems unnecessary
-                #new_contig_breaks = self.expand_contig_breaks(adj.chroms[0], adj.breaks, contig, adj.contig_breaks[0], adj.rearrangement, self.debug)
-                # if new_contig_breaks is not None:
-                    #adj.contig_breaks[0] = new_contig_breaks
 
             if repeats:
                 for i in sorted(repeats, reverse=True):
@@ -101,8 +77,7 @@ class SVFinder:
             s1, e1 = align.tstart, align.tend
             if align.target in acen:
                 for (start, end) in acen[align.target]:
-                    s2, e2 = int(start) - \
-                        self.acen_buffer, int(end) + self.acen_buffer
+                    s2, e2 = int(start) - self.acen_buffer, int(end) + self.acen_buffer
                     if s1 <= e2 and s2 <= e1:
                         return True
 
@@ -124,38 +99,39 @@ class SVFinder:
             skip_contigs = create_set(skip_contigs_file)
 
         all_adjs = []
-        for contig, group in groupby(
-            self.bam.fetch(
-                until_eof=True), lambda x: x.qname):
+        for contig, group in groupby(self.bam.fetch(until_eof=True), lambda x: x.qname):
             print('contig', contig)
             alns = list(group)
             contig_seq = self.contig_fasta.fetch(contig)
 
             if len(contig_seq) < min_ctg_size:
                 if self.debug:
-                    sys.stdout.write(
-                        '%s(%d bp) less than min contig size %d bp\n' %
-                        (contig, len(contig_seq), min_ctg_size))
+                    sys.stdout.write('{}({} bp) less than min contig size {} bp\n'.format(contig,
+                                                                                          len(contig_seq),
+                                                                                          min_ctg_size))
                 continue
 
             if skip_contigs and contig in skip_contigs:
                 if self.debug:
-                    sys.stdout.write('%s skipped\n' % contig)
+                    sys.stdout.write('{} skipped\n'.format(contig))
                 continue
 
             if len(alns) > 1:
-                chimeric_aligns, dubious = split_align.find_chimera(
-                    alns, self.bam, min_coverage=min_ctg_cov, check_alt_paths=check_alt_paths, debug=self.debug)
+                chimeric_aligns, dubious = split_align.find_chimera(alns,
+                                                                    self.bam,
+                                                                    min_coverage=min_ctg_cov,
+                                                                    check_alt_paths=check_alt_paths,
+                                                                    debug=self.debug)
                 if chimeric_aligns:
                     if acen_coords:
                         skip = False
                         for align in chimeric_aligns:
-                            if acen_coords and is_align_in_acen(
-                                    align, acen_coords):
+                            if acen_coords and is_align_in_acen(align, acen_coords):
                                 if self.debug:
-                                    sys.stdout.write(
-                                        'skip contig %s because alignment is in centromere %s:%d-%d\n' %
-                                        (contig, align.target, align.tstart, align.tend))
+                                    sys.stdout.write('skip contig {} because alignment is in centromere {}:{}-{}\n'.format(contig,
+                                                                                                                           align.target,
+                                                                                                                           align.tstart,
+                                                                                                                           align.tend))
                                 skip = True
                                 break
                         if skip:
@@ -168,29 +144,26 @@ class SVFinder:
                     for i in range(len(adjs)):
                         adj = adjs[i]
                         # check if homol is simple repeat
-                        if adj.homol_seq and adj.homol_seq[0] != '-' and self.is_homol_low_complexity(
-                                adj):
+                        if adj.homol_seq and adj.homol_seq[0] != '-' and self.is_homol_low_complexity(adj):
                             if self.debug:
                                 sys.stdout.write(
-                                    "homol_seq is simple-repeat %s:%s\n" %
-                                    (adj.contigs[0], adj.homol_seq[0]))
+                                    "homol_seq is simple-repeat {}:{}\n".format(adj.contigs[0], adj.homol_seq[0]))
                             bad.add(i)
 
                         # check if event is simple repeat expansions
-                        if self.skip_simple_repeats and self.is_novel_sequence_repeat(
-                                adj):
+                        if self.skip_simple_repeats and self.is_novel_sequence_repeat(adj):
                             if self.debug:
-                                sys.stdout.write(
-                                    "novel_seq is simple-repeat %s:%s\n" %
-                                    (adj.contigs[0], adj.novel_seq))
+                                sys.stdout.write("novel_seq is simple-repeat {}:{}\n".format(adj.contigs[0], adj.novel_seq))
                             bad.add(i)
 
                         # inversion with size of 1
                         if adj.rearrangement == 'inv' and adj.get_size() <= 1:
                             if self.debug:
-                                sys.stdout.write(
-                                    "inversion with unreasonable size %s:%d %s:%d-%d\n" %
-                                    (adj.contigs[0], adj.get_size(), adj.chroms[0], adj.breaks[0], adj.breaks[1]))
+                                sys.stdout.write("inversion with unreasonable size {}:{} {}:{}-{}\n".format(adj.contigs[0],
+                                                                                                            adj.get_size(),
+                                                                                                            adj.chroms[0],
+                                                                                                            adj.breaks[0],
+                                                                                                            adj.breaks[1]))
                                 bad.add(i)
 
                         if i > 0:
@@ -199,9 +172,7 @@ class SVFinder:
                                adjs[i].orients == adjs[i].orients and\
                                adjs[i].contig_breaks != adjs[i - 1].contig_breaks:
                                 if self.debug:
-                                    sys.stdout.write(
-                                        "%s has 2 contig_breaks for same event\n" %
-                                        adj.contigs[0])
+                                    sys.stdout.write("{} has 2 contig_breaks for same event\n".format(adj.contigs[0]))
                                 bad.add(i - 1)
                                 bad.add(i)
 
@@ -232,20 +203,16 @@ class SVFinder:
             for adj in merged_adjs:
                 size = adj.get_size()
 
-                if max_size is not None and\
-                   min_size is not None:
-                    if isinstance(size, int) and\
-                       size >= min_size and size <= max_size:
+                if max_size is not None and min_size is not None:
+                    if isinstance(size, int) and size >= min_size and size <= max_size:
                         selected.append(adj)
 
                 elif max_size is not None:
-                    if isinstance(size, int) and\
-                       size <= max_size:
+                    if isinstance(size, int) and size <= max_size:
                         selected.append(adj)
 
                 elif min_size is not None:
-                    if not isinstance(size, int) or\
-                       size >= min_size:
+                    if not isinstance(size, int) or size >= min_size:
                         selected.append(adj)
 
             return selected
@@ -258,50 +225,44 @@ class SVFinder:
                 for variant in variants:
                     for adj in variant.adjs:
                         used_ids.add(adj.id)
-            # print 'used', used_ids
 
         """Creates variants from adjacencies"""
         self.variants = []
         adjs_ids_used = set()
 
-        split_events = [
-            adj for adj in adjs if adj.rearrangement not in (
-                'trl', 'ins') and adj.align_types[0] == 'split']
-        ins_variants, split_events_remained = Adjacency.extract_interchrom_ins(
-            split_events)
+        split_events = [adj for adj in adjs if adj.rearrangement not in ('trl', 'ins') and adj.align_types[0] == 'split']
+        ins_variants, split_events_remained = Adjacency.extract_interchrom_ins(split_events)
         self.variants.extend(ins_variants)
         track_adjs(adjs_ids_used, ins_variants)
 
         # special cases for imprecise insertions
-        ins_variants, ins_adjs = Adjacency.extract_imprecise_ins(
-            [adj for adj in adjs if adj.align_types[0] == 'split' and adj.rearrangement != 'inv' and adj.id not in adjs_ids_used], debug=self.debug)
+        ins_variants, ins_adjs = Adjacency.extract_imprecise_ins([adj for adj in adjs if adj.align_types[0] == 'split' and\
+                                                                  adj.rearrangement != 'inv' and\
+                                                                  adj.id not in adjs_ids_used
+                                                                  ], debug=self.debug)
         self.variants.extend(ins_variants)
         track_adjs(adjs_ids_used, ins_variants)
 
         # handle inversions
-        invs = [adj for adj in adjs if adj.rearrangement ==
-                'inv' and adj.id not in adjs_ids_used]
+        invs = [adj for adj in adjs if adj.rearrangement == 'inv' and adj.id not in adjs_ids_used]
         inv_variants = Adjacency.group_inversions(invs)
         self.variants.extend(inv_variants)
         track_adjs(adjs_ids_used, inv_variants)
 
         # convert translocations to insertions
-        trls = [adj for adj in adjs if adj.rearrangement ==
-                'trl' and adj.id not in adjs_ids_used]
+        trls = [adj for adj in adjs if adj.rearrangement == 'trl' and adj.id not in adjs_ids_used]
         ins_variants, trls_remained = Adjacency.extract_interchrom_ins(trls)
         self.variants.extend(ins_variants)
         track_adjs(adjs_ids_used, ins_variants)
 
         # group reciprocal transcloations
-        trls = [adj for adj in adjs if adj.rearrangement ==
-                'trl' and adj.id not in adjs_ids_used]
+        trls = [adj for adj in adjs if adj.rearrangement == 'trl' and adj.id not in adjs_ids_used]
         reciprocal_trls, trls_remained = Adjacency.group_trls(trls)
         self.variants.extend(reciprocal_trls)
         track_adjs(adjs_ids_used, reciprocal_trls)
 
         # append remaining non-dubious translocations
-        trls = [adj for adj in adjs if adj.rearrangement ==
-                'trl' and adj.id not in adjs_ids_used]
+        trls = [adj for adj in adjs if adj.rearrangement == 'trl' and adj.id not in adjs_ids_used]
         for trl in trls:
             if not trl.dubious:
                 variant = Variant('TRL', [trl])
@@ -334,15 +295,12 @@ class SVFinder:
 
                 if contig_seq[i:i + len_seq] == adj.novel_seq:
                     # check if it overlaps (or contiguous) with contig_breaks
-                    if min(i + len(adj.novel_seq) - 1,
-                           contig_breaks[1]) - max(i,
-                                                   contig_breaks[0]) >= -1:
+                    if min(i + len(adj.novel_seq) - 1, contig_breaks[1]) - max(i, contig_breaks[0]) >= -1:
                         copies.append(i)
 
         return len(copies) > 0
 
-    def break_region_has_low_complexity(
-            self, chrom, breaks, min_units=4, buf=1):
+    def break_region_has_low_complexity(self, chrom, breaks, min_units=4, buf=1):
         """Determines if genomic region around deletion/insertion breakpoint has low-complexity sequences
 
         Window of search = 100bp on either side genomic breakpoint
@@ -363,15 +321,13 @@ class SVFinder:
             try:
                 seq = self.ref_fasta.fetch(chrom, max(0, i), i + 100)
             except BaseException:
-                print(
-                    "can't extract reference sequence for complexity checking %s:%s-%s" %
-                    (chrom, i, i + 100))
+                print("can't extract reference sequence for complexity checking {}:{}-{}".format(chrom, i, i + 100))
                 continue
 
             repeats = r.findall(seq)
 
             if repeats and repeats[0].upper() != 'N':
-                m = re.search('^(%s){1,}' % repeats[0], seq)
+                m = re.search('^({}){1,}'.format(repeats[0]), seq)
                 if m is not None:
                     repeat_start = i + 1
                     repeat_end = i + len(m.group(0))
@@ -380,46 +336,33 @@ class SVFinder:
                         if breaks[0] != breaks[1] and breaks[0] + 1 >= repeat_start - \
                                 buf and breaks[1] - 1 <= repeat_end + buf:
                             if self.debug:
-                                sys.stdout.write(
-                                    '%s %s:%s-%s in low-complexity region %s:%s-%s %sx%d\n' %
-                                    ('del',
-                                     chrom,
-                                     breaks[0],
-                                        breaks[1],
-                                        chrom,
-                                        repeat_start,
-                                        repeat_end,
-                                        repeats[0].upper(),
-                                        num_units,
-                                     ))
+                                sys.stdout.write('{} {}:{}-{} in low-complexity region {}:{}-{} {}x{}\n'.format('del',
+                                                                                                                chrom,
+                                                                                                                breaks[0],
+                                                                                                                breaks[1],
+                                                                                                                chrom,
+                                                                                                                repeat_start,
+                                                                                                                repeat_end,
+                                                                                                                repeats[0].upper(),
+                                                                                                                num_units,))
 
                             return True
-                        elif breaks[0] == breaks[1] and\
-                                breaks[0] >= repeat_start - buf and breaks[0] + 1 <= repeat_end + buf:
+                        elif breaks[0] == breaks[1] and breaks[0] >= repeat_start - buf and breaks[0] + 1 <= repeat_end + buf:
                             if self.debug:
                                 sys.stdout.write(
-                                    '%s %s:%s-%s in low-complexity region %s:%s-%s %sx%d\n' %
-                                    ('ins',
-                                     chrom,
-                                     breaks[0],
-                                        breaks[1],
-                                        chrom,
-                                        repeat_start,
-                                        repeat_end,
-                                        repeats[0].upper(),
-                                        num_units,
-                                     ))
+                                    '{} {}:{}-{} in low-complexity region {}:{}-{} {}x{}\n'.format('ins',
+                                                                                                   chrom,
+                                                                                                   breaks[0],
+                                                                                                   breaks[1],
+                                                                                                   chrom,
+                                                                                                   repeat_start,
+                                                                                                   repeat_end,
+                                                                                                   repeats[0].upper(),
+                                                                                                   num_units,))
                             return True
         return False
 
-    def expand_contig_breaks(
-            self,
-            chrom,
-            breaks,
-            contig,
-            contig_breaks,
-            event,
-            debug=False):
+    def expand_contig_breaks(self, chrom, breaks, contig, contig_breaks, event, debug=False):
         """Expands contig_breaks if repeats reside in breakpoints
 
         Args:
@@ -471,8 +414,7 @@ class SVFinder:
             if not pos_strand:
                 seq = reverse_complement(seq)
         elif event == 'ins':
-            seq = contig_seq[contig_breaks_sorted[0]
-                : contig_breaks_sorted[1] - 1]
+            seq = contig_seq[contig_breaks_sorted[0] : contig_breaks_sorted[1] - 1]
         if seq is None:
             print(contig, event, 'cannot find seq', seq)
             return None
@@ -514,9 +456,7 @@ class SVFinder:
                 contig_breaks_expanded[1] += expand
 
         if debug and tuple(contig_breaks_expanded) != contig_breaks:
-            sys.stdout.write(
-                'contig breaks expanded:%s %s -> %s\n' %
-                (contig, contig_breaks, contig_breaks_expanded))
+            sys.stdout.write('contig breaks expanded:{} {} -> {}\n'.format(contig, contig_breaks, contig_breaks_expanded))
 
         return tuple(contig_breaks_expanded)
 
@@ -530,14 +470,12 @@ class SVFinder:
         """
         subseqs = adj.extract_subseqs(self.contig_fasta)
         for i in range(len(subseqs)):
-            out.write(
-                '>%s%s%s%s%d\n%s\n' %
-                (adj.contigs[0],
-                 name_sep,
-                 adj.key(),
-                    name_sep,
-                    i,
-                    subseqs[i]))
+            out.write('>{}{}{}{}{}\n{}\n'.format(adj.contigs[0],
+                                                 name_sep,
+                                                 adj.key(),
+                                                 name_sep,
+                                                 i,
+                                                 subseqs[i]))
 
     def is_homol_low_complexity(self, adj, min_len=5):
         """Determine if the microhomology sequence of the Adjacency is low-complexity
@@ -642,11 +580,7 @@ class SVFinder:
                 query_to_variant[query] = (i, j)
 
         failed_variants = set()
-        for key, group in groupby(
-            bam.fetch(
-                until_eof=True), lambda x: name_sep.join(
-                x.qname.split(name_sep)[
-                :2])):
+        for key, group in groupby(bam.fetch(until_eof=True), lambda x: name_sep.join(x.qname.split(name_sep)[:2])):
             alns = list(group)
             variant_idx = query_to_variant[key][0]
             variant = self.variants[variant_idx]
@@ -658,8 +592,7 @@ class SVFinder:
             if variant.event == 'INS':
                 index = None
                 for i in (0, 1):
-                    if variant.chrom == adj.chroms[i] and (
-                            variant.pos[0] == adj.breaks[i] or variant.pos[1] == adj.breaks[i]):
+                    if variant.chrom == adj.chroms[i] and (variant.pos[0] == adj.breaks[i] or variant.pos[1] == adj.breaks[i]):
                         index = i
                         break
 
@@ -670,21 +603,14 @@ class SVFinder:
             if not gapped_align.screen_probe_alns(
                     adj_aligns, probe_alns, adj.align_types[0]):
                 if self.debug:
-                    sys.stdout.write(
-                        'probe align completely to one location or not aligned with confidence: %s\n' %
-                        key)
+                    sys.stdout.write('probe align completely to one location or not aligned with confidence: {}\n'.formatkey)
                 failed_variants.add(variant)
                 continue
 
         for failed_var in failed_variants:
             self.variants.remove(failed_var)
 
-    def output(
-            self,
-            reference_url=None,
-            assembly_url=None,
-            insertion_as_breakends=None,
-            header=None):
+    def output(self, reference_url=None, assembly_url=None, insertion_as_breakends=None, header=None):
         """Wrapper function to output Variants and Adjacencies
         Args:
             only_somatic: (boolean) Only outputs somatic variants/adjacencies
@@ -692,16 +618,13 @@ class SVFinder:
             assembly_url: (str) assembly url to be put in VCF header (optional)
             insertion_as_breakends: (boolean) Output big insertion as breakends
         """
-        variants = [
-            variant for variant in self.variants if not variant.filtered_out]
-        # if only_somatic:
-        #variants = [variant for variant in variants if variant.somatic]
+        variants = [variant for variant in self.variants if not variant.filtered_out]
 
         source = 'NA'
         if header is not None and 'software' in header:
             source = header['software']
         self.output_variants(variants,
-                             '%s/variants.vcf' % self.out_dir,
+                             '{}/variants.vcf'.format(self.out_dir),
                              reference_url=reference_url,
                              assembly_url=assembly_url,
                              insertion_as_breakends=insertion_as_breakends,
@@ -712,22 +635,14 @@ class SVFinder:
         for variant in variants:
             adjs.extend(variant.adjs)
 
-        header = '#%s\n#%s %s' % (header['software'],
-                                  header['time'],
-                                  header['cmd'])
+        header = '#{}\n#{} {}'.format(header['software'], header['time'], header['cmd'])
         self.output_adjacencies(adjs,
-                                '%s/adjacencies.bedpe' % self.out_dir,
+                                '{}/adjacencies.bedpe'.format(self.out_dir),
                                 format='bedpe',
                                 header=header)
 
-    def output_variants(
-            self,
-            variants,
-            out_file,
-            reference_url=None,
-            assembly_url=None,
-            insertion_as_breakends=False,
-            source='NA'):
+    def output_variants(self, variants, out_file, reference_url=None, assembly_url=None,
+                        insertion_as_breakends=False, source='NA'):
         """Output variants in VCF format
         Args:
             variants: (List) Variants
@@ -738,26 +653,17 @@ class SVFinder:
         """
         records = []
         for variant in variants:
-            output = variant.as_vcf(self.ref_fasta,
-                                    insertion_as_sv=not insertion_as_breakends)
+            output = variant.as_vcf(self.ref_fasta, insertion_as_sv=not insertion_as_breakends)
 
             if output is not None and output != '':
                 records.extend(output.split('\n'))
 
         out = open(out_file, 'w')
-        out.write(
-            '%s\n' %
-            VCF.header(
-                source=source,
-                reference_url=reference_url,
-                assembly_url=assembly_url))
+        out.write('{}\n'.format(VCF.header(source=source, reference_url=reference_url, assembly_url=assembly_url)))
         # sort by chromosome and pos
-        records.sort(
-            key=lambda record: (
-                record.split('\t')[0],
-                record.split('\t')[1]))
+        records.sort(key=lambda record: (record.split('\t')[0], record.split('\t')[1]))
         for record in records:
-            out.write('%s\n' % record)
+            out.write('{}\n'.format(record))
         out.close()
 
     def output_probes(self, adjs, out_file):
@@ -769,8 +675,7 @@ class SVFinder:
         out = open(out_file, 'w')
         for adj in adjs:
             if adj.probes[0] != 'NA':
-                out.write('>%s %d\n%s\n' %
-                          (adj.id, len(adj.probes[0]), adj.probes[0]))
+                out.write('>{} {}\n{}\n'.format(adj.id, len(adj.probes[0]), adj.probes[0]))
         out.close()
 
     def output_adjacencies(self, adjs, out_file, format, header=None):
@@ -794,55 +699,43 @@ class SVFinder:
                 out.write(header + '\n')
 
             if format == 'tab':
-                out.write('%s\n' % Adjacency.show_tab_headers())
+                out.write('{}\n'.format(Adjacency.show_tab_headers()))
             elif format == 'bedpe':
-                out.write('%s\n' % Adjacency.show_bedpe_headers())
+                out.write('{}\n'.format(Adjacency.show_bedpe_headers()))
 
             for adj in adjs:
                 output = getattr(adj, fn)(*args)
                 try:
-                    out.write('%s\n' % output)
+                    out.write('{}\n'.format(output))
                 except BaseException:
                     sys.stdout.write("can't output Adjacency")
 
             out.close()
 
-    def find_support(
-            self,
-            script,
-            bam,
-            min_support,
-            min_overlap,
-            allow_clipped=False,
-            normal_bam=None,
-            min_support_normal=None,
-            min_overlap_normal=None,
-            allow_clipped_normal=False,
-            min_ratio_mapped=None,
-            force=False,
-            debug=False):
-        cmd = "python %s %s %s %s --num_procs %d" % (script,
-                                                     self.out_dir,
-                                                     bam,
-                                                     self.contig_fasta_file,
-                                                     self.num_procs,
-                                                     )
+    def find_support(self, script, bam, min_support, min_overlap,
+                     allow_clipped=False, normal_bam=None, min_support_normal=None, min_overlap_normal=None,
+                     allow_clipped_normal=False, min_ratio_mapped=None, force=False, debug=False):
+        cmd = "python {} {} {} {} --num_procs {}".format(script,
+                                                         self.out_dir,
+                                                         bam,
+                                                         self.contig_fasta_file,
+                                                         self.num_procs,)
         if min_support is not None:
-            cmd += ' --min_support %d' % min_support
+            cmd += ' --min_support {}'.format(min_support)
         if allow_clipped:
             cmd += ' --allow_clipped'
             if min_ratio_mapped is not None:
-                cmd += ' --support_min_mapped %s' % min_ratio_mapped
+                cmd += ' --support_min_mapped {}'.format(min_ratio_mapped)
         if min_overlap is not None:
-            cmd += ' --min_overlap %d' % min_overlap
+            cmd += ' --min_overlap {}'.format(min_overlap)
 
         # normal
         if normal_bam is not None:
-            cmd += ' --normal_bam %s' % normal_bam
+            cmd += ' --normal_bam {}'.format(normal_bam)
         if min_support_normal is not None:
-            cmd += ' --min_support_normal %s' % min_support_normal
+            cmd += ' --min_support_normal {}'.format(min_support_normal)
         if min_overlap_normal is not None:
-            cmd += ' --min_overlap_normal %s' % min_overlap_normal
+            cmd += ' --min_overlap_normal {}'.format(min_overlap_normal)
         if allow_clipped_normal:
             cmd += ' --allow_clipped_normal'
         if force:
@@ -862,7 +755,7 @@ class SVFinder:
             out.close()
 
         # creates bed file for all adjacencies
-        adjs_bed_file = '%s/adjs.bed' % self.out_dir
+        adjs_bed_file = '{}/adjs.bed'.format(self.out_dir)
         create_bed(adjs_bed_file)
         adjs_bed = BedTool(adjs_bed_file)
 
@@ -871,24 +764,22 @@ class SVFinder:
         regions = BedTool(bad_bed_file)
         overlaps = regions.intersect(adjs_bed)
         for olap in overlaps:
-            bad_breaks.add('%s:%s' % (olap[0], int(olap[1]) + 1))
+            bad_breaks.add('{}:{}'.format(olap[0], int(olap[1]) + 1))
 
         # screen out adjacencies
         bad_adj_indices = set()
         for i in range(len(adjs)):
             for j in (0, 1):
-                breakpt = '%s:%s' % (adjs[i].chroms[j], adjs[i].breaks[j])
+                breakpt = '{}:{}'.format(adjs[i].chroms[j], adjs[i].breaks[j])
                 if breakpt in bad_breaks:
                     bad_adj_indices.add(i)
                     if self.debug:
-                        sys.stdout.write(
-                            '%s %s:%s %s:%s (%s) overlaps repeat/segdup\n' %
-                            (adjs[i].contigs[0],
-                             adjs[i].chroms[0],
-                                adjs[i].breaks[0],
-                                adjs[i].chroms[1],
-                                adjs[i].breaks[1],
-                                breakpt))
+                        sys.stdout.write('{} {}:{} {}:{} ({}) overlaps repeat/segdup\n'.format(adjs[i].contigs[0],
+                                                                                               adjs[i].chroms[0],
+                                                                                               adjs[i].breaks[0],
+                                                                                               adjs[i].chroms[1],
+                                                                                               adjs[i].breaks[1],
+                                                                                               breakpt))
         for i in sorted(bad_adj_indices, reverse=True):
             del adjs[i]
 
@@ -911,36 +802,24 @@ class SVFinder:
                 if 'N' in adj.probes[0].upper():
                     adj.filtered_out = True
                     if self.debug:
-                        sys.stdout.write(
-                            'N_in_probe %s %s\n' %
-                            (adj.contigs, adj.probes[0]))
+                        sys.stdout.write('N_in_probe {} {}\n'.format(adj.contigs, adj.probes[0]))
 
                 if not adj.filtered_out and adj.novel_seq is not None and adj.novel_seq != 'NA' and adj.novel_seq != '-' and\
                         re.search('[^ATGC]', adj.novel_seq, re.IGNORECASE):
                     adj.filtered_out = True
                     if self.debug:
-                        sys.stdout.write(
-                            'non AGTC in novel sequence %s %s\n' %
-                            (adj.contigs, adj.novel_seq))
+                        sys.stdout.write('non AGTC in novel sequence {} {}\n'.format(adj.contigs, adj.novel_seq))
 
-                if not adj.filtered_out and (
-                    target_non_canonical(
-                        adj.chroms[0]) or target_non_canonical(
-                        adj.chroms[1])):
+                if not adj.filtered_out and (target_non_canonical(adj.chroms[0]) or target_non_canonical(adj.chroms[1])):
                     adj.filtered_out = True
                     if self.debug:
-                        sys.stdout.write(
-                            'non canonical chromosome %s %s\n' %
-                            (adj.contigs, adj.chroms))
+                        sys.stdout.write('non canonical chromosome {} {}\n'.format(adj.contigs, adj.chroms))
 
                 if not adj.filtered_out and adj.homol_seq and max_homol is not None:
                     if len(adj.homol_seq[0]) > max_homol:
                         adj.filtered_out = True
                         if self.debug:
-                            sys.stdout.write(
-                                'homolgous sequence length %s too long (>%s)\n' %
-                                (len(
-                                    adj.homol_seq[0]), max_homol))
+                            sys.stdout.write('homolgous sequence length {} too long (>{})\n'.format(len(adj.homol_seq[0]), max_homol))
 
                 if adj.filtered_out:
                     variant.filtered_out = True

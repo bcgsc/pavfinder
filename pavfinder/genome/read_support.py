@@ -231,17 +231,7 @@ def worker(args):
     return supports
 
 
-def create_batches(
-        bam_file,
-        coords,
-        size,
-        overlap_buffer,
-        contig_fasta_file,
-        perfect,
-        get_seq,
-        allow_clipped,
-        min_ratio_mapped,
-        debug=False):
+def create_batches(bam_file, coords, size, overlap_buffer, contig_fasta_file, perfect, get_seq, allow_clipped, min_ratio_mapped, debug=False):
     size = int(size)
     if size == 0:
         yield bam_file, coords, overlap_buffer, contig_fasta_file, perfect, get_seq, debug
@@ -254,16 +244,7 @@ def create_batches(
                 yield bam_file, coords[i:i + size], overlap_buffer, contig_fasta_file, perfect, get_seq, allow_clipped, min_ratio_mapped, debug
 
 
-def fetch_support(
-        coords,
-        bam_file,
-        contig_fasta,
-        overlap_buffer=0,
-        perfect=False,
-        get_seq=False,
-        allow_clipped=False,
-        min_ratio_mapped=None,
-        debug=False):
+def fetch_support(coords, bam_file, contig_fasta, overlap_buffer=0, perfect=False, get_seq=False, allow_clipped=False, min_ratio_mapped=None, debug=False):
     """Fetches read support when number given coords is relatively small
     It will use Pysam's fetch() instead of going through all read alignments
     Args:
@@ -298,8 +279,7 @@ def fetch_support(
             results[contig][coord] = [0, 0, None, []]
 
             reads = []
-            for read in bam.fetch(contig, max(
-                    0, span[0] - window_size), min(contig_len, span[1] + window_size)):
+            for read in bam.fetch(contig, max(0, span[0] - window_size), min(contig_len, span[1] + window_size)):
                 reads.append(read)
 
             spanning = find_spanning(reads, span, contig_seq, debug=debug,
@@ -323,15 +303,7 @@ def fetch_support(
     return results, tlens_all
 
 
-def expand_contig_breaks(
-        chrom,
-        breaks,
-        contig,
-        contig_breaks,
-        event,
-        ref_fasta,
-        contig_fasta,
-        debug=False):
+def expand_contig_breaks(chrom, breaks, contig, contig_breaks, event, ref_fasta, contig_fasta, debug=False):
     def extract_repeat(seq):
         repeat = {'start': None, 'end': None}
         if len(seq) == 1:
@@ -406,9 +378,7 @@ def expand_contig_breaks(
             contig_breaks_expanded[1] += expand
 
     if debug and tuple(contig_breaks_expanded) != contig_breaks:
-        sys.stdout.write(
-            'contig breaks expanded:%s %s -> %s\n' %
-            (contig, contig_breaks, contig_breaks_expanded))
+        sys.stdout.write('contig breaks expanded:{} {} -> {}\n'.format(contig, contig_breaks, contig_breaks_expanded))
 
     return tuple(contig_breaks_expanded)
 
@@ -420,12 +390,7 @@ def sum_support(values, use_minimum=False):
         return min(values)
 
 
-def filter_support(
-        spanning,
-        flanking,
-        min_support,
-        use_spanning=True,
-        use_flanking=False):
+def filter_support(spanning, flanking, min_support, use_spanning=True, use_flanking=False):
     support = 0
     if use_spanning:
         if spanning:
@@ -497,32 +462,12 @@ if __name__ == '__main__':
     parser.add_argument("bam", type=str, help="bam file")
     parser.add_argument("contigs", type=str, help="contigs fasta file")
     parser.add_argument("outfile", type=str, help="output file")
-    parser.add_argument(
-        "-n",
-        "--num_procs",
-        help="Number of processes. Default: 5",
-        default=5,
-        type=int)
-    parser.add_argument(
-        "--min_overlap",
-        help="minimum breakpoint overlap for identifying read support. Default:4",
-        type=int,
-        default=4)
-    parser.add_argument(
-        "--allow_clipped_support",
-        help="allow using clipped reads in gathering read support",
-        action="store_true",
-        default=False)
-    parser.add_argument(
-        "--support_min_mapped",
-        help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8",
-        type=float,
-        default=0.8)
-    parser.add_argument(
-        "--debug",
-        help="debug mode",
-        action="store_true",
-        default=False)
+    parser.add_argument("-n", "--num_procs", help="Number of processes. Default: 5", default=5, type=int)
+    parser.add_argument("--min_overlap", help="minimum breakpoint overlap for identifying read support. Default:4", type=int, default=4)
+    parser.add_argument("--allow_clipped_support", help="allow using clipped reads in gathering read support", action="store_true", default=False)
+    parser.add_argument("--support_min_mapped", help="when clipped reads are allowed as read support, minimum ratio of read length mapped Default:0.8",
+                         type=float, default=0.8)
+    parser.add_argument("--debug", help="debug mode", action="store_true", default=False)
 
     args = parser.parse_args()
     main(args)

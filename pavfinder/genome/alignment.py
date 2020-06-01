@@ -7,11 +7,8 @@ import pysam
 import sys
 from operator import itemgetter
 
-
 class Alignment:
-    def __init__(self, query=None, qstart=None, qend=None,
-                 target=None, tstart=None, tend=None,
-                 strand=None):
+    def __init__(self, query=None, qstart=None, qend=None, target=None, tstart=None, tend=None, strand=None):
         self.query = query
         self.qstart, self.qend = qstart, qend
         self.target = target
@@ -32,8 +29,7 @@ class Alignment:
         align = cls(query=read.qname, target=target)
         align.strand = '-' if read.is_reverse else '+'
         align.query_len = get_query_len_from_cigar(read.cigar)
-        align.blocks, align.query_blocks = cigar_to_blocks(
-            read.cigar, read.pos + 1, align.strand)
+        align.blocks, align.query_blocks = cigar_to_blocks(read.cigar, read.pos + 1, align.strand)
         align.set_start_end_from_blocks()
         align.cigar = read.cigar
         align.cigarstring = read.cigarstring
@@ -90,7 +86,6 @@ class Alignment:
 
             elif qblock[0] > qblock[1] and qpos <= qblock[0] and qpos >= qblock[1]:
                 return tblock[0] + qblock[0] - qpos
-
 
 def cigar_to_blocks(cigar, tstart, strand):
     query_len = get_query_len_from_cigar(cigar)
@@ -202,20 +197,13 @@ def compare_chr(chr1, chr2):
             return 0
 
 
-def bam2bed(
-        bam,
-        out,
-        name_sorted=True,
-        header=None,
-        min_size=None,
-        no_chimera=True):
+def bam2bed(bam, out, name_sorted=True, header=None, min_size=None, no_chimera=True):
     if header is not None:
         out.write(header + '\n')
     if name_sorted:
         aligns = []
         outputs = []
-        for query, group in groupby(
-                bam.fetch(until_eof=True), lambda x: x.qname):
+        for query, group in groupby(bam.fetch(until_eof=True), lambda x: x.qname):
             alns = list(group)
 
             if alns[0].is_unmapped:
@@ -231,12 +219,9 @@ def bam2bed(
                 try:
                     output = align.as_bed()
                 except BaseException:
-                    sys.stderr.write(
-                        "can't convert alignment of contig %s to bed\n" %
-                        query)
+                    sys.stderr.write("can't convert alignment of contig {} to bed\n".format(query))
 
-                outputs.append(
-                    (align.target, align.tstart, align.tend, output))
+                outputs.append((align.target, align.tstart, align.tend, output))
 
         for output in sorted(outputs, key=itemgetter(0, 1, 2)):
             out.write(output[-1] + '\n')
@@ -250,9 +235,7 @@ def bam2bed(
             try:
                 out.write(align.as_bed() + '\n')
             except BaseException:
-                sys.stderr.write(
-                    "can't convert alignment of contig %s to bed\n" %
-                    query)
+                sys.stderr.write("can't convert alignment of contig {} to bed\n".format(query))
 
     out.close()
 
@@ -260,30 +243,15 @@ def bam2bed(
 def open_bam(bamfile):
     return pysam.AlignmentFile(bamfile, 'rb')
 
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Module dealing with alignments")
+    parser = argparse.ArgumentParser(description="Module dealing with alignments")
     parser.add_argument_group("bam2bed", "converts BAM file to BED")
-    parser.add_argument(
-        "--bam2bed",
-        action='store_true',
-        help="convert bam to bed")
+    parser.add_argument("--bam2bed", action='store_true', help="convert bam to bed")
     parser.add_argument("--bam", type=open_bam, help="alignment bam output")
-    parser.add_argument(
-        "--output",
-        type=argparse.FileType('w'),
-        help="output file")
-    parser.add_argument(
-        "--header",
-        type=str,
-        help="header for UCSC track e.g. 'track header=\"abc\" color=255,255,255'")
+    parser.add_argument("--output", type=argparse.FileType('w'), help="output file")
+    parser.add_argument("--header", type=str, help="header for UCSC track e.g. 'track header=\"abc\" color=255,255,255'")
     parser.add_argument("--min_size", type=int, help="minimum query size")
     args = parser.parse_args()
 
     if args.bam2bed:
-        bam2bed(
-            args.bam,
-            args.output,
-            header=args.header,
-            min_size=args.min_size)
+        bam2bed(args.bam, args.output, header=args.header, min_size=args.min_size)

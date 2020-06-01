@@ -7,23 +7,12 @@ from . import bwa_mem
 
 def find_single_unique(alns, bam, debug=False):
     return bwa_mem.find_single_unique(alns, bam, debug=debug)
-    # return {
-    # 'bwa_mem': bwa_mem.find_single_unique,
-    # }[aligner](alns, bam, debug=debug)
 
 
-def find_adjs(
-        align,
-        contig_seq,
-        is_transcriptome,
-        ins_as_ins=False,
-        query_fasta=None,
-        target_fasta=None):
+def find_adjs(align, contig_seq, is_transcriptome, ins_as_ins=False, query_fasta=None, target_fasta=None):
     adjs = []
 
-    if not align.is_valid() or\
-       not align.cigarstring or\
-       len(align.blocks) != len(align.query_blocks) or\
+    if not align.is_valid() or not align.cigarstring or len(align.blocks) != len(align.query_blocks) or\
        not re.search(r'[ID]\d+', align.cigarstring):
         return adjs
 
@@ -38,34 +27,24 @@ def find_adjs(
     for i in range(0, len(align.blocks) - 1):
         target_gap = align.blocks[i + 1][0] - align.blocks[i][1] - 1
         if align.strand == '+':
-            query_gap = align.query_blocks[i +
-                                           1][0] - align.query_blocks[i][1] - 1
+            query_gap = align.query_blocks[i + 1][0] - align.query_blocks[i][1] - 1
         else:
-            query_gap = align.query_blocks[i][1] - \
-                align.query_blocks[i + 1][0] - 1
+            query_gap = align.query_blocks[i][1] - align.query_blocks[i + 1][0] - 1
 
         # deletion or indel
         if target_gap > 0:
             if gap_count in target_gaps:
                 breaks = (align.blocks[i][1], align.blocks[i + 1][0])
-                contig_breaks = (
-                    align.query_blocks[i][1], align.query_blocks[i + 1][0])
+                contig_breaks = (align.query_blocks[i][1], align.query_blocks[i + 1][0])
 
-                del_seq = target_fasta.fetch(
-                    align.target, breaks[0], breaks[1] - 1)
+                del_seq = target_fasta.fetch(align.target, breaks[0], breaks[1] - 1)
                 if align.strand == '-':
                     del_seq = reverse_complement(del_seq)
 
-                duplicated, repeat_seq, repeat_num = is_duplicated(
-                    del_seq, sorted(contig_breaks, key=int), contig_seq)
+                duplicated, repeat_seq, repeat_num = is_duplicated(del_seq, sorted(contig_breaks, key=int), contig_seq)
                 if duplicated[0] > 0 or duplicated[1] > 0:
-                    contig_breaks = (
-                        contig_breaks[0] -
-                        len(repeat_seq) *
-                        duplicated[0],
-                        contig_breaks[1] +
-                        len(repeat_seq) *
-                        duplicated[1])
+                    contig_breaks = (contig_breaks[0] - len(repeat_seq) * duplicated[0],
+                                     contig_breaks[1] + len(repeat_seq) * duplicated[1])
 
                 if target_gaps[gap_count][0] == 'N' and is_transcriptome:
                     continue
@@ -75,24 +54,18 @@ def find_adjs(
                 else:
                     rearrangement = 'indel'
 
-                probe_seq, break_pos = Adjacency.extract_probe(
-                    contig_seq, contig_breaks)
-                #probe_seq = Adjacency.extract_probe(contig_seq, contig_breaks, kmer_size=51, min_buffer=4)
+                probe_seq, break_pos = Adjacency.extract_probe(contig_seq, contig_breaks)
 
-                adj = Adjacency(
-                    (align.target,
-                     align.target),
-                    breaks,
-                    rearrangement,
-                    contig=align.query,
-                    contig_sizes=len(contig_seq),
-                    contig_breaks=contig_breaks,
-                    probes=probe_seq,
-                    orients=(
-                        'L',
-                        'R'),
-                    aligns=[align],
-                    align_types='gapped')
+                adj = Adjacency((align.target, align.target),
+                                breaks,
+                                rearrangement,
+                                contig=align.query,
+                                contig_sizes=len(contig_seq),
+                                contig_breaks=contig_breaks,
+                                probes=probe_seq,
+                                orients=('L', 'R'),
+                                aligns=[align],
+                                align_types='gapped')
                 adjs.append(adj)
 
                 if duplicated[0] > 0 or duplicated[1] > 0:
@@ -101,8 +74,8 @@ def find_adjs(
                     else:
                         adj.repeat_seq = reverse_complement(repeat_seq.upper())
                     adj.repeat_num = repeat_num
-                    adj.repeat_num_change = '%d>%d' % (
-                        duplicated[0] + duplicated[1] + repeat_num, duplicated[0] + duplicated[1])
+                    adj.repeat_num_change = '{}>{}'.format(duplicated[0] + duplicated[1] + repeat_num,
+                                                           duplicated[0] + duplicated[1])
 
             gap_count += 1
 
@@ -110,67 +83,48 @@ def find_adjs(
         elif query_gap > 0:
             event = 'ins'
             breaks = (align.blocks[i][1], align.blocks[i][1])
-            contig_breaks = (
-                align.query_blocks[i][1], align.query_blocks[i + 1][0])
+            contig_breaks = (align.query_blocks[i][1], align.query_blocks[i + 1][0])
 
             if align.strand == '+':
-                novel_seq = contig_seq[align.query_blocks[i][
-                    1]: align.query_blocks[i][1] + query_gap]
+                novel_seq = contig_seq[align.query_blocks[i][1]: align.query_blocks[i][1] + query_gap]
                 novel_seq_ref = novel_seq
             else:
-                novel_seq = contig_seq[align.query_blocks[i + 1]
-                                       [0]: align.query_blocks[i + 1][0] + query_gap]
+                novel_seq = contig_seq[align.query_blocks[i + 1][0]: align.query_blocks[i + 1][0] + query_gap]
                 novel_seq_ref = reverse_complement(novel_seq)
 
             length_novel_seq = len(novel_seq)
 
-            duplicated, repeat_seq, repeat_num = is_duplicated(
-                novel_seq, sorted(contig_breaks, key=int), contig_seq)
+            duplicated, repeat_seq, repeat_num = is_duplicated(novel_seq, sorted(contig_breaks, key=int), contig_seq)
             if duplicated[0] > 0 or duplicated[1] > 0:
                 if not ins_as_ins:
                     event = 'dup'
 
                     if duplicated[0] > 0:
                         if align.strand == '+':
-                            breaks = (
-                                breaks[0] - length_novel_seq, breaks[1] + 1)
+                            breaks = (breaks[0] - length_novel_seq, breaks[1] + 1)
                         else:
-                            breaks = (
-                                breaks[0], breaks[0] + length_novel_seq + 1)
+                            breaks = (breaks[0], breaks[0] + length_novel_seq + 1)
                     else:
                         if align.strand == '+':
-                            breaks = (
-                                breaks[0], breaks[0] + length_novel_seq + 1)
+                            breaks = (breaks[0], breaks[0] + length_novel_seq + 1)
                         else:
-                            breaks = (
-                                breaks[0] - length_novel_seq, breaks[1] + 1)
+                            breaks = (breaks[0] - length_novel_seq, breaks[1] + 1)
 
-                contig_breaks = (
-                    contig_breaks[0] -
-                    len(repeat_seq) *
-                    duplicated[0],
-                    contig_breaks[1] +
-                    len(repeat_seq) *
-                    duplicated[1])
+                contig_breaks = (contig_breaks[0] - len(repeat_seq) * duplicated[0],
+                                 contig_breaks[1] + len(repeat_seq) * duplicated[1])
 
-            probe_seq, break_pos = Adjacency.extract_probe(
-                contig_seq, contig_breaks)
+            probe_seq, break_pos = Adjacency.extract_probe(contig_seq, contig_breaks)
 
-            adj = Adjacency(
-                (align.target,
-                 align.target),
-                breaks,
-                event,
-                contig=align.query,
-                contig_breaks=contig_breaks,
-                contig_sizes=len(contig_seq),
-                probes=probe_seq,
-                novel_seq=novel_seq_ref,
-                orients=(
-                    'L',
-                    'R'),
-                aligns=[align],
-                align_types='gapped')
+            adj = Adjacency((align.target, align.target),
+                            breaks,
+                            event,
+                            contig=align.query,
+                            contig_breaks=contig_breaks,
+                            contig_sizes=len(contig_seq),
+                            probes=probe_seq,
+                            novel_seq=novel_seq_ref,orients=('L', 'R'),
+                            aligns=[align],
+                            align_types='gapped')
 
             if event == 'dup':
                 if align.strand == '+':
@@ -178,8 +132,8 @@ def find_adjs(
                 else:
                     adj.repeat_seq = reverse_complement(repeat_seq.upper())
                 adj.repeat_num = repeat_num
-                adj.repeat_num_change = '%d>%d' % (
-                    duplicated[0] + duplicated[1], duplicated[0] + duplicated[1] + repeat_num)
+                adj.repeat_num_change = '{}>{}'.format(duplicated[0] + duplicated[1], 
+                                                       duplicated[0] + duplicated[1] + repeat_num)
 
             adjs.append(adj)
 
@@ -260,14 +214,12 @@ def screen_probe_alns(adj_aligns, probe_alns, align_type, min_pc_mapped=1.0):
 
         # if align_type == 'split' and (re.match('\d+M$', aln.cigarstring) or
         # re.match('\d+M.+\d+M$', aln.cigarstring)):
-        if align_type == 'split' and float(
-                matched_len) / float(query_len) >= min_pc_mapped:
+        if align_type == 'split' and float(matched_len) / float(query_len) >= min_pc_mapped:
             return False
 
         # if it's a single alignment and the probe can map perfectly (no clips,
         # no insertion/deletion) to a location -> out
-        if align_type == 'gapped' and aln.rlen == aln.alen and not re.search(
-                '[DIN]', aln.cigarstring):
+        if align_type == 'gapped' and aln.rlen == aln.alen and not re.search('[DIN]', aln.cigarstring):
             return False
 
     return True

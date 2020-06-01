@@ -6,22 +6,10 @@ from .alignment import reverse_complement
 
 
 class Adjacency:
-    def __init__(
-            self,
-            chroms,
-            breaks,
-            rearrangement,
-            novel_seq='-',
-            contig=None,
-            contig_breaks=None,
-            contig_sizes=None,
-            contig_support_span=None,
-            probes=None,
-            orients=None,
-            homol_seq=None,
-            homol_coords=None,
-            aligns=None,
-            align_types=None):
+    def __init__(self, chroms, breaks, rearrangement, novel_seq='-', contig=None,
+                 contig_breaks=None, contig_sizes=None, contig_support_span=None,
+                 probes=None, orients=None, homol_seq=None, homol_coords=None,
+                 aligns=None, align_types=None):
         """
         Args:
             chroms: (str, str) a tuple containing 2 strings (if list provided, will convert to tuple)
@@ -95,27 +83,16 @@ class Adjacency:
         self.repeat_num_change = None
 
     def debug(self):
-        print(
-            '%s %s %s %s %s %s' %
-            (self.rearrangement,
-             self.chroms,
-             self.breaks,
-             self.get_size(),
-             ','.join(
-                 self.contigs),
-                self.orients))
-
-    # def sum_support(self, normal=False):
-        # if not normal:
-        # return self.support['spanning'] + self.support['flanking']
-        # else:
-        # return self.support_normal['spanning'] +
-        # self.support_normal['flanking']
+        print('{} {} {} {} {} {}'.format(self.rearrangement,
+                                         self.chroms,
+                                         self.breaks,
+                                         self.get_size(),
+                                         ','.join(self.contigs),
+                                         self.orients))
 
     def get_size(self):
         size = 0
-        if self.align_types[0] == 'gapped' and self.rearrangement in (
-                'ins', 'dup'):
+        if self.align_types[0] == 'gapped' and self.rearrangement in ('ins', 'dup'):
             if self.novel_seq:
                 size = len(self.novel_seq)
         elif self.insertion_size is not None:
@@ -134,22 +111,14 @@ class Adjacency:
 
     def as_vcf(self, ref_fasta, size_threshold, genomic=True):
         size = self.get_size()
-        if (self.rearrangement == 'ins' or self.rearrangement ==
-                'del') and isinstance(size, int) and size <= size_threshold:
+        if (self.rearrangement == 'ins' or self.rearrangement == 'del') and isinstance(size, int) and size <= size_threshold:
             return self.as_indel(ref_fasta)
         elif self.rearrangement == 'trl':
             return self.as_breakends(ref_fasta, genomic)
         else:
             return self.as_sv(ref_fasta)
 
-    def as_breakends(
-            self,
-            ref_fasta,
-            genomic=True,
-            max_novel_seq_len=50,
-            info_ext=None,
-            parids=None,
-            event=None):
+    def as_breakends(self, ref_fasta, genomic=True, max_novel_seq_len=50, info_ext=None, parids=None, event=None):
         chroms = list(map(lambda c: c.lstrip('chr'), self.chroms))
         alt_chroms = chroms[:]
         pos = list(self.breaks)
@@ -158,28 +127,23 @@ class Adjacency:
         inserted_seqs = ['', '']
         if self.novel_seq and self.novel_seq != 'NA' and self.novel_seq != '-':
             if len(self.novel_seq) > max_novel_seq_len:
-                alt_chroms[0] = '<%s>' % self.contigs[0]
-                alt_chroms[1] = '<%s>' % self.contigs[0]
+                alt_chroms[0] = '<{}>'.format(self.contigs[0])
+                alt_chroms[1] = '<{}>'.format(self.contigs[0])
                 alt_pos[1] = self.contig_breaks[0][0] + 1
                 alt_pos[0] = self.contig_breaks[0][1] - 1
             else:
                 if len(self.aligns[0]) == 1:
-                    inserted_seqs[0] = self.novel_seq if self.aligns[0][0].strand == '+' else reverse_complement(
-                        self.novel_seq)
-                    inserted_seqs[1] = self.novel_seq if self.aligns[0][0].strand == '+' else reverse_complement(
-                        self.novel_seq)
+                    inserted_seqs[0] = self.novel_seq if self.aligns[0][0].strand == '+' else reverse_complement(self.novel_seq)
+                    inserted_seqs[1] = self.novel_seq if self.aligns[0][0].strand == '+' else reverse_complement(self.novel_seq)
                 else:
-                    inserted_seqs[0] = self.novel_seq if self.aligns[0][0].strand == '+' else reverse_complement(
-                        self.novel_seq)
-                    inserted_seqs[1] = self.novel_seq if self.aligns[0][1].strand == '+' else reverse_complement(
-                        self.novel_seq)
+                    inserted_seqs[0] = self.novel_seq if self.aligns[0][0].strand == '+' else reverse_complement(self.novel_seq)
+                    inserted_seqs[1] = self.novel_seq if self.aligns[0][1].strand == '+' else reverse_complement(self.novel_seq)
 
         # microhomology, cipos
         cipos = None
         homol_len = None
         homol_seq = None
-        if self.homol_seq and self.homol_seq[0] != '-' and len(
-                self.homol_seq) > 0:
+        if self.homol_seq and self.homol_seq[0] != '-' and len(self.homol_seq) > 0:
             homol_seq = self.homol_seq[0].upper()
             homol_len = len(self.homol_seq[0])
             contig_breaks = self.contig_breaks[0]
@@ -190,24 +154,20 @@ class Adjacency:
             elif contig_breaks[0] >= contig_breaks[1]:
                 pos[0] -= homol_len
                 alt_pos[1] += homol_len
-                cipos = '0,%d' % homol_len
+                cipos = '0,{}'.format(homol_len)
 
-        refs = (
-            ref_fasta.fetch(
-                self.chroms[0],
-                self.breaks[0] - 1,
-                self.breaks[0]).upper(),
-            ref_fasta.fetch(
-                self.chroms[1],
-                self.breaks[1] - 1,
-                self.breaks[1]).upper())
+        refs = (ref_fasta.fetch(self.chroms[0], self.breaks[0] - 1, self.breaks[0]).upper(),
+                ref_fasta.fetch(self.chroms[1], self.breaks[1] - 1, self.breaks[1]).upper())
 
-        ids = ('%s%s' % (self.id, 'a'),
-               '%s%s' % (self.id, 'b'))
+        ids = ('{}{}'.format(self.id, 'a'), '{}{}'.format(self.id, 'b'))
 
         svtype = 'BND' if genomic else 'FND'
-        infos = [{'SVTYPE': svtype, 'MATEID': ids[1], 'EVENTTYPE':self.rearrangement.upper(
-        )}, {'SVTYPE': svtype, 'MATEID': ids[0], 'EVENTTYPE':self.rearrangement.upper()}]
+        infos = [{'SVTYPE': svtype,
+                  'MATEID': ids[1],
+                  'EVENTTYPE':self.rearrangement.upper()},
+                 {'SVTYPE': svtype,
+                   'MATEID': ids[0],
+                   'EVENTTYPE':self.rearrangement.upper()}]
         if cipos is not None:
             infos[0]['CIPOS'] = cipos
             infos[1]['CIPOS'] = cipos
@@ -220,8 +180,6 @@ class Adjacency:
 
         # read support
         if self.final_support is not None:
-            #infos[0]['READSUPPORT'] = self.final_support
-            #infos[1]['READSUPPORT'] = self.final_support
             infos[0]['SPANNING_READS'] = self.support['spanning']
             infos[1]['SPANNING_READS'] = self.support['spanning']
             if self.support['flanking'] is not NONE:
@@ -247,7 +205,7 @@ class Adjacency:
             contig_breaks = []
             for bk in self.contig_breaks:
                 if len(bk) == 2:
-                    contig_breaks.append('%s-%s' % (bk[0], bk[1]))
+                    contig_breaks.append('{}-{}'.format(bk[0], bk[1]))
                 else:
                     print('error')
 
@@ -265,36 +223,31 @@ class Adjacency:
         if self.orients[0] == 'L':
             # LL
             if self.orients[1] == 'L':
-                alts = (
-                    '%s%s]%s:%s]' %
-                    (refs[0], inserted_seqs[0], alt_chroms[1], alt_pos[1]), '%s%s]%s:%s]' %
-                    (refs[1], inserted_seqs[1], alt_chroms[0], alt_pos[0]))
+                alts = ('{}{}]{}:{}]'.format(refs[0], inserted_seqs[0], alt_chroms[1], alt_pos[1]),
+                        '{}{}]{}:{}]'.format(refs[1], inserted_seqs[1], alt_chroms[0], alt_pos[0]))
             # LR
             else:
-                alts = (
-                    '%s%s[%s:%s[' %
-                    (refs[0], inserted_seqs[0], alt_chroms[1], alt_pos[1]), ']%s:%s]%s%s' %
-                    (alt_chroms[0], alt_pos[0], inserted_seqs[1], refs[1]))
+                alts = ('{}{}[{}:{}['.format(refs[0], inserted_seqs[0], alt_chroms[1], alt_pos[1]),
+                        ']{}:{}]{}{}'.format(alt_chroms[0], alt_pos[0], inserted_seqs[1], refs[1]))
         else:
             # RL
             if self.orients[1] == 'L':
-                alts = (
-                    ']%s:%s]%s%s' %
-                    (chroms[1], alt_pos[1], inserted_seqs[0], refs[0]), '%s%s[%s:%s[' %
-                    (refs[1], inserted_seqs[1], chroms[0], alt_pos[0]))
+                alts = (']{}:{}]{}{}'.format(chroms[1], alt_pos[1], inserted_seqs[0], refs[0]),
+                        '{}{}[{}:{}['.format(refs[1], inserted_seqs[1], chroms[0], alt_pos[0]))
             # RR
             else:
-                alts = (
-                    '[%s:%s[%s%s' %
-                    (chroms[1], alt_pos[1], inserted_seqs[0], refs[0]), '[%s:%s[%s%s' %
-                    (chroms[0], alt_pos[0], inserted_seqs[1], refs[1]))
+                alts = ('[{}:{}[{}{}'.format(chroms[1], alt_pos[1], inserted_seqs[0], refs[0]),
+                        '[{}:{}[{}{}'.format(chroms[0], alt_pos[0], inserted_seqs[1], refs[1]))
 
-        breakends = map(
-            lambda i: '\t'.join(
-                [
-                    chroms[i], str(
-                        pos[i]), ids[i], refs[i], alts[i], '.', '.', VCF.info_dict_to_str(
-                        infos[i])]), range(2))
+        breakends = map(lambda i: '\t'.join([chroms[i],
+                                             str(pos[i]),
+                                             ids[i],
+                                             refs[i],
+                                             alts[i],
+                                             '.',
+                                             '.',
+                                             VCF.info_dict_to_str(infos[i])]),
+                        range(2))
 
         return '\n'.join(breakends)
 
@@ -305,32 +258,20 @@ class Adjacency:
         ref = alt = None
         size = self.get_size()
         if self.rearrangement == 'del':
-            ref = ref_fasta.fetch(
-                self.chroms[0],
-                self.breaks[0] - 1,
-                self.breaks[1] - 1).upper()
-            alt = ref_fasta.fetch(
-                self.chroms[0],
-                self.breaks[0] - 1,
-                self.breaks[0]).upper()
+            ref = ref_fasta.fetch(self.chroms[0], self.breaks[0] - 1, self.breaks[1] - 1).upper()
+            alt = ref_fasta.fetch(self.chroms[0], self.breaks[0] - 1, self.breaks[0]).upper()
 
         else:
-            ref = ref_fasta.fetch(
-                self.chroms[0],
-                self.breaks[0] - 1,
-                self.breaks[1]).upper()
+            ref = ref_fasta.fetch(self.chroms[0], self.breaks[0] - 1, self.breaks[1]).upper()
             alt = ref + self.novel_seq.upper()
 
         id = self.id
         qual = '.'
         filter = '.'
-        info = {
-            'BKPTID': ','.join(self.contigs),
-        }
+        info = {'BKPTID': ','.join(self.contigs),}
 
         # read support
         if self.final_support is not None:
-            #info['READSUPPORT'] = self.final_support
             info['SPANNING_READS'] = self.support['spanning']
 
         # somatic
@@ -347,27 +288,17 @@ class Adjacency:
                 info['REPEAT_NUM_CHANGE'] = self.repeat_num_change
 
         if ref is not None and alt is not None:
-            fields = [chrom, pos, id, ref, alt, qual,
-                      filter, VCF.info_dict_to_str(info)]
+            fields = [chrom, pos, id, ref, alt, qual, filter, VCF.info_dict_to_str(info)]
             return '\t'.join(map(str, fields))
 
-    def as_sv(
-            self,
-            ref_fasta,
-            id_ext=None,
-            info_ext=None,
-            chrom_ext=None,
-            pos_ext=None):
+    def as_sv(self, ref_fasta, id_ext=None, info_ext=None, chrom_ext=None, pos_ext=None):
         chrom = self.chroms[0] if chrom_ext is None else chrom_ext
         pos = self.breaks[0] if pos_ext is None else pos_ext
 
         chrom = chrom.lstrip('chr')
 
         alt = None
-        ref = ref_fasta.fetch(
-            self.chroms[0],
-            self.breaks[0] - 1,
-            self.breaks[0]).upper()
+        ref = ref_fasta.fetch(self.chroms[0], self.breaks[0] - 1, self.breaks[0]).upper()
         sv_len = self.get_size()
         end = None
         if isinstance(sv_len, int):
@@ -433,11 +364,10 @@ class Adjacency:
             contig_breaks = self.contig_breaks[0]
             # e.g. GMAP
             if contig_breaks[0] + 1 == contig_breaks[1]:
-                # print 'gmap', contig_breaks
                 pass
             # e.g. BWA-mem
             elif contig_breaks[0] >= contig_breaks[1]:
-                cipos = '0,%d' % homol_len
+                cipos = '0,{}'.format(homol_len)
 
         if cipos is not None:
             info['CIPOS'] = cipos
@@ -457,8 +387,7 @@ class Adjacency:
                 info[key] = value
 
         if ref is not None and alt is not None:
-            fields = [chrom, pos, id, ref, alt, qual,
-                      filter, VCF.info_dict_to_str(info)]
+            fields = [chrom, pos, id, ref, alt, qual, filter, VCF.info_dict_to_str(info)]
             return '\t'.join(map(str, fields))
 
     @classmethod
@@ -614,8 +543,6 @@ class Adjacency:
             data.append(self.chroms[i])
             data.append(str(self.breaks[i] - 1))
             data.append(str(self.breaks[i]))
-        # data.append(self.key())
-        # name == ID
         data.append(custom_fields[0])
         data.append('.')
         data.append('+')
@@ -631,20 +558,9 @@ class Adjacency:
         # rest of fields, starting from 'size'
         data.extend(custom_fields[8:])
 
-        # for i in range(len(self.orients)):
-        # if i == 'L':
-        # data.append('+')
-        # else:
-        # data.append('-')
-
         return '\t'.join(data)
 
     def get_contig_support_span(self, contig_index):
-        # if self.homol_coords and self.homol_coords[contig_index][0] is int and self.homol_coords[contig_index][1] is int:
-        # return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
-        # else:
-        # return (self.contig_breaks[contig_index][0],
-        # self.contig_breaks[contig_index][1])
         try:
             return (
                 self.homol_coords[contig_index][0],
@@ -653,14 +569,6 @@ class Adjacency:
             return (
                 self.contig_breaks[contig_index][0],
                 self.contig_breaks[contig_index][1])
-
-    # def sum_support(self, normal=False):
-        #(support, support_total) = (self.support, self.support_total) if not normal else (self.support_normal, self.support_total_normal)
-        # for kind, nums in support.items():
-            # if kind == 'tiling':
-            # continue
-
-            #support_total[kind] = sum(nums)
 
     def key(self, transcriptome=False, include_novel_seq=False):
         """Constructs a unique key for grouping adjacencies
@@ -691,17 +599,10 @@ class Adjacency:
         upstream_coord = max(0, start - len_on_each_side)
         downstream_coord = min(end - 1 + len_on_each_side, len(contig_seq))
 
-        return contig_seq[upstream_coord:downstream_coord], start - \
-            upstream_coord
+        return contig_seq[upstream_coord:downstream_coord], start - upstream_coord
 
     @classmethod
-    def extract_probe_new(
-            cls,
-            contig_seq,
-            contig_breaks,
-            len_on_each_side=50,
-            kmer_size=None,
-            min_buffer=1):
+    def extract_probe_new(cls, contig_seq, contig_breaks, len_on_each_side=50, kmer_size=None, min_buffer=1):
         probe = 'NA'
         contig_breaks_sorted = sorted(contig_breaks)
         print(contig_breaks_sorted, min_buffer, kmer_size)
@@ -720,20 +621,14 @@ class Adjacency:
         subseqs = []
         aligns = self.aligns[0]
         for i in range(len(aligns)):
-            subseqs.append(
-                contig_fasta.fetch(
-                    self.contigs[0],
-                    aligns[i].qstart - 1,
-                    aligns[i].qend))
+            subseqs.append(contig_fasta.fetch(self.contigs[0], aligns[i].qstart - 1, aligns[i].qend))
 
         return subseqs
 
     @classmethod
     def group_inversions(cls, adjs):
         """Group 2 inversion adjacencies into a single event"""
-        inversions = sorted(
-            adjs, key=lambda adj: (
-                adj.chroms[0], adj.breaks[0]))
+        inversions = sorted(adjs, key=lambda adj: (adj.chroms[0], adj.breaks[0]))
 
         max_homology = 25
         variants = []
@@ -742,13 +637,9 @@ class Adjacency:
             if inversions[i].chroms[0] == inversions[i + 1].chroms[0] and\
                inversions[i + 1].breaks[0] - inversions[i].breaks[0] <= max_homology and\
                ((inversions[i].orients == ('L', 'L') and inversions[i + 1].orients == ('R', 'R')) or
-                    (inversions[i].orients == ('R', 'R') and inversions[i + 1].orients == ('L', 'L'))):
+                (inversions[i].orients == ('R', 'R') and inversions[i + 1].orients == ('L', 'L'))):
 
-                (adj1,
-                 adj2) = (inversions[i],
-                          inversions[i + 1]) if inversions[i].orients == ('L',
-                                                                          'L') else (inversions[i + 1],
-                                                                                     inversions[i])
+                (adj1, adj2) = (inversions[i], inversions[i + 1]) if inversions[i].orients == ('L', 'L') else (inversions[i + 1], inversions[i])
 
                 variants.append(Variant('INV', [adj1, adj2]))
                 i += 2
@@ -810,36 +701,45 @@ class Adjacency:
                         target_chrom = trls[i].chroms[0]
                         target_breaks = trls[i].breaks[0], trls[j].breaks[0]
                         target_orients = trls[i].orients[0], trls[j].orients[0]
-                        target_spans = (trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend), (
-                            trls[j].aligns[0][0].tstart, trls[j].aligns[0][0].tend)
+                        target_spans = (trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend),\
+                                       (trls[j].aligns[0][0].tstart, trls[j].aligns[0][0].tend)
                         source_chroms = trls[i].chroms[1]
                         source_breaks = trls[i].breaks[1], trls[j].breaks[1]
                         source_orients = trls[i].orients[1], trls[j].orients[1]
-                        source_spans = min(
-                            trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend, trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend), max(
-                            trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend, trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend)
+                        source_spans = min(trls[i].aligns[0][1].tstart,
+                                           trls[i].aligns[0][1].tend,
+                                           trls[j].aligns[0][1].tstart,
+                                           trls[j].aligns[0][1].tend),\
+                                       max(trls[i].aligns[0][1].tstart,
+                                           trls[i].aligns[0][1].tend,
+                                           trls[j].aligns[0][1].tstart,
+                                           trls[j].aligns[0][1].tend)
 
                         if trls[i].aligns[0][0].dubious:
-                            print(
-                                'anchor',
-                                target_chrom,
-                                target_breaks,
-                                trls[i].aligns[0][0].target,
-                                trls[i].aligns[0][0].tstart,
-                                trls[i].aligns[0][0].tend)
+                            print('anchor',
+                                  target_chrom,
+                                  target_breaks,
+                                  trls[i].aligns[0][0].target,
+                                  trls[i].aligns[0][0].tstart,
+                                  trls[i].aligns[0][0].tend)
                             anchor_dubious = True
                     else:
                         target_chrom = trls[i].chroms[1]
                         target_breaks = trls[i].breaks[1], trls[j].breaks[1]
                         target_orients = trls[i].orients[1], trls[j].orients[1]
-                        target_spans = (trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend), (
-                            trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend)
+                        target_spans = (trls[i].aligns[0][1].tstart, trls[i].aligns[0][1].tend),\
+                                       (trls[j].aligns[0][1].tstart, trls[j].aligns[0][1].tend)
                         source_chroms = trls[i].chroms[0]
                         source_breaks = trls[i].breaks[0], trls[j].breaks[0]
                         source_orients = trls[i].orients[0], trls[j].orients[0]
-                        source_spans = min(
-                            trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend, trls[j].aligns[0][0].tstart, trls[j].aligns[0][0].tend), max(
-                            trls[i].aligns[0][0].tstart, trls[i].aligns[0][0].tend, trls[j].aligns[0][0].tstart, trls[j].aligns[0][0].tend)
+                        source_spans = min(trls[i].aligns[0][0].tstart,
+                                           trls[i].aligns[0][0].tend,
+                                           trls[j].aligns[0][0].tstart,
+                                           trls[j].aligns[0][0].tend),\
+                                       max(trls[i].aligns[0][0].tstart,
+                                           trls[i].aligns[0][0].tend,
+                                           trls[j].aligns[0][0].tstart,
+                                           trls[j].aligns[0][0].tend)
 
                         if trls[i].aligns[0][1].dubious:
                             anchor_dubious = True
@@ -847,27 +747,27 @@ class Adjacency:
                     if anchor_dubious:
                         continue
 
-                    if abs(
-                        target_breaks[0] -
-                        target_breaks[1]) <= neighborhood and target_orients[0] != target_orients[1] and source_breaks == source_spans and (
-                        (source_orients[0] == 'L' and source_orients[1] == 'R' and source_breaks[1] < source_breaks[0]) or (
-                            source_orients[0] == 'R' and source_orients[1] == 'L' and source_breaks[0] < source_breaks[1])):
+                    if abs(target_breaks[0] - target_breaks[1]) <= neighborhood and\
+                       target_orients[0] != target_orients[1] and\
+                       source_breaks == source_spans and\
+                       ((source_orients[0] == 'L' and\
+                         source_orients[1] == 'R' and\
+                         source_breaks[1] < source_breaks[0]) or\
+                        (source_orients[0] == 'R' and\
+                         source_orients[1] == 'L' and\
+                         source_breaks[0] < source_breaks[1])):
 
                         if source_breaks[0] > source_breaks[1]:
-                            insertion_size = source_breaks[0] - \
-                                source_breaks[1] + 1
+                            insertion_size = source_breaks[0] - source_breaks[1] + 1
                         else:
-                            insertion_size = source_breaks[1] - \
-                                source_breaks[0] + 1
+                            insertion_size = source_breaks[1] - source_breaks[0] + 1
 
                         trls[i].rearrangement = 'ins'
                         trls[j].rearrangement = 'ins'
                         trls[i].insertion_size = insertion_size
                         trls[j].insertion_size = insertion_size
 
-                        insertion = Variant(
-                            'INS', [
-                                trls[i], trls[j]], chrom=target_chrom, pos=target_breaks)
+                        insertion = Variant('INS', [trls[i], trls[j]], chrom=target_chrom, pos=target_breaks)
                         insertions.append(insertion)
                         used.add(i)
                         used.add(j)
@@ -884,8 +784,7 @@ class Adjacency:
 
         # if insertion is at second chromosome
         if trls_remained:
-            insertions, trls_remained = pair_up(
-                trls_remained, ins_at_first=False)
+            insertions, trls_remained = pair_up(trls_remained, ins_at_first=False)
             variants.extend(insertions)
 
         return variants, trls_remained
@@ -893,8 +792,7 @@ class Adjacency:
     @classmethod
     def group_trls(cls, adjs):
         """Group 2 translocation adjacencies into single reciprocal event"""
-        trls = sorted([adj for adj in adjs if not adj.dubious],
-                      key=lambda adj: (adj.chroms[0], adj.breaks[0]))
+        trls = sorted([adj for adj in adjs if not adj.dubious], key=lambda adj: (adj.chroms[0], adj.breaks[0]))
 
         grouped_trl_ids = set()
         neighborhood = 10000
@@ -908,8 +806,8 @@ class Adjacency:
                    abs(trls[i + 1].breaks[1] - trls[i].breaks[1]) <= neighborhood and\
                    ((trls[i].orients == ('L', 'R') and trls[i + 1].orients == ('R', 'L')) or
                     (trls[i].orients == ('R', 'L') and trls[i + 1].orients == ('L', 'R')) or
-                            (trls[i].orients == ('L', 'L') and trls[i + 1].orients == ('R', 'R')) or
-                        (trls[i].orients == ('R', 'R') and trls[i + 1].orients == ('L', 'L'))
+                    (trls[i].orients == ('L', 'L') and trls[i + 1].orients == ('R', 'R')) or
+                    (trls[i].orients == ('R', 'R') and trls[i + 1].orients == ('L', 'L'))
                     ):
                     variants.append(Variant('TRL', [trls[i], trls[i + 1]]))
                     grouped_trl_ids.add(trls[i].id)
@@ -938,31 +836,23 @@ class Adjacency:
                             adj1.breaks[t1] -
                             adj2.breaks[t2]) <= neighborhood and adj1.orients[t1] != adj2.orients[t2]:
                         if adj1.chroms[s1] == adj2.chroms[s2]:
-                            if abs(
-                                    adj1.breaks[s1] -
-                                    adj2.breaks[s2]) > neighborhood:
+                            if abs(adj1.breaks[s1] - adj2.breaks[s2]) > neighborhood:
                                 if (int(adj1.aligns[0][t1].tstart) < int(adj2.aligns[0][t2].tstart) and
-                                    adj1.orients[t1] == 'L' and
-                                    adj2.orients[t2] == 'R' and
+                                    adj1.orients[t1] == 'L' and adj2.orients[t2] == 'R' and
                                     ((adj1.breaks[s1] < adj2.breaks[s2] and
-                                      adj1.orients[s1] == 'R' and
-                                      adj2.orients[s2] == 'L')
+                                      adj1.orients[s1] == 'R' and adj2.orients[s2] == 'L')
                                      or
                                      (adj1.breaks[s1] > adj2.breaks[s2] and
-                                      adj1.orients[s1] == 'L' and
-                                      adj2.orients[s2] == 'R'))
+                                      adj1.orients[s1] == 'L' and adj2.orients[s2] == 'R'))
                                     )\
                                    or\
                                    (int(adj2.aligns[0][t2].tstart) < int(adj1.aligns[0][t1].tstart) and
-                                    adj2.orients[t2] == 'L' and
-                                    adj1.orients[t1] == 'R' and
+                                    adj2.orients[t2] == 'L' and adj1.orients[t1] == 'R' and
                                     ((adj2.breaks[s2] < adj1.breaks[s1] and
-                                              adj2.orients[s2] == 'R' and
-                                              adj1.orients[s1] == 'L')
-                                             or
-                                             (adj2.breaks[s2] > adj1.breaks[s1] and
-                                              adj2.orients[s2] == 'L' and
-                                              adj1.orients[s1] == 'R'))
+                                      adj2.orients[s2] == 'R' and adj1.orients[s1] == 'L')
+                                     or
+                                     (adj2.breaks[s2] > adj1.breaks[s1] and
+                                      adj2.orients[s2] == 'L' and  adj1.orients[s1] == 'R'))
                                     ):
                                     return (s1, s2, t1, t2)
 
@@ -988,40 +878,29 @@ class Adjacency:
                 ins_event = screen_insertion(adjs[i], adjs[j])
 
                 if ins_event is not None:
-                    src_chroms = adjs[i].chroms[ins_event[0]
-                                                ], adjs[j].chroms[ins_event[1]]
-                    src_coords = sorted(
-                        [adjs[i].breaks[ins_event[0]], adjs[j].breaks[ins_event[0]]])
+                    src_chroms = adjs[i].chroms[ins_event[0]], adjs[j].chroms[ins_event[1]]
+                    src_coords = sorted([adjs[i].breaks[ins_event[0]], adjs[j].breaks[ins_event[0]]])
                     target_chrom = adjs[i].chroms[ins_event[2]]
-                    target_coords = sorted(
-                        [adjs[i].breaks[ins_event[2]], adjs[j].breaks[ins_event[3]]])
+                    target_coords = sorted([adjs[i].breaks[ins_event[2]], adjs[j].breaks[ins_event[3]]])
                     ins_size = None
                     if src_chroms[0] == src_chroms[1]:
                         ins_size = src_coords[1] - src_coords[0] + 1
                     if debug:
-                        sys.stdout.write(
-                            'ins_grouped contigs:%s,%s source:%s:%s %s:%s target:%s:%s-%s\n' %
-                            (adjs[i].contigs[0],
-                             adjs[j].contigs[0],
-                                src_chroms[0],
-                                src_coords[0],
-                                src_chroms[1],
-                                src_coords[1],
-                                target_chrom,
-                                target_coords[0],
-                                target_coords[1]))
+                        sys.stdout.write('ins_grouped contigs:{},{} source:{}:{} {}:{} target:{}:{}-{}\n'.format(adjs[i].contigs[0],
+                                                                                                                 adjs[j].contigs[0],
+                                                                                                                 src_chroms[0],
+                                                                                                                 src_coords[0],
+                                                                                                                 src_chroms[1],
+                                                                                                                 src_coords[1],
+                                                                                                                 target_chrom,
+                                                                                                                 target_coords[0],
+                                                                                                                 target_coords[1]))
                     adjs[i].rearrangement = 'ins'
                     adjs[j].rearrangement = 'ins'
                     adjs[i].insertion_size = ins_size
                     adjs[j].insertion_size = ins_size
 
-                    insertions.append(
-                        Variant(
-                            'INS',
-                            (adjs[i],
-                             adjs[j]),
-                            chrom=target_chrom,
-                            pos=target_coords))
+                    insertions.append(Variant('INS', (adjs[i], adjs[j]), chrom=target_chrom, pos=target_coords))
 
                     used_contigs.add(adjs[i].contigs[0])
                     used_contigs.add(adjs[j].contigs[0])
@@ -1052,8 +931,7 @@ class Adjacency:
                 first_adj.contig_breaks.append(adj.contig_breaks[0])
                 first_adj.contig_sizes.append(adj.contig_sizes[0])
                 if adj.contig_support_span:
-                    first_adj.contig_support_span.append(
-                        adj.contig_support_span[0])
+                    first_adj.contig_support_span.append(adj.contig_support_span[0])
                 if adj.probes:
                     first_adj.probes.append(adj.probes[0])
                 else:
@@ -1073,15 +951,7 @@ class Adjacency:
                 if hasattr(first_adj, attr) and hasattr(first_adj, attr) and\
                    getattr(first_adj, attr) is not None and\
                    getattr(adj, attr) is not None:
-                    setattr(
-                        first_adj,
-                        attr,
-                        getattr(
-                            first_adj,
-                            attr) +
-                        getattr(
-                            adj,
-                            attr))
+                    setattr(first_adj, attr, getattr(first_adj, attr) + getattr(adj, attr))
 
         # for generating ID
         count = 1
@@ -1127,12 +997,7 @@ class Adjacency:
                 out: Filehandle of output file
                 name_sep: (str) Character used to combine various info into query name
             """
-            out.write(
-                '>%s%s%s\n%s\n' %
-                (adj.contigs[0],
-                 name_sep,
-                 adj.key(),
-                    adj.probes[0]))
+            out.write('>{}{}{}\n{}\n'.format(adj.contigs[0], name_sep, adj.key(), adj.probes[0]))
 
         def write_subseq(adj, out, name_sep, contigs_fasta):
             """Outputs the sub-sequence of a split alignment to output file
@@ -1144,20 +1009,13 @@ class Adjacency:
             """
             subseqs = adj.extract_subseqs(contigs_fasta)
             for i in range(len(subseqs)):
-                out.write(
-                    '>%s%s%s%s%d\n%s\n' %
-                    (adj.contigs[0],
-                     name_sep,
-                     adj.key(),
-                        name_sep,
-                        i,
-                        subseqs[i]))
+                out.write('>{}{}{}{}{}\n{}\n'.format(adj.contigs[0], name_sep, adj.key(), name_sep, i, subseqs[i]))
 
         import bwa_mem
 
         prefix = 'realign'
         if not use_realigns:
-            out_file = '%s/%s.fa' % (out_dir, prefix)
+            out_file = '{}/{}.fa'.format(out_dir, prefix)
             out = open(out_file, 'w')
             for adj in adjs:
                 if probe:
@@ -1167,13 +1025,8 @@ class Adjacency:
             out.close()
 
         # run aligner
-        realign_bam_file = '%s/%s.bam' % (out_dir, prefix)
+        realign_bam_file = '{}/{}.bam'.format(out_dir, prefix)
         if not use_realigns:
-            return_code = bwa_mem.run(
-                out_file,
-                realign_bam_file,
-                genome,
-                index_dir,
-                num_procs)
+            return_code = bwa_mem.run(out_file, realign_bam_file, genome, index_dir, num_procs)
 
         return realign_bam_file

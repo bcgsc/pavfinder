@@ -32,22 +32,17 @@ def find_chimera(alns, bam, debug=False, check_haplotype=True):
         if bad_aligns:
             if debug:
                 for align in bad_aligns:
-                    sys.stdout.write(
-                        'bad alignment %s %s %s %s %s %s' %
-                        (align.query,
-                         align.qstart,
-                         align.qend,
-                         align.target,
-                         align.tstart,
-                         align.tend))
+                    sys.stdout.write('bad alignment {} {} {} {} {} {}'.format(align.query,
+                                                                              align.qstart,
+                                                                              align.qend,
+                                                                              align.target,
+                                                                              align.tstart,
+                                                                              align.tend))
         else:
             valid_secondary_aligns = []
             if secondary_alns:
-                secondary_aligns = [
-                    Alignment.from_alignedRead(
-                        aln, bam) for aln in secondary_alns]
-                valid_secondary_aligns = [
-                    align for align in secondary_aligns if align.is_valid()]
+                secondary_aligns = [Alignment.from_alignedRead(aln, bam) for aln in secondary_alns]
+                valid_secondary_aligns = [align for align in secondary_aligns if align.is_valid()]
 
             return aligns, valid_secondary_aligns
 
@@ -112,51 +107,30 @@ def find_single_unique(alns, bam, debug=False):
     Returns:
         Alignment object or None
     """
-    primary_alns = [
-        aln for aln in alns if not aln.is_unmapped and not aln.is_secondary]
+    primary_alns = [aln for aln in alns if not aln.is_unmapped and not aln.is_secondary]
     if len(primary_alns) == 1:
         if primary_alns[0].mapq > 0:
-            matched_and_insertion_len = sum(
-                [a[1] for a in primary_alns[0].cigar if a[0] <= 1])
-            if float(matched_and_insertion_len) / \
-                    float(primary_alns[0].rlen) < 0.95:
+            matched_and_insertion_len = sum([a[1] for a in primary_alns[0].cigar if a[0] <= 1])
+            if float(matched_and_insertion_len) / float(primary_alns[0].rlen) < 0.95:
                 if debug:
-                    sys.stdout.write(
-                        'best alignment less than 0.95 mapped:%s %s\n' %
-                        (alns[0].qname, alns[0].cigarstring))
+                    sys.stdout.write('best alignment less than 0.95 mapped:{} {}\n'.format(alns[0].qname,
+                                                                                           alns[0].cigarstring))
                 return None
 
             else:
                 edit_distance = effective_edit_distance(alns[0])
-                if edit_distance is not None and float(
-                        edit_distance) / float(primary_alns[0].inferred_length) > 0.1:
+                if edit_distance is not None and float(edit_distance) / float(primary_alns[0].inferred_length) > 0.1:
                     if debug:
-                        sys.stdout.write(
-                            'filter out single uniq alignment %s: edit distance %s - > 0.1 of contig len %d (%.01f)\n' %
-                            (alns[0].qname,
-                             edit_distance,
-                             primary_alns[0].inferred_length,
-                                float(edit_distance) /
-                                float(
-                                primary_alns[0].inferred_length)))
+                        sys.stdout.write('filter out single uniq alignment {}: edit distance {} - > 0.1 of contig len {} ({:.01f})\n'.format(alns[0].qname,
+                                                                                                                                             edit_distance,
+                                                                                                                                             primary_alns[0].inferred_length,
+                                                                                                                                             float(edit_distance) / float(primary_alns[0].inferred_length)))
                     return None
 
         else:
             if debug:
-                sys.stdout.write(
-                    'filter out single uniq alignment %s: mapq = 0\n' %
-                    primary_alns[0].qname)
+                sys.stdout.write('filter out single uniq alignment {}: mapq = 0\n'.format(primary_alns[0].qname))
             return None
-
-        #ambiguous_NM = 5
-        # for aln in alns:
-            # if aln.is_secondary and \
-            # not re.search('[HS]', aln.cigarstring) and\
-            # re.match('\d+M', aln.cigarstring) and re.search('\d+M$', aln.cigarstring) and\
-            # int(aln.opt('NM')) - int(primary_alns[0].opt('NM')) <= ambiguous_NM:
-            # if debug:
-            #sys.stdout.write('secondary alignments too similar %s\n' % primary_alns[0].qname)
-            # return None
 
         return Alignment.from_alignedRead(primary_alns[0], bam)
     else:
@@ -175,14 +149,13 @@ def run(fasta, output_bam, genome, index_dir=None, num_threads=4):
     Returns:
         return code of system call
     """
-    cmd = 'bwa mem -a -t %d %s/%s %s | samtools view -bhS - -o %s' % (
-        num_threads, index_dir, genome, fasta, output_bam)
+    cmd = 'bwa mem -a -t {} {}/{} {} | samtools view -bhS - -o {}'.format(num_threads, index_dir, genome, fasta, output_bam)
 
     print(cmd)
     try:
         returncode = check_call(cmd, shell=True)
     except CalledProcessError as e:
-        sys.stderr.write('Failed to align:%s\n' % e.cmd)
+        sys.stderr.write('Failed to align:{}\n'.format(e.cmd))
         returncode = e.returncode
 
     return returncode
@@ -204,8 +177,8 @@ def find_microhomology(aligns, contig_seq):
     homol_seq = None
     homol_coords = None
 
-    contig_span1 = intspan('%s-%s' % (aligns[0].qstart, aligns[0].qend))
-    contig_span2 = intspan('%s-%s' % (aligns[1].qstart, aligns[1].qend))
+    contig_span1 = intspan('{}-{}'.format(aligns[0].qstart, aligns[0].qend))
+    contig_span2 = intspan('{}-{}'.format(aligns[1].qstart, aligns[1].qend))
     overlap = contig_span1.intersection(contig_span2)
     if len(overlap) > 0:
         homol_coords = overlap.ranges()[0]
@@ -229,20 +202,15 @@ def find_untemplated_sequence(aligns, contig_seq):
     """
     untemplated_seq = '-'
 
-    contig_span1 = intspan('%s-%s' % (aligns[0].qstart, aligns[0].qend))
-    contig_span2 = intspan('%s-%s' % (aligns[1].qstart, aligns[1].qend))
-    sorted_contig_coords = sorted(
-        [aligns[0].qstart, aligns[0].qend, aligns[1].qstart, aligns[1].qend])
-    whole_span = intspan(
-        '%s-%s' %
-        (min(sorted_contig_coords),
-         max(sorted_contig_coords)))
+    contig_span1 = intspan('{}-{}'.format(aligns[0].qstart, aligns[0].qend))
+    contig_span2 = intspan('{}-{}'.format(aligns[1].qstart, aligns[1].qend))
+    sorted_contig_coords = sorted([aligns[0].qstart, aligns[0].qend, aligns[1].qstart, aligns[1].qend])
+    whole_span = intspan('{}-{}'.format(min(sorted_contig_coords), max(sorted_contig_coords)))
     unmapped = whole_span - contig_span1 - contig_span2
 
     if len(unmapped) > 0:
         unmapped_coords = unmapped.ranges()
-        untemplated_seq = contig_seq[unmapped_coords[0]
-                                     [0] - 1: unmapped_coords[0][1]]
+        untemplated_seq = contig_seq[unmapped_coords[0][0] - 1: unmapped_coords[0][1]]
         # sequence given in relation to strand of first alignment
         if aligns[0].strand == '-':
             untemplated_seq = reverse_complement(untemplated_seq)

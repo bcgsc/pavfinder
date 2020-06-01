@@ -23,12 +23,7 @@ class Variant:
         self.final_support = None
         self.final_support_normal = None
 
-    def as_vcf(
-            self,
-            ref_fasta,
-            genomic=True,
-            size_threshold=100,
-            insertion_as_sv=True):
+    def as_vcf(self, ref_fasta, genomic=True, size_threshold=100, insertion_as_sv=True):
         if len(self.adjs) == 2:
             if self.event == 'INV':
                 return self.inversion_as_vcf(ref_fasta)
@@ -54,10 +49,10 @@ class Variant:
         info['BKPTID'] = ','.join(contigs)
 
         if self.adjs[0].homol_seq and self.adjs[0].homol_seq[0] != '-':
-            info['CIPOS'] = '0,%d' % len(self.adjs[0].homol_seq[0])
+            info['CIPOS'] = '0,{}'.format(len(self.adjs[0].homol_seq[0]))
 
         if self.adjs[1].homol_seq and self.adjs[1].homol_seq[0] != '-':
-            info['CIEND'] = '0,%d' % len(self.adjs[1].homol_seq[0])
+            info['CIEND'] = '0,{}'.format(len(self.adjs[1].homol_seq[0]))
 
         info['READSUPPORT'] = self.final_support
 
@@ -72,10 +67,8 @@ class Variant:
 
         event_id = self.event.upper() + self.id
 
-        info_0 = {'EVENT': (event_id, event_id),
-                  'PARID': parids[0]}
-        info_1 = {'EVENT': (event_id, event_id),
-                  'PARID': parids[1]}
+        info_0 = {'EVENT': (event_id, event_id), 'PARID': parids[0]}
+        info_1 = {'EVENT': (event_id, event_id), 'PARID': parids[1]}
         if self.somatic:
             info_0['SOMATIC'] = 'SOMATIC'
             info_1['SOMATIC'] = 'SOMATIC'
@@ -87,8 +80,7 @@ class Variant:
 
     def insertion_as_vcf(self, ref_fasta):
         assert self.chrom is not None, 'must specify chrom for big insertion event'
-        assert isinstance(self.pos, list) or isinstance(
-            self.pos, tuple), '"pos" for big insertion event must be list or tuple'
+        assert isinstance(self.pos, list) or isinstance(self.pos, tuple), '"pos" for big insertion event must be list or tuple'
         info = {}
 
         contigs = set()
@@ -106,12 +98,7 @@ class Variant:
         if self.somatic:
             info['SOMATIC'] = 'SOMATIC'
 
-        return self.adjs[0].as_sv(
-            ref_fasta,
-            chrom_ext=self.chrom,
-            pos_ext=self.pos[0],
-            id_ext=self.id,
-            info_ext=info)
+        return self.adjs[0].as_sv(ref_fasta, chrom_ext=self.chrom, pos_ext=self.pos[0], id_ext=self.id, info_ext=info)
 
     def check_adjs(self, adjs_passed):
         num_adjs_passed = 0
