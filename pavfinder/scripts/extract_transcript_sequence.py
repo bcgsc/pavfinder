@@ -48,7 +48,7 @@ def get_transcripts(annot, coding_only, genes=None, only_longest=False, coding_f
 
 def get_genomic_sequence(by_gene, genome_fa):
     seq = {}
-    for gene, transcripts in by_gene.iteritems():
+    for gene, transcripts in by_gene.items():
         start, end = None, None
         for transcript in transcripts:
             if start is None or transcript.exons[0][0] < start:
@@ -71,13 +71,13 @@ def output_single(out_file, transcripts, genome_fa, genomic_seq=None):
                   )
         
     if genomic_seq is not None:
-        for gene, seq in genomic_seq.iteritems():
+        for gene, seq in genomic_seq.items():
             out.write('>%s\n%s\n' % (gene, seq.upper()))
 
     out.close()
     
 def output_by_gene(out_dir, by_gene, genome_fa, genomic_seq=None):
-    for gene, transcripts in by_gene.iteritems():
+    for gene, transcripts in by_gene.items():
         with open('%s/%s.fa' % (out_dir, gene), 'w') as out:
             for transcript in transcripts:
                 out.write('>%s %s\n%s\n' % (transcript.id,
