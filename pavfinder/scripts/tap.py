@@ -24,13 +24,15 @@ def run_cmd(cmd, force=False):
                                stderr = subprocess.PIPE,
                                shell = True)
 
-    stdout_str, stderr_str = process.communicate()
+    stdout, stderr = process.communicate()
 
     if process.returncode != 0 and not force:
-        raise Exception("Failed to run '%s'\n%s%sNon-zero exit status %s" %
-                        (cmd, stdout_str, stderr_str, process.returncode))
+        raise Exception("Failed to run '{}'\n{}{}Non-zero exit status {}".format(cmd,
+                                                                                 stdout.decode('utf-8'),
+                                                                                 stderr.decode('utf-8'),
+                                                                                 process.returncode))
 
-    return stdout_str, stderr_str
+    return stdout.decode('utf-8'), stderr.decode('utf-8')
     
 def format_read_pairs(fqs=None, list_file=None):
     """Formulates fastq pairs from either fastq parameter or file that lists fastq files"""
@@ -56,7 +58,7 @@ def get_version(exe):
     version = None
     cmd = None
     if exe == 'bbt':
-        cmd = 'biobloomcategorizer --version'
+        cmd = 'biobloommicategorizer --version'
         re.compile(r'(\d+\.\d+\.\d+[a-z])')
     elif exe == 'transabyss':
         cmd = 'transabyss --version'
@@ -250,7 +252,7 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
 
     if args.bf:
         with open(bbt_fastq[0], 'r') as fq:
-            for lines in itertools.izip_longest(*[fq]*8):
+            for lines in itertools.zip_longest(*[fq]*8):
                 header_cols = lines[0].rstrip().split('\t')
                 if len(header_cols) == 3:
                     targets = [hit.split(',')[0].replace('.fa', '') for hit in header_cols[2].split(';')]
@@ -367,7 +369,7 @@ def get_assembly_params():
            logger, logging_mutex)
 def assemble_single_gene(k_dir, contigs_file, is_strand_specific, logger, logging_mutex):
     """Assemblies each gene"""
-    prefix, k = filter(None, k_dir.split(os.sep))[-2:]
+    prefix, k = list(filter(None, k_dir.split(os.sep)))[-2:]
     fastqs = ' '.join(open('%s/%s.in' % (k_dir, prefix), 'r').read().split('\n')[:-1])
 
     cmd = 'transabyss --kmer %s --pe %s --outdir %s --name %s --cleanup 3' % (k.lstrip('k'),
@@ -397,7 +399,7 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
     """Merge k assemblies of each gene into a single assembly"""
     ks = []
     for k_assembly in k_assemblies:
-        gene, k = filter(None, k_assembly.split(os.sep))[-3:-1]
+        gene, k = list(filter(None, k_assembly.split(os.sep)))[-3:-1]
         ks.append(int(k.lstrip('k')))
     
     if args.bf:
@@ -405,8 +407,8 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
     else:
         prefixes = ' '.join(['k%d.' % k for k in ks])
     
-    merged_fasta = '/' + '/'.join(filter(None, os.path.abspath(k_assemblies[0]).split(os.sep))[:-2]) + '/%s-merged.fa' % gene
-    
+    merged_fasta = '/' + '/'.join(list(filter(None, os.path.abspath(k_assemblies[0]).split(os.sep)))[:-2]) + '/%s-merged.fa' % gene
+
     # check if we have all empty assemblies
     num_empty_assemblies = 0
     for assembly in k_assemblies:
@@ -461,7 +463,7 @@ def r2c(index, r2c_bam):
     
     cmd = None
     if args.bf:
-        gene = filter(None, index.split(os.sep))[-2]
+        gene = list(filter(None, index.split(os.sep)))[-2]
         reads1 = '%s/%s_1.fastq' % (bbt_outdir, gene)
         reads2 = '%s/%s_2.fastq' % (bbt_outdir, gene)
         cmd = 'bwa mem %s <(cat %s %s) | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
@@ -512,13 +514,16 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
                         continue
                 cmd = subprocess.Popen('samtools view -H %s' % r2c_bams[i], shell=True, stdout=subprocess.PIPE)
                 for line in cmd.stdout:
+                    line = line.decode('utf-8')
                     if i == 0 and line[:3] == '@HD':
                         header.write(line)
                     elif line[:3] == '@SQ':
                         header.write(line)
     
                 cmd = subprocess.Popen('samtools view %s' % r2c_bams[i], shell=True, stdout=subprocess.PIPE)
-                sam.writelines(cmd.stdout)
+                for line in cmd.stdout:
+                    line = line.decode('utf-8')
+                    sam.write(line)
 
         cmd = 'cat %s %s | samtools view -Su - | samtools sort -m %s - -o %s' % (header_file,
                                                                                  sam_file,
