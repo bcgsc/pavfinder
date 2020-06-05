@@ -70,6 +70,11 @@ def get_version(exe):
         match = re.search(r'(\d+\.\d+\.\d+[a-z]?)', stderr)
         if match:
             version = match.group(1)
+
+        if not match:
+            match = re.search(r'(\d+\.\d+\.\d+[a-z]?)', stdout)
+            if match:
+                version = match.group(1)
             
     return version
 
