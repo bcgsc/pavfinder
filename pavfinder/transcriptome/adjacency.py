@@ -552,7 +552,7 @@ class Adjacency:
                     counter += 1
 
         else:
-            events_sorted = sorted(events, cmp=lambda e1, e2: compare_event(e1, e2))
+            events_sorted = sorted(events, key=cmp_to_key(compare_event))
             counter = 1
             for event in events_sorted:
                 out.write('{}\n'.format(event.as_bedpe(event_id=counter)))
