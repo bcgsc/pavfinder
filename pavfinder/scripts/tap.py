@@ -131,7 +131,7 @@ def check_params(args, params):
                 error = 'no transcripts fasta provided'
 
     if error is not None:
-        sys.exit('TAP ABORTED: %s' % error.upper())
+        sys.exit('TAP ABORTED: {}'.format(error.upper()))
 
 parser = cmdline.get_argparse(description='TAP pipeline')
 parser.add_argument('sample', type=str, help='sample name')
@@ -167,7 +167,7 @@ logs_dir = args.outdir + '/logs'
 if not os.path.exists(logs_dir):
     os.makedirs(logs_dir)
 
-log_file = '%s/log.%s.txt' % (logs_dir, datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+log_file = '{}/log.{}.txt'.format(logs_dir, datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
 logger, logging_mutex = cmdline.setup_logging(__name__,
                                               log_file,
                                               args.verbose)
@@ -181,10 +181,10 @@ if args.fq:
 elif args.fq_list:
     read_pairs = format_read_pairs(list_file=args.fq_list)
 
-history_file = '%s/.ruffus_history.sqlite' % args.outdir
-bbt_outdir = '%s/bbt_%s' % (args.outdir, get_version('bbt'))
-assembly_outdir = '%s/transabyss_%s' % (args.outdir, get_version('transabyss'))
-pv_outdir = '%s/pv_%s' % (args.outdir, get_version('pv'))
+history_file = '{}/.ruffus_history.sqlite'.format(args.outdir)
+bbt_outdir = '{}/bbt_{}'.format(args.outdir, get_version('bbt'))
+assembly_outdir = '{}/transabyss_{}'.format(args.outdir, get_version('transabyss'))
+pv_outdir = '{}/pv_{}'.format(args.outdir, get_version('pv'))
 
 bbt_prefix = bbt_outdir + '/' + args.sample
 
@@ -210,26 +210,26 @@ def classify(paired_fqs, bbt_output, prefix, bf, nthreads):
         if len(paired_fqs[0]) == 1:
             input_fq1 = paired_fqs[0][0]
         else:
-            input_fq1 = '<(zcat %s)' % ' '.join(paired_fqs[0])
+            input_fq1 = '<(zcat {})'.format(' '.join(paired_fqs[0]))
         if len(paired_fqs[1]) == 1:
             input_fq2 = paired_fqs[1][0]
         else:
-            input_fq2 = '<(zcat %s)' % ' '.join(paired_fqs[1])
+            input_fq2 = '<(zcat {})'.format(' '.join(paired_fqs[1]))
         
-        cmd = 'biobloommicategorizer -t %d -f %s --fq -p %s -e %s %s' % (nthreads,
-                                                                         bf,
-                                                                         prefix,
-                                                                         input_fq1,
-                                                                         input_fq2)
-        stdout, stderr = run_cmd('/bin/bash -c "%s"' % cmd)
+        cmd = 'biobloommicategorizer -t {} -f {} --fq -p {} -e {} {}'.format(nthreads,
+                                                                             bf,
+                                                                             prefix,
+                                                                             input_fq1,
+                                                                             input_fq2)
+        stdout, stderr = run_cmd('/bin/bash -c "{}"'.format(cmd))
 
         if stdout:
-            with open('%s/%s_reads.fq' % (bbt_outdir, args.sample), 'w') as out:
-                out.write('%s' % stdout)
+            with open('{}/{}_reads.fq'.format(bbt_outdir, args.sample), 'w') as out:
+                out.write('{}'.format(stdout))
 
     else:
-        cmd = 'touch %s' % bbt_output
-        run_cmd('/bin/bash -c "%s"' % cmd)
+        cmd = 'touch {}'.format(bbt_output)
+        run_cmd('/bin/bash -c "{}"'.format(cmd))
     
 def format_read_pairs_for_abyss(lines):
     """format reads to '/1' and '/2' for abyss"""
@@ -272,9 +272,9 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
         for i in range(len(read_pairs[0])):
             source = os.path.abspath(read_pairs[0][i])
             if len(read_pairs[0]) == 1:
-                target = '%s/%s_%d.fastq' % (bbt_outdir, args.sample, 1)
+                target = '{}/{}_{}.fastq'.format(bbt_outdir, args.sample, 1)
             else:
-                target = '%s/%s_%d-%d.fastq' % (bbt_outdir, args.sample, 1, i + 1)
+                target = '{}/{}_{}-{}.fastq'.format(bbt_outdir, args.sample, 1, i + 1)
             if os.path.splitext(source)[1] == '.gz':
                 target += '.gz'
 
@@ -283,9 +283,9 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
 
             source = os.path.abspath(read_pairs[1][i])
             if len(read_pairs[1]) == 1:
-                target = '%s/%s_%d.fastq' % (bbt_outdir, args.sample, 2)
+                target = '{}/{}_{}.fastq'.format(bbt_outdir, args.sample, 2)
             else:
-                target = '%s/%s_%d-%d.fastq' % (bbt_outdir, args.sample, 2, i + 1)
+                target = '{}/{}_{}-{}.fastq'.format(bbt_outdir, args.sample, 2, i + 1)
             if os.path.splitext(source)[1] == '.gz':
                 target += '.gz'
 
@@ -296,8 +296,8 @@ def output_split_pairs(seqs1, seqs2, outdir):
     """Outputs read sequences into FASTA files"""
     fqs = []
     for target in sorted(seqs1.keys()):
-        fq1 = '%s/%s_1.fastq' % (outdir, target)
-        fq2 = '%s/%s_2.fastq' % (outdir, target)
+        fq1 = '{}/{}_1.fastq'.format(outdir, target)
+        fq2 = '{}/{}_2.fastq'.format(outdir, target)
         with open(fq1, 'w') as out1:
             out1.writelines(seqs1[target])
                 
@@ -342,16 +342,16 @@ def pair_reads(fastqs, input_file):
 
 @subdivide(pair_reads,
            formatter(),
-           ["{path[0]}/k%d" % k for k in args.k],
+           ["{path[0]}" + "/k{}".format(k) for k in args.k],
            args.k)
 def symlink_assembly_input(assembly_input, k_dirs, ks):
     """Symlinks input file for each individual k assembly"""
     prefix = os.path.splitext(os.path.basename(assembly_input))[0]
     for k in ks:
-        k_dir = '%s/%s/k%d' % (assembly_outdir, prefix, k)
+        k_dir = '{}/{}/k{}'.format(assembly_outdir, prefix, k)
         if not os.path.exists(k_dir):
             os.makedirs(k_dir)
-        target = '%s/%s' % (k_dir, os.path.basename(assembly_input))
+        target = '{}/{}'.format(k_dir, os.path.basename(assembly_input))
         if not os.path.exists(target):
             os.symlink(os.path.relpath(assembly_input, k_dir), target)
 
@@ -363,7 +363,7 @@ def get_assembly_params():
                 changed_params.append((param, value))
 
     if changed_params:
-        return ' '.join(map(str, ['-%s %s' % (p[0], p[1]) for p in changed_params]))
+        return ' '.join(map(str, ['-{} {}'.format(p[0], p[1]) for p in changed_params]))
     else:
         return None
                 
@@ -375,24 +375,23 @@ def get_assembly_params():
 def assemble_single_gene(k_dir, contigs_file, is_strand_specific, logger, logging_mutex):
     """Assemblies each gene"""
     prefix, k = list(filter(None, k_dir.split(os.sep)))[-2:]
-    fastqs = ' '.join(open('%s/%s.in' % (k_dir, prefix), 'r').read().split('\n')[:-1])
+    fastqs = ' '.join(open('{}/{}.in'.format(k_dir, prefix), 'r').read().split('\n')[:-1])
 
-    cmd = 'transabyss --kmer %s --pe %s --outdir %s --name %s --cleanup 3' % (k.lstrip('k'),
-                                                                              fastqs,
-                                                                              k_dir,
-                                                                              prefix)
+    cmd = 'transabyss --kmer {} --pe {} --outdir {} --name {} --cleanup 3'.format(k.lstrip('k'),
+                                                                                  fastqs,
+                                                                                  k_dir,
+                                                                                  prefix)
     assembly_params = get_assembly_params()
     if assembly_params is not None:
-        cmd += ' %s' % assembly_params
+        cmd += ' {}'.format(assembly_params)
 
     if is_strand_specific:
         cmd += ' --SS'
 
     stdout_str, stderr_str = run_cmd(cmd, force=True)
 
-    if stderr_str and\
-       re.search('error', stderr_str, re.IGNORECASE):
-        run_cmd('touch %s/%s-final.fa %s/%s-FINAL.COMPLETE' % (k_dir, prefix, k_dir, prefix))
+    if stderr_str and re.search('error', stderr_str, re.IGNORECASE):
+        run_cmd('touch {}/{}-final.fa {}/{}-FINAL.COMPLETE'.format(k_dir, prefix, k_dir, prefix))
         with logging_mutex:
             logger.info(stderr_str)
     
@@ -408,11 +407,11 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
         ks.append(int(k.lstrip('k')))
     
     if args.bf:
-        prefixes = ' '.join(['%s.k%d.' % (gene, k) for k in ks])
+        prefixes = ' '.join(['{}.k{}.'.format(gene, k) for k in ks])
     else:
-        prefixes = ' '.join(['k%d.' % k for k in ks])
+        prefixes = ' '.join(['k{}.'.format(k) for k in ks])
     
-    merged_fasta = '/' + '/'.join(list(filter(None, os.path.abspath(k_assemblies[0]).split(os.sep)))[:-2]) + '/%s-merged.fa' % gene
+    merged_fasta = '/' + '/'.join(list(filter(None, os.path.abspath(k_assemblies[0]).split(os.sep)))[:-2]) + '/{}-merged.fa'.format(gene)
 
     # check if we have all empty assemblies
     num_empty_assemblies = 0
@@ -421,14 +420,14 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
             num_empty_assemblies += 1
     
     if num_empty_assemblies < len(k_assemblies):
-        cmd = 'transabyss-merge --mink %d --maxk %d --prefixes %s --length %d %s --out %s --force --abyssmap' % (min(ks),
-                                                                                                                 max(ks),
-                                                                                                                 prefixes,
-                                                                                                                 readlen,
-                                                                                                                 ' '.join(k_assemblies),
-                                                                                                                 merged_fasta)
+        cmd = 'transabyss-merge --mink {} --maxk {} --prefixes {} --length {} {} --out {} --force --abyssmap'.format(min(ks),
+                                                                                                                     max(ks),
+                                                                                                                     prefixes,
+                                                                                                                     readlen,
+                                                                                                                     ' '.join(k_assemblies),
+                                                                                                                     merged_fasta)
     else:
-        cmd = 'touch %s' % merged_fasta
+        cmd = 'touch {}'.format(merged_fasta)
 
     run_cmd(cmd)
     
@@ -436,9 +435,9 @@ def bbt_cleanup():
     """Removes all fastq files generated by BBT step r2c is done"""
     if args.remove_fq:
         temp_files = []
-        for ff in glob.glob('%s/*.fastq' % bbt_outdir):
+        for ff in glob.glob('{}/*.fastq'.format(bbt_outdir)):
             temp_files.append(ff)
-        for ff in glob.glob('%s/*.fq' % bbt_outdir):
+        for ff in glob.glob('{}/*.fq'.format(bbt_outdir)):
             temp_files.append(ff)
 
         for temp_file in temp_files:
@@ -452,10 +451,10 @@ def bbt_cleanup():
 def r2c_bwa_index(merged_fasta, index):
     """BWA index each gene FASTA for r2c"""
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'bwa index %s' % merged_fasta
+        cmd = 'bwa index {}'.format(merged_fasta)
 
     else:
-        cmd = 'touch %s' % index
+        cmd = 'touch {}'.format(index)
         
     run_cmd(cmd)
     
@@ -469,26 +468,26 @@ def r2c(index, r2c_bam):
     cmd = None
     if args.bf:
         gene = list(filter(None, index.split(os.sep)))[-2]
-        reads1 = '%s/%s_1.fastq' % (bbt_outdir, gene)
-        reads2 = '%s/%s_2.fastq' % (bbt_outdir, gene)
-        cmd = 'bwa mem %s <(cat %s %s) | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
-                                                                        reads1,
-                                                                        reads2,
-                                                                        r2c_bam)
+        reads1 = '{}/{}_1.fastq'.format(bbt_outdir, gene)
+        reads2 = '{}/{}_2.fastq'.format(bbt_outdir, gene)
+        cmd = 'bwa mem {} <(cat {} {}) | samtools view -bhS - -o {}'.format(os.path.splitext(index)[0],
+                                                                            reads1,
+                                                                            reads2,
+                                                                            r2c_bam)
     else:
-        in_files = glob.glob('%s/*.in' % os.path.dirname(index))
+        in_files = glob.glob('{}/*.in'.format(os.path.dirname(index)))
         if in_files:
             with open(in_files[0], 'r') as ff:
                 reads = [line.rstrip() for line in ff.readlines()]
-                cmd = 'bwa mem %s <(zcat %s) | samtools view -bhS - -o %s' % (os.path.splitext(index)[0],
-                                                                              ' '.join(reads),
-                                                                              r2c_bam)
+                cmd = 'bwa mem {} <(zcat {}) | samtools view -bhS - -o {}'.format(os.path.splitext(index)[0],
+                                                                                  ' '.join(reads),
+                                                                                  r2c_bam)
 
     if cmd is not None:
-        run_cmd('/bin/bash -c "%s"' % cmd)
+        run_cmd('/bin/bash -c "{}"'.format(cmd))
 
 @merge(merge_assemblies,
-       '%s/%s.fa' % (assembly_outdir, args.sample))
+       '{}/{}.fa'.format(assembly_outdir, args.sample))
 def concat_fasta(gene_fastas, single_merged_fasta):
     """Concatenates every gene assembly into single fasta file"""
     if args.bf:
@@ -501,23 +500,23 @@ def concat_fasta(gene_fastas, single_merged_fasta):
         source = os.path.relpath(gene_fastas[0], os.path.dirname(single_merged_fasta))
         os.symlink(source, single_merged_fasta)
 
-    cmd = 'samtools faidx %s' % single_merged_fasta
-    run_cmd('/bin/bash -c "%s"' % cmd)
+    cmd = 'samtools faidx {}'.format(single_merged_fasta)
+    run_cmd('/bin/bash -c "{}"'.format(cmd))
 
 @active_if(not args.only_assembly)
 @merge(r2c,
-       '%s/r2c.bam' % assembly_outdir,
+       '{}/r2c.bam'.format(assembly_outdir),
        )
 def r2c_concat(r2c_bams, r2c_cat_bam):
     """Concatenates all r2c bam files into single file"""
-    header_file = '%s/r2c_cat.header' % assembly_outdir
-    sam_file = '%s/r2c_cat.sam' % assembly_outdir
+    header_file = '{}/r2c_cat.header'.format(assembly_outdir)
+    sam_file = '{}/r2c_cat.sam'.format(assembly_outdir)
     if len(r2c_bams) > 1:
         with open(header_file, 'w') as header, open(sam_file, 'w') as sam:
             for i in range(len(r2c_bams)):
                 if os.path.getsize(r2c_bams[i]) == 0:
                         continue
-                cmd = subprocess.Popen('samtools view -H %s' % r2c_bams[i], shell=True, stdout=subprocess.PIPE)
+                cmd = subprocess.Popen('samtools view -H {}'.format(r2c_bams[i]), shell=True, stdout=subprocess.PIPE)
                 for line in cmd.stdout:
                     line = line.decode('utf-8')
                     if i == 0 and line[:3] == '@HD':
@@ -525,34 +524,34 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
                     elif line[:3] == '@SQ':
                         header.write(line)
     
-                cmd = subprocess.Popen('samtools view %s' % r2c_bams[i], shell=True, stdout=subprocess.PIPE)
+                cmd = subprocess.Popen('samtools view {}'.format(r2c_bams[i]), shell=True, stdout=subprocess.PIPE)
                 for line in cmd.stdout:
                     line = line.decode('utf-8')
                     sam.write(line)
 
-        cmd = 'cat %s %s | samtools view -Su - | samtools sort -m %s - -o %s' % (header_file,
-                                                                                 sam_file,
-                                                                                 params['alignments']['sort_mem'],
-                                                                                 r2c_cat_bam)
-        run_cmd('/bin/bash -c "%s"' % cmd)
+        cmd = 'cat {} {} | samtools view -Su - | samtools sort -m {} - -o {}'.format(header_file,
+                                                                                     sam_file,
+                                                                                     params['alignments']['sort_mem'],
+                                                                                     r2c_cat_bam)
+        run_cmd('/bin/bash -c "{}"'.format(cmd))
 
     elif len(r2c_bams) == 1:
         source = os.path.relpath(r2c_bams[0], os.path.dirname(r2c_cat_bam))
-        cmd = 'samtools sort -m %s %s -o %s' % (params['alignments']['sort_mem'],
-                                               r2c_bams[0],
-                                               r2c_cat_bam)
+        cmd = 'samtools sort -m {} {} -o {}'.format(params['alignments']['sort_mem'],
+                                                    r2c_bams[0],
+                                                    r2c_cat_bam)
 
-        run_cmd('/bin/bash -c "%s"' % cmd)
+        run_cmd('/bin/bash -c "{}"'.format(cmd))
 
 def r2c_cleanup():
     """Removes individual r2c indices and intermediate files"""
-    temp_files = ['%s/r2c_cat.header' % assembly_outdir, '%s/r2c_cat.sam' % assembly_outdir]
-    for ff in glob.glob('%s/*/*-merged.fa.*' % assembly_outdir):
+    temp_files = ['{}/r2c_cat.header'.format(assembly_outdir), '{}/r2c_cat.sam'.format(assembly_outdir)]
+    for ff in glob.glob('{}/*/*-merged.fa.*'.format(assembly_outdir)):
         temp_files.append(ff)
 
     if args.bf:
         r2c_bams = []
-        for ff in glob.glob('%s/*/r2c.bam' % assembly_outdir):
+        for ff in glob.glob('{}/*/r2c.bam'.format(assembly_outdir)):
             r2c_bams.append(ff)
         if len(r2c_bams) > 1:
             temp_files.extend(r2c_bams)
@@ -569,7 +568,7 @@ def r2c_cleanup():
            '.bam.bai')
 def r2c_index_concat(r2c_cat_sorted_bam, r2c_cat_sorted_bam_index):
     """Samtools index sorted r2c bam"""
-    cmd = 'samtools index %s' % r2c_cat_sorted_bam
+    cmd = 'samtools index {}'.format(r2c_cat_sorted_bam)
     run_cmd(cmd)
            
 @active_if(not args.only_assembly)
@@ -581,15 +580,15 @@ def r2c_index_concat(r2c_cat_sorted_bam, r2c_cat_sorted_bam_index):
 def c2g(contigs_fasta, c2g_bam, genome_index, nthreads):
     """Aligns contigs to genome using GMAP"""
     if os.path.getsize(contigs_fasta) > 0:
-        cmd = 'gmap -D %s -d %s %s -t %d -f samse -n 0 -x 10 | samtools view -bhS - -o %s' % (params['alignments']['genome_index'][0],
-                                                                                              params['alignments']['genome_index'][1],
-                                                                                              contigs_fasta,
-                                                                                              nthreads,
-                                                                                              c2g_bam)
+        cmd = 'gmap -D {} -d {} {} -t {} -f samse -n 0 -x 10 | samtools view -bhS - -o {}'.format(params['alignments']['genome_index'][0],
+                                                                                                  params['alignments']['genome_index'][1],
+                                                                                                  contigs_fasta,
+                                                                                                  nthreads,
+                                                                                                  c2g_bam)
     else:
-        cmd = 'touch %s' % c2g_bam
+        cmd = 'touch {}'.format(c2g_bam)
 
-    run_cmd('/bin/bash -c "%s"' % cmd)
+    run_cmd('/bin/bash -c "{}"'.format(cmd))
     
 @active_if(not args.only_splicing and not args.only_assembly)
 @transform(concat_fasta,
@@ -599,14 +598,14 @@ def c2g(contigs_fasta, c2g_bam, genome_index, nthreads):
 def c2t(contigs_fasta, c2t_bam, nthreads):
     """Aligns contigs to transcripts using BWA mem"""
     if os.path.getsize(contigs_fasta) > 0:
-        cmd = 'bwa mem -t %d %s %s | samtools view -bhS - -o %s' % (nthreads,
-                                                                    params['alignments']['transcripts_fasta'],
-                                                                    contigs_fasta,
-                                                                    c2t_bam)
+        cmd = 'bwa mem -t {} {} {} | samtools view -bhS - -o {}'.format(nthreads,
+                                                                        params['alignments']['transcripts_fasta'],
+                                                                        contigs_fasta,
+                                                                        c2t_bam)
     else:
-        cmd = 'touch %s' % c2t_bam
+        cmd = 'touch {}'.format(c2t_bam)
 
-    run_cmd('/bin/bash -c "%s"' % cmd)
+    run_cmd('/bin/bash -c "{}"'.format(cmd))
     
 @active_if(not args.only_splicing and not args.only_assembly)
 @follows(mkdir(pv_outdir))
@@ -622,29 +621,29 @@ def find_sv(inputs, events_output, nprocs):
         nprocs /= num_analysis
 
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'find_sv_transcriptome.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d' % (c2g_bam,
-                                                                                                                             c2t_bam,
-                                                                                                                             params['alignments']['transcripts_fasta'],
-                                                                                                                             ' '.join(params['alignments']['genome_index']),
-                                                                                                                             os.path.splitext(r2c_index)[0],
-                                                                                                                             nprocs)
+        cmd = 'find_sv_transcriptome.py --gbam {} --tbam {} --transcripts_fasta {} --genome_index {} --r2c {} --nproc {}'.format(c2g_bam,
+                                                                                                                                 c2t_bam,
+                                                                                                                                 params['alignments']['transcripts_fasta'],
+                                                                                                                                 ' '.join(params['alignments']['genome_index']),
+                                                                                                                                 os.path.splitext(r2c_index)[0],
+                                                                                                                                 int(nprocs))
 
         if 'sv' in params:
             sparams = params['sv']
-            cmd += ' %s' % ' '.join(['--%s %s' % (name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool])
-            cmd += ' %s' % ' '.join(['--%s' % name for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True])
+            cmd += ' {}'.format(' '.join(['--{} {}'.format(name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool]))
+            cmd += ' {}'.format(' '.join(['--{}'.format(name) for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True]))
 
-        cmd += ' %s' % ' '.join([merged_fasta, params['annotations']['gtf'], params['annotations']['genome_fasta'], os.path.dirname(events_output)])
+        cmd += ' {}'.format(' '.join([merged_fasta, params['annotations']['gtf'], params['annotations']['genome_fasta'], os.path.dirname(events_output)]))
 
     else:
-        cmd = 'touch %s' % events_output
+        cmd = 'touch {}'.format(events_output)
 
     run_cmd(cmd)
 
 @active_if(not args.only_sv and not args.only_assembly)
 @follows(mkdir(pv_outdir))
 @merge([concat_fasta, c2g, r2c_index_concat],
-       ['%s/%s' % (pv_outdir, ff) for ff in ('novel_splicing.bedpe', 'mappings.tsv', 'junctions.bed')],
+       ['{}/{}'.format(pv_outdir, ff) for ff in ('novel_splicing.bedpe', 'mappings.tsv', 'junctions.bed')],
        args.gtf,
        args.genome_fasta,
        args.nprocs,
@@ -658,34 +657,34 @@ def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, genome_bam):
         nprocs /= num_analysis
 
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'map_splice.py %s %s %s %s %s --r2c %s --nproc %d' % (c2g_bam,
-                                                                    merged_fasta,
-                                                                    params['annotations']['gtf'],
-                                                                    params['annotations']['genome_fasta'],
-                                                                    pv_outdir,
-                                                                    os.path.splitext(r2c_index)[0],
-                                                                    nprocs,
-                                                                    )
+        cmd = 'map_splice.py {} {} {} {} {} --r2c {} --nproc {}'.format(c2g_bam,
+                                                                        merged_fasta,
+                                                                        params['annotations']['gtf'],
+                                                                        params['annotations']['genome_fasta'],
+                                                                        pv_outdir,
+                                                                        os.path.splitext(r2c_index)[0],
+                                                                        int(nprocs),
+                                                                        )
 
         if 'splicing' in params:
             sparams = params['splicing']
-            cmd += ' %s' % ' '.join(['--%s %s' % (name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool])
-            cmd += ' %s' % ' '.join(['--%s' % name for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True])
+            cmd += ' {}'.format(' '.join(['--{} {}'.format(name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool]))
+            cmd += ' {}'.format(' '.join(['--{}'.format(name) for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True]))
 
         if 'suppl_annot' in params['annotations'] and params['annotations']['suppl_annot'] and\
            params['annotations']['suppl_annot'] is not None:
             if type(params['annotations']['suppl_annot']) is str and not params['annotations']['suppl_annot'].isspace():
-                cmd += ' --suppl_annot %s' % params['annotations']['suppl_annot']
+                cmd += ' --suppl_annot {}'.format(params['annotations']['suppl_annot'])
             elif type(params['annotations']['suppl_annot']) is list or type(params['annotations']['suppl_annot']) is tuple:
-                cmd += ' --suppl_annot %s' % ' '.join(params['annotations']['suppl_annot'])
+                cmd += ' --suppl_annot {}'.format(' '.join(params['annotations']['suppl_annot']))
 
         if genome_bam:
-            cmd += ' --genome_bam %s' % genome_bam
+            cmd += ' --genome_bam {}'.format(genome_bam)
 
         run_cmd(cmd)
     else:
         for output in outputs:
-            run_cmd('touch %s' % output)
+            run_cmd('touch {}'.format(output))
 
 pipeline_printout(sys.stdout, verbose=3)
 pipeline_run(verbose=3, multiprocess=args.nprocs, logger=logger, history_file=history_file)
