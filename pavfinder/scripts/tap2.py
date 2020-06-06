@@ -24,13 +24,13 @@ def run_cmd(cmd, force=False):
                                stderr = subprocess.PIPE,
                                shell = True)
 
-    stdout_str, stderr_str = process.communicate()
+    stdout, stderr = process.communicate()
 
     if process.returncode != 0 and not force:
         raise Exception("Failed to run '%s'\n%s%sNon-zero exit status %s" %
-                        (cmd, stdout_str, stderr_str, process.returncode))
+                        (cmd, stdout.decode('utf-8'), stderr.decode('utf-8'), process.returncode))
 
-    return stdout_str, stderr_str
+    return stdout.decode('utf-8'), stderr.decode('utf-8')
     
 def format_read_pairs(fqs=None, list_file=None):
     """Formulates fastq pairs from either fastq parameter or file that lists fastq files"""
@@ -56,7 +56,7 @@ def get_version(exe):
     version = None
     cmd = None
     if exe == 'bbt':
-        cmd = 'biobloomcategorizer --version'
+        cmd = 'biobloommicategorizer --version'
         re.compile(r'(\d+\.\d+\.\d+[a-z])')
     elif exe == 'rnabloom':
         cmd = 'rnabloom -v'
@@ -253,7 +253,7 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
 
     if args.bf:
         with open(bbt_fastq[0], 'r') as fq:
-            for lines in itertools.izip_longest(*[fq]*8):
+            for lines in itertools.zip_longest(*[fq]*8):
                 header_cols = lines[0].rstrip().split('\t')
                 if len(header_cols) == 3:
                     targets = [hit.split(',')[0].replace('.fa', '') for hit in header_cols[2].split(';')]
@@ -369,7 +369,7 @@ def r2c_bwa_index(fasta, index):
            formatter(),
            "{path[0]}/r2c.bam")
 def r2c(index, r2c_bam):
-    gene = filter(None, index.split(os.sep))[-2]
+    gene = list(filter(None, index.split(os.sep)))[-2]
     reads1 = '%s/%s_1.fastq' % (bbt_outdir, gene)
     reads2 = '%s/%s_2.fastq' % (bbt_outdir, gene)
     r2c_bam = os.path.dirname(index) + '/r2c.bam'
@@ -413,13 +413,16 @@ def r2c_concat(r2c_bams, r2c_cat_bam):
                         continue
                 cmd = subprocess.Popen('samtools view -H %s' % r2c_bams[i], shell=True, stdout=subprocess.PIPE)
                 for line in cmd.stdout:
+                    line = line.decode('utf-8')
                     if i == 0 and line[:3] == '@HD':
                         header.write(line)
                     elif line[:3] == '@SQ':
                         header.write(line)
     
                 cmd = subprocess.Popen('samtools view %s' % r2c_bams[i], shell=True, stdout=subprocess.PIPE)
-                sam.writelines(cmd.stdout)
+                for line in cmd.stdout:
+                    line = line.decode('utf-8')
+                    sam.write(line)
 
         cmd = 'cat %s %s | samtools view -Su - | samtools sort -m %s - -o %s' % (header_file,
                                                                                  sam_file,
@@ -519,7 +522,7 @@ def find_sv(inputs, events_output, nprocs):
                                                                                                                              params['alignments']['transcripts_fasta'],
                                                                                                                              ' '.join(params['alignments']['genome_index']),
                                                                                                                              os.path.splitext(r2c_index)[0],
-                                                                                                                             nprocs)
+                                                                                                                             int(nprocs))
 
         if 'sv' in params:
             sparams = params['sv']
@@ -556,7 +559,7 @@ def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, genome_bam):
                                                                     params['annotations']['genome_fasta'],
                                                                     pv_outdir,
                                                                     os.path.splitext(r2c_index)[0],
-                                                                    nprocs,
+                                                                    int(nprocs),
                                                                     )
 
         if 'splicing' in params:
