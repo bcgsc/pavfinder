@@ -31,7 +31,7 @@ $(assembly_outdir)/$(name).transcripts.nr.fa: $(left) $(right)
 $(assembly_outdir)/$(name).transcripts.filtered.fa: $(assembly_outdir)/$(name).transcripts.nr.fa
 	$(eval L := $(shell grep Q1 $(assembly_outdir)/$(name).fragstats | cut -f2 -d':'))
 	@echo $(L)
-	filter_fasta min=$(L) $(assembly_outdir)/$(name).transcripts.nr.fa > $(assembly_outdir)/$(name).transcripts.filtered.fa && \
+	filter_fasta $(assembly_outdir)/$(name).transcripts.nr.fa $(L) $(assembly_outdir)/$(name).transcripts.filtered.fa && \
 	samtools faidx $(assembly_outdir)/$(name).transcripts.filtered.fa
 
 # r2c

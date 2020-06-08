@@ -1,10 +1,4 @@
-#!/bin/sh
-# Exec script with awk. Don't remove slash \
-exec awk -f "$0" "$@"
+#!/bin/bash
 
-!/^>/ { next }
-{ getline seq }
-length(seq) >= min { print $0 "\n" seq }
-
-#Code from: http://bioinfofly.wordpress.com/2012/07/09/binawk-f-nex/
-
+script_dir=`dirname $0`
+python $script_dir/filter_fasta.py $@
