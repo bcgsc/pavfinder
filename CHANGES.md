@@ -11,16 +11,16 @@ v0.1.2
   - output correct strand (useful for displaying strand-specific contig alignment)
   - minimum size `--min_size` can be specified so that small contig alignments can be skipped
 - Fixed bug in mis-labelling reciprocal translocations as insertions
-- Don't use Pysam AlignedRead.rlen for checking if sequence is chimeric as BWA versions later than 0.7.4 outputs only chimeric portion of sequence other than entire sequence
+- Did not use Pysam AlignedRead.rlen for checking if sequence is chimeric as BWA versions later than 0.7.4 outputs only chimeric portion of sequence other than entire sequence
 
 v0.2.0 (all transcriptome changes)
 
 - reports coverage/depth of all exon-exon junctions assembled in BED format `junctions.bed`
 - reports coverage/depth of reference 5'`ref5_jn_depth` and 3'`ref5_jn_depth` junctions in `events.tsv` for gene fusions and all novel splicing events
-- renamed header "spanning_reads" to "support_reads"
+- renamed header `spanning_reads` to `support_reads`
 - accepts supplementary gene annotation GTF `--suppl_annot` for checking novelty of splicing events
 - will not call ITD on homopolymer expansion
-- changed event-label of same-gene chimera to actual rearrangement (e.g. a duplication within the same gene will be called 'dup' but not 'fusion')
+- changed event-label of same-gene chimera to actual rearrangement (e.g. a duplication within the same gene will be called `dup` but not `fusion`)
 
 v0.3.0
 
@@ -53,12 +53,12 @@ v0.4.2
 v0.4.3
 
 - changes to handle novel untemplated sequence at ITD breakpoint
-	- uses `blastn` to check for duplication, and doesn't require end-to-end matching, but requires insertion sequence to be at least 15bp(hard-coded) long; allows bases at edges un-matched (specified by `max_novel_length` default=10)
+	- uses `blastn` to check for duplication, and does not require end-to-end matching, but requires insertion sequence to be at least 15bp(hard-coded) long; allows bases at edges un-matched (specified by `max_novel_length` default=10)
 	- when parsing partial alignments, allow clipped bases (specified by `max_novel_length` again)
-	- introduce parameter `min_dup_size`: minimum insertion size to check if it's a duplication (default: 15)
+	- introduce parameter `min_dup_size`: minimum insertion size to check if it is a duplication (default: 15)
 	- changed default `--max_novel_len` from 20 to 10
 - added `--only_fusions` parameter to only look for fusions
-- fixed bug in detecting retained_intron: retained_intron in last match block wasn't detected.
+- fixed bug in detecting retained_intron: retained_intron in last match block was not detected.
 
 v0.4.4
 
@@ -92,7 +92,7 @@ v1.3.0
 v1.4.0
 - allow fusion flanking_pair support reads to overlap span window (default size 8bp, 4 on either side of breakpoint) so that flanking_pair support of short fragment can also be captured
 - changed r2c to run BWA-mem in paired-end mode in `tap2.py`
-- fixed bug in `tap2.py` extracting `RNA-Bloom` version when there is stderr message while running `rnabloom -v'
+- fixed bug in `tap2.py` extracting `RNA-Bloom` version when there is stderr message while running `rnabloom -v`
 
 v1.5.0
 - added `--min_overhang` (default=4) for changing minimum overhang size for gathering spanning reads from r2c in `find_sv_transcriptome.py`
@@ -107,4 +107,9 @@ v1.5.1
 v1.6.0
 - Fusion-Bloom now expects [RNA-Bloom v1.2](https://github.com/bcgsc/RNA-Bloom/releases/tag/v1.2.0) to be used, as it reduces redundancy at its final stage. *.transcripts.nr.fa will be expected to be output of the assembly stage.
 - [Minimap2](https://github.com/lh3/minimap2) replaces BWA MEM as the aligner for r2c
-- BugFix for read-through identification - previous assumption of single transcript at both up and downstream junctions removed, as it is not uncommon to have some "minor" transcript in annotation 
+- BugFix for read-through identification - previous assumption of single transcript at both up and downstream junctions removed, as it is not uncommon to have some "minor" transcript in annotation
+
+v1.7.0
+- conversion to Python3
+- added `filter_fasta.py` and changed `filter_fasta` to use it
+- updated test data
