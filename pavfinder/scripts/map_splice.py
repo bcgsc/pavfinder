@@ -90,9 +90,9 @@ def main():
     
     cmd = ' '.join(sys.argv)
     time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
-    software = '%s %s' % (pv.__name__, pv.__version__)
-    em.output_mappings(mappings, '%s/mappings.tsv' % args.outdir)
-    em.output_juncs(juncs_merged, '%s/junctions.bed' % args.outdir)    
-    em.output_events(events_merged, '%s/novel_splicing.bedpe' % args.outdir, header=(software, '%s %s' % (time, cmd)))
+    software = '{} {}'.format(pv.__name__, pv.__version__)
+    em.output_mappings(mappings, '{}/mappings.tsv'.format(args.outdir))
+    em.output_juncs(juncs_merged, '{}/junctions.bed'.format(args.outdir))    
+    em.output_events(events_merged, '{}/novel_splicing.bedpe'.format(args.outdir), header=(software, '{} {}'.format(time, cmd)))
     
 main()

@@ -45,23 +45,23 @@ def combine_events(events, mappings):
             if query in mappings['via_transcripts'] and\
                query in mappings['via_genome']:
                 if not mappings['via_transcripts'][query] or not mappings['via_transcripts'][query][0]:
-                    print('%s: mapping disagreed transcripts:None genome:%s' % (query,
-                                                                                mappings['via_genome'][query]))
+                    print('{}: mapping disagreed transcripts:None genome:{}'.format(query,
+                                                                                    mappings['via_genome'][query]))
                 elif not mappings['via_genome'][query] or not mappings['via_genome'][query][0]:
-                    print('%s: mapping disagreed transcripts:%s genome:None' % (query,
-                                                                                mappings['via_transcripts'][query]))
+                    print('{}: mapping disagreed transcripts:{} genome:None'.format(query,
+                                                                                    mappings['via_transcripts'][query]))
                 elif mappings['via_transcripts'][query][0] and mappings['via_genome'][query][0]:
                     passed = True
                 else:
-                    print('%s: mapping disagreed transcripts:%s genome:%s' % (query,
-                                                                              mappings['via_transcripts'][query],
-                                                                              mappings['via_genome'][query]))
+                    print('{}: mapping disagreed transcripts:{} genome:{}'.format(query,
+                                                                                  mappings['via_transcripts'][query],
+                                                                                  mappings['via_genome'][query]))
             elif not query in mappings['via_transcripts']:
-                print('%s: mapping disagreed transcripts:None genome:%s' % (query,
-                                                                            mappings['via_genome'][query]))
+                print('{}: mapping disagreed transcripts:None genome:{}'.format(query,
+                                                                                mappings['via_genome'][query]))
             else:
-                print('%s: mapping disagreed transcripts:%s genome:None' % (query,
-                                                                            mappings['via_transcripts'][query]))
+                print('{}: mapping disagreed transcripts:{} genome:None'.format(query,
+                                                                                mappings['via_transcripts'][query]))
                 
         return passed
 
@@ -139,7 +139,7 @@ def parse_args():
     parser.add_argument("--genome_index", type=str, help="genome index path and name", nargs=2)
     parser.add_argument("--sort_by_coord", action="store_true", help="sort output by genome coordinates")
     parser.add_argument("--only_fusions", action="store_true", help="report only fusions and read-throughs")
-    parser.add_argument("--version", action='version', version='%s %s' % (pv.__name__, pv.__version__))
+    parser.add_argument("--version", action='version', version='{} {}'.format(pv.__name__, pv.__version__))
     filtering = parser.add_argument_group('filtering')
     filtering.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
     filtering.add_argument("--min_overhang", type=int, help="minimum overhang for spanning reads. Default:4", default=4)
@@ -253,8 +253,8 @@ def main():
     # report (with meta data)
     cmd = ' '.join(sys.argv)
     time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
-    software = '%s %s' % (pv.__name__, pv.__version__)
-    Adjacency.report_events(events_filtered, '%s/sv.bedpe' % args.outdir, sort_by_coord=args.sort_by_coord, header=(software, '%s %s' % (time, cmd)))
+    software = '{} {}'.format(pv.__name__, pv.__version__)
+    Adjacency.report_events(events_filtered, '{}/sv.bedpe'.format(args.outdir), sort_by_coord=args.sort_by_coord, header=(software, '{} {}'.format(time, cmd)))
 
 main()
     
