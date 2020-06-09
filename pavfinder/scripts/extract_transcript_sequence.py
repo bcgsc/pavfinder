@@ -39,7 +39,7 @@ def get_transcripts(annot, coding_only, genes=None, only_longest=False, coding_f
         captured_genes = set([t.gene for t in transcripts])
         
         for gene in genes - set([t.gene for t in transcripts]):
-            print("can't find %s from gtf" % gene)
+            print("can't find {} from gtf".format(gene))
                 
     if coding_only:
         transcripts = [t for t in transcripts if t.is_coding()]
@@ -64,33 +64,33 @@ def get_genomic_sequence(by_gene, genome_fa):
 def output_single(out_file, transcripts, genome_fa, genomic_seq=None):
     out = open(out_file, 'w')
     for transcript in transcripts:
-        out.write('>%s %s\n%s\n' % (transcript.id,
-                                    transcript.gene,
-                                    transcript.get_sequence(genome_fa).upper()
-                                    )
+        out.write('>{} {}\n{}\n'.format(transcript.id,
+                                        transcript.gene,
+                                        transcript.get_sequence(genome_fa).upper()
+                                        )
                   )
         
     if genomic_seq is not None:
         for gene, seq in genomic_seq.items():
-            out.write('>%s\n%s\n' % (gene, seq.upper()))
+            out.write('>{}\n{}\n'.format(gene, seq.upper()))
 
     out.close()
     
 def output_by_gene(out_dir, by_gene, genome_fa, genomic_seq=None):
     for gene, transcripts in by_gene.items():
-        with open('%s/%s.fa' % (out_dir, gene), 'w') as out:
+        with open('{}/{}.fa'.format(out_dir, gene), 'w') as out:
             for transcript in transcripts:
-                out.write('>%s %s\n%s\n' % (transcript.id,
-                                            transcript.gene,
-                                            transcript.get_sequence(genome_fa).upper()
-                                            )
+                out.write('>{} {}\n{}\n'.format(transcript.id,
+                                                transcript.gene,
+                                                transcript.get_sequence(genome_fa).upper()
+                                                )
                           )
             if genomic_seq is not None and transcript.gene in genomic_seq:
-                out.write('>%s\n%s\n' % (transcript.gene, genomic_seq[transcript.gene].upper()))
+                out.write('>{}\n{}\n'.format(transcript.gene, genomic_seq[transcript.gene].upper()))
     
 def bwa_index(fa):
     print('bwa', 'index', os.path.abspath(fa))
-    subprocess.call(['bwa index %s' % fa], shell=True)
+    subprocess.call(['bwa index {}'.format(fa)], shell=True)
 
 def parse_args():
     parser = argparse.ArgumentParser()
