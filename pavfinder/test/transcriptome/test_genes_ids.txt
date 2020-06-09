@@ -1,8 +1,8 @@
-5	KMT2A.fa
-7	NSD1.fa
 1	ATXN3.fa
-4	FOXP1.fa
-3	FLT3.fa
-6	NPM1.fa
-8	NUP98.fa
 2	CEBPA.fa
+3	FLT3.fa
+4	FOXP1.fa
+5	KMT2A.fa
+6	NPM1.fa
+7	NSD1.fa
+8	NUP98.fa
