@@ -84,5 +84,6 @@ setup(
                'pavfinder/scripts/fusion-bloom',
                'pavfinder/scripts/tap2.py',
                'pavfinder/scripts/filter_fasta',
+               'pavfinder/scripts/filter_fasta.py',
                ],
 )
