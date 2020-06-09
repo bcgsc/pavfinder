@@ -1,4 +1,4 @@
-Data is provided for testing the detection of genome structural variants, transcriptome structural and splice variants, and the TAP targeted pipeline.  
+Data is provided for testing the detection of genome structural variants, transcriptome structural and splice variants, TAP, and Fusion-Bloom pipelines.  
 
 ## pavfinder genome
 * input `genome`
@@ -31,7 +31,7 @@ pavfinder genome c2g.bam test.fa /path/to/hg19.fa /path/to/output_directory --mi
     * 1 FLT3 internal tandem duplication (ITD)
     * 1 KMT2A partial tandem duplication (PTD)
     * 1 NPM1 insertion
-    * 2 CEBPA deletions
+    * 3 CEBPA deletions
     * 1 ATXN3 trinucleotide-repeat expansion polymorphism
     * 1 CEBPA trinucleotide-repeat contraction polymorphism
     * various FLT3 novel splicing events (skipped exons, novel splice donors/acceptors)
@@ -53,7 +53,8 @@ pavfinder fusion --gbam c2g.bam --tbam c2t.bam --transcripts_fasta refGene.fa --
 pavfinder splice c2g.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to/output_directory --r2c r2c.bam
 ```
 
-## tap
+## tap and tap2
+* `tap2` uses RNA-Bloom as the transcriptome assembler instead of Trans-ABySS, and runs the same way as `tap` (make sure rnabloom is in $PATH)
 * input `transcriptome`
   * `test_1.fastq.gz`, `test_2.fastq.gz`
   * `test.cfg`: 
@@ -61,6 +62,11 @@ pavfinder splice c2g.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to
     * specify full paths to `transcripts_fasta`(`refGene.fa` provided) and `gtf`(`refGene.sorted.gtf.gz` provided)
   * `test_genes.bf`: Bloom filter corresponding to the genes described above containing the various events
 * output `transcriptome/expected_output/tap.tar.gz`
+
+The Bloom filter provided for testing with `tap` and `tap2` was generated with the following spaced seeds:
+```
+biobloommimaker -F -b 0.8 -t 64 -p test_genes -S "001100111101110000001100101001111001110110011010010001101001 111011000000001001100001011110000010011011111101111110010010 010010011111101111110110010000011110100001100100000000110111 100101100010010110011011100111100101001100000011101111001100" ./test_genes/*.fa
+```
 
 ```
 tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
@@ -75,4 +81,5 @@ tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz te
 * output `transcriptome/expected_output/fusion-bloom.out.tar.gz`
 
 ```
-fusion-bloom profile=test.profile left=test_1.fastq.gz right=test_2.fastq.gz readlen=100
+fusion-bloom profile=test.profile left=test_1.fastq.gz right=test_2.fastq.gz readlen=100 name=test
+```
