@@ -24,9 +24,9 @@ def find_unmapped_mates(bam, outdir):
         else:
             seq = read.query_sequence
             
-        out.write('>%s\n%s\n' % (read.query_name, seq))
+        out.write('>{}\n{}\n'.format(read.query_name, seq))
     
-    out_fas = ['%s/unmapped_%d.fa' % (outdir, i) for i in range(1,3)]
+    out_fas = ['{}/unmapped_{}.fa'.format(outdir, i) for i in range(1,3)]
     fa1 = open(out_fas[0], 'w')
     fa2 = open(out_fas[1], 'w')
 
@@ -50,16 +50,16 @@ def find_unmapped_mates(bam, outdir):
     return out_fas
 
 def align_unmapped_mates(fastas, ref, nthreads, outdir):
-    out_bam = '%s/unmapped.bam' % outdir
-    cmd = 'bwa mem %s %s %s -t %s | samtools view -uhS - -o %s' % (ref,
-                                                                   fastas[0],
-                                                                   fastas[1],
-                                                                   nthreads,
-                                                                   out_bam)
-    process = subprocess.Popen('/bin/bash -c "%s"' % cmd, shell = True)
+    out_bam = '{}/unmapped.bam'.format(outdir)
+    cmd = 'bwa mem {} {} {} -t {} | samtools view -uhS - -o {}'.format(ref,
+                                                                       fastas[0],
+                                                                       fastas[1],
+                                                                       nthreads,
+                                                                       out_bam)
+    process = subprocess.Popen('/bin/bash -c "{}"'.format(cmd), shell = True)
     process.communicate()
     if process.returncode != 0:
-	return Exception("Failed to run '%s'\n" % cmd)
+	return Exception("Failed to run '{}'\n".format(cmd))
     
     return out_bam
 
@@ -329,7 +329,7 @@ def find_discordant_pairs(bam, transcripts_dict, genome_fasta, min_pairs=2):
 
 def cleanup(outdir):
     for ff in ('unmapped_1.fa', 'unmapped_2.fa', 'unmapped.bam'):
-	os.remove('%s/%s' % (outdir, ff))
+	os.remove('{}/{}'.format(outdir, ff))
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Extracts discordant read pairs when fusion breakpoints are not captured')
@@ -357,7 +357,7 @@ def main():
     unmapped_bam = pysam.AlignmentFile(unmapped_bam_file)
     transcripts_dict = Transcript.extract_transcripts(args.gtf)
     adjs = find_discordant_pairs(unmapped_bam, transcripts_dict, pysam.FastaFile(args.genome_fasta), min_pairs=args.min_pairs)
-    Adjacency.report_events(adjs, '%s/discordant_pairs.bedpe' % args.outdir)
+    Adjacency.report_events(adjs, '{}/discordant_pairs.bedpe'.format(args.outdir))
     
     if not args.no_cleanup:
 	cleanup(args.outdir)

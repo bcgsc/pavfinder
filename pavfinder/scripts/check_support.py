@@ -71,7 +71,7 @@ def create_coords_file(adjs, vid_to_aid, out_file):
         for contig in sorted(coords.keys()):
             for start, end, aid in coords[contig]:
                 #print 'gg', contig, start, end, aid
-                out.write('%s\n' % '\t'.join([contig, start, end, align_types[aid]]))
+                out.write('{}\n'.format('\t'.join([contig, start, end, align_types[aid]])))
 
 def link_variants_adjs(variants, adjs):
     vid_to_aid = {}
@@ -168,19 +168,19 @@ def get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
                 support_min_mapped=None,
                 debug=False):
     import pavfinder.genome.read_support
-    script = '%s/read_support.py' % os.path.dirname(os.path.abspath(pavfinder.genome.read_support.__file__))
-    cmd = "python %s %s %s %s %s -n %d" % (script,
-                                           coords_file,
-                                           bam_file,
-                                           contigs_fa,
-                                           support_file,
-                                           num_procs)
+    script = '{}/read_support.py'.format(os.path.dirname(os.path.abspath(pavfinder.genome.read_support.__file__)))
+    cmd = "python {} {} {} {} {} -n {}".format(script,
+                                               coords_file,
+                                               bam_file,
+                                               contigs_fa,
+                                               support_file,
+                                               num_procs)
     if allow_clipped_support:
         cmd += ' --allow_clipped_support'
     if support_min_mapped is not None:
-        cmd += ' --support_min_mapped %s' % support_min_mapped
+        cmd += ' --support_min_mapped {}'.format(support_min_mapped)
     if min_overlap is not None:
-        cmd += ' --min_overlap %d' % min_overlap
+        cmd += ' --min_overlap {}'.format(min_overlap)
     if debug:
         cmd += ' --debug'
     print(cmd)
@@ -189,16 +189,16 @@ def get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
         
 def output(adjs, variants, adjs_failed, variants_failed, outdir, out_prefix=None, adj_meta=None):
     if out_prefix is None:
-        out_file = '%s/adjacencies_filtered.bedpe' % outdir
+        out_file = '{}/adjacencies_filtered.bedpe'.format(outdir)
     else:
-        out_file = '%s/adjacencies_%s_filtered.bedpe' % (outdir, out_prefix)
+        out_file = '{}/adjacencies_{}_filtered.bedpe'.format(outdir, out_prefix)
     
     with open(out_file, 'w') as bedpe:
         if adj_meta is not None:
             bedpe.write(adj_meta)
 
         header = adjs[0].keys()
-        bedpe.write('#%s\n' % '\t'.join(header))
+        bedpe.write('#{}\n'.format('\t'.join(header)))
 
         by_id = {}
         for adj in adjs:
@@ -212,9 +212,9 @@ def output(adjs, variants, adjs_failed, variants_failed, outdir, out_prefix=None
             by_id[cols[0]] = adj
         
     if out_prefix is None:
-        out_file = '%s/variants_filtered.vcf' % outdir
+        out_file = '{}/variants_filtered.vcf'.format(outdir)
     else:
-        out_file = '%s/variants_%s_filtered.vcf' % (outdir, out_prefix)
+        out_file = '{}/variants_{}_filtered.vcf'.format(outdir, out_prefix)
     vheader = None
     iheader = None
     with open(out_file, 'w') as vcf:
@@ -232,10 +232,10 @@ def output(adjs, variants, adjs_failed, variants_failed, outdir, out_prefix=None
                     else:
                         info = []
                         for ih in variants[i][vh].keys():
-                            info.append('%s=%s' % (ih, variants[i][vh][ih]))
+                            info.append('{}={}'.format(ih, variants[i][vh][ih]))
                         cols.append(';'.join(info))
                 line = '\t'.join(cols)
-                vcf.write('%s\n' % line)
+                vcf.write('{}\n'.format(line))
 
 def gather_and_filter(adjs, variants, vid_to_aid, coords_file, contigs_fa,
                       bam_file, out_dir, out_prefix, num_procs,
@@ -243,9 +243,9 @@ def gather_and_filter(adjs, variants, vid_to_aid, coords_file, contigs_fa,
                       adj_meta=None, force=False, debug=False):
     # get support
     if out_prefix is None:
-        support_file = '%s/support.tsv' % out_dir
+        support_file = '{}/support.tsv'.format(out_dir)
     else:
-        support_file = '%s/%s_support.tsv' % (out_dir, out_prefix)
+        support_file = '{}/{}_support.tsv'.format(out_dir, out_prefix)
     if not os.path.exists(support_file) or force:
         get_support(coords_file, bam_file, contigs_fa, support_file, num_procs,
                     min_overlap=min_overlap,
@@ -318,7 +318,7 @@ def main():
     print('done linking events')
     
     out_dir = args.sv_dir
-    coords_file = '%s/coords.tsv' % out_dir
+    coords_file = '{}/coords.tsv'.format(out_dir)
     create_coords_file(adjs, vid_to_aid, coords_file)
     print('done creating coords file')
     
