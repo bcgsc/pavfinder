@@ -58,7 +58,7 @@ $(outdir)/c2t.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa
 $(pavfinder_outdir)/sv.bedpe: $(outdir)/c2g.bam $(outdir)/c2t.bam $(outdir)/r2c.bam $(outdir)/r2c.bam.bai
 	source $(profile) && \
 	mkdir -p $(pavfinder_outdir) && \
-	time pavfinder fusion --gbam $(outdir)/c2g.bam --tbam $(outdir)/c2t.bam --transcripts_fasta $(TRANSCRIPTS_FASTA) --genome_index $(GMAPDB) $(GENOME) --r2c $(outdir)/r2c.bam $(assembly_outdir)/$(name).transcripts.filtered.fa $(GTF) $(GENOME_FASTA) $(pavfinder_outdir) $(PAVFINDER_PARAMS)
+	time pavfinder fusion --gbam $(outdir)/c2g.bam --tbam $(outdir)/c2t.bam --transcripts_fasta $(TRANSCRIPTS_FASTA) --genome_index $(GMAPDB) $(GENOME) --r2c $(outdir)/r2c.bam $(assembly_outdir)/$(name).transcripts.filtered.fa $(GTF) $(GENOME_FASTA) $(pavfinder_outdir) --nproc $(NUM_THREADS) $(PAVFINDER_PARAMS)
 
 # clean up
 clean:
