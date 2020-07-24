@@ -1037,7 +1037,7 @@ class SVFinder:
                             aln.cigartuples[0][1] <= max_unaligned_len):
                         align = Alignment.from_alignedRead(aln, bam)
                         query_len = align.query_len
-                        if align.is_valid and align.target == query_target[query]:
+                        if align.is_valid() and align.target == query_target[query]:
                             tcoords_sorted = sorted([align.tstart, align.tend])
                             if align.strand == '+':
                                 matches.append(tcoords_sorted)
