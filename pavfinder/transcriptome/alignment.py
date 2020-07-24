@@ -53,6 +53,10 @@ class Alignment:
 
     def is_valid(self):
         try:
+            assert self.qstart is not None
+            assert self.qend is not None
+            assert self.tstart is not None
+            assert self.tend is not None
             assert self.qstart > 0
             assert self.qend > self.qstart
             assert self.tstart > 0
