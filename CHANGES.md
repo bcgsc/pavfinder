@@ -113,3 +113,10 @@ v1.7.0
 - conversion to Python3
 - added `filter_fasta.py` and changed `filter_fasta` to use it
 - updated test data
+
+v1.7.1
+- bugfixes and changes related to Fusion-Bloom
+	- bugfix: more checkings in `is_valid()` of `Alignment` object
+	- bugfix: `is_valid()` call in `sv_finder.py`
+	- bugfix: rare case where `adj.size` is not `int`
+	- added `--nproc` to running `pavfinder`
