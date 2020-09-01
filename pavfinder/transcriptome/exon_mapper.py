@@ -250,10 +250,11 @@ class ExonMapper:
     def map_align(self, align):
         mappings = {}
         for record in self.annot.fetch(align.target, align.tstart, align.tend):
-            if record.transcript_id not in self.transcripts_dict:
+            try:
+                transcript = self.transcripts_dict[record.transcript_id]
+            except:
                 continue
 
-            transcript = self.transcripts_dict[record.transcript_id]
             mapping = self.map_exons(align.blocks, transcript.exons)
             if len([m for m in mapping if m is None]) != len(mapping):
                 # new condition: at least one exon has one boundary mapped
