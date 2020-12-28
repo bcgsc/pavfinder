@@ -37,7 +37,7 @@ $(assembly_outdir)/$(name).transcripts.filtered.fa: $(assembly_outdir)/$(name).t
 # r2c
 $(outdir)/r2c.bam: $(assembly_outdir)/$(name).transcripts.filtered.fa
 	source $(profile) && \
-	time minimap2 -ax sr -t $(NUM_THREADS) $(assembly_outdir)/$(name).transcripts.filtered.fa $(left) $(right) | samtools view -uhS - | samtools sort -m $(SAMTOOLS_SORT_MEM) - -o $(outdir)/r2c.bam
+	time minimap2 -ax sr -t $(NUM_THREADS) $(assembly_outdir)/$(name).transcripts.filtered.fa $(left) $(right) | samtools view -uhS -t $(assembly_outdir)/$(name).transcripts.filtered.fa.fai - | samtools sort -m $(SAMTOOLS_SORT_MEM) - -o $(outdir)/r2c.bam
 
 # r2c index
 $(outdir)/r2c.bam.bai: $(outdir)/r2c.bam
