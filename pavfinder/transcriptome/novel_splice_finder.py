@@ -806,7 +806,7 @@ def is_junction_annotated(match1, match2):
     return False
 
 
-def corroborate_genome(adjs, genome_bam):
+def corroborate_genome(adjs, genome_bam=False, vcfs=[], sample=None):
     """Check if genome has splice-site mutation leading to novel splice site
 
     Args:
@@ -820,12 +820,17 @@ def corroborate_genome(adjs, genome_bam):
 
         if adj.event in ('novel_acceptor', 'novel_donor', 'retained_intron', 'novel_intron', 'novel_exon'):
             if adj.splice_motif[0] != canonical and adj.splice_motif[1]:
-                find_genome_support(adj, genome_bam)
+                if genome_bam:
+                    find_genome_support(adj, genome_bam)
+                elif vcfs:
+                    find_vcf_support(adj, vcfs, sample=sample)
 
         if adj.event in ('skipped_exon', 'novel_acceptor', 'novel_donor'):
             if adj.splice_motif[0] == canonical and adj.splice_motif[1] and len(adj.splice_motif[1]) == 4:
-                find_genome_interruptions(adj, genome_bam)
-
+                if genome_bam:
+                    find_genome_interruptions(adj, genome_bam)
+                elif vcfs:
+                    find_vcf_interruptions(adj, vcfs, sample=sample)
 
 def find_genome_support(adj, bam):
     """Reports level of support of novel base change from genome bam file
@@ -859,6 +864,29 @@ def find_genome_support(adj, bam):
 
     adj.genome_support = ','.join(genome_support)
 
+def extract_support_vcf_rec(rec, sample=None):
+    ''' assumptions: first allele is ref, second allele is alt, only one alt allele, DP only single number '''
+    if sample is None:
+        DPs = [s['DP'] for s in rec.samples.values()]
+        ADs = [s['AD'] for s in rec.samples.values()]
+        return '{}/{}'.format(ADs[0][1], DPs[0])
+    else:
+        for s in rec.samples:
+            if s == sample:
+                return '{}/{}'.format(rec.samples[s]['AD'][1], rec.samples[s]['DP'])
+
+def find_vcf_support(adj, vcfs, sample=None):
+    genome_support = []
+    for pos, base, variant in adj.splice_motif[1]:
+        for vcf in vcfs:
+            for rec in vcf.fetch(adj.chroms[0], pos-1, pos):
+                if base.upper() in rec.alleles and pos == rec.pos:
+                    support = extract_support_vcf_rec(rec, sample)
+                    if support:
+                        genome_support.append(support)
+
+    if genome_support:
+        adj.genome_support = ','.join(genome_support)
 
 def find_genome_interruptions(adj, bam):
     """Search for genomic variants that disrupt splice motifs
@@ -904,3 +932,26 @@ def find_genome_interruptions(adj, bam):
     if variants:
         adj.splice_site_variant = ','.join(variants)
         adj.genome_support = ','.join(supports)
+
+def find_vcf_interruptions(adj, vcfs, sample=None, search_dist=500):
+    variants = []
+    supports = []
+    for pos, ref_base in adj.splice_motif[1]:
+        for vcf in vcfs:
+            for rec in vcf.fetch(adj.chroms[0], pos-search_dist, pos+search_dist):
+                if rec.pos == pos and rec.rlen == 1:
+                    variants.append('{}:{}{}>{}'.format(adj.chroms[0], pos, ref_base.upper(), ','.join([a.upper() for a in list(rec.alts)])))
+                    support = extract_support_vcf_rec(rec, sample)
+                    if support:
+                        supports.append(support)
+                elif rec.start <= pos and rec.stop >= pos:
+                    adj.splice_site_variant = ','.join(list(rec.alts))
+                    variants.append('{}:{}{}>{}'.format(adj.chroms[0], '{}-{}'.format(rec.start, rec.stop), rec.ref, ','.join([a.upper() for a in list(rec.alts)])))
+                    support = extract_support_vcf_rec(rec, sample)
+                    if support:
+                        supports.append(support)
+
+    if variants:
+        adj.splice_site_variant = ','.join(variants)
+        if supports:
+            adj.genome_support = ','.join(supports)

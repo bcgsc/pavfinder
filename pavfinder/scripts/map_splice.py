@@ -24,6 +24,8 @@ def parse_args():
     parser.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
     parser.add_argument("--suppl_annot", type=str, nargs="+", help="supplementary annotation file(s) for checking novel splice events")
     parser.add_argument("--genome_bam", type=str, help="genome bam")
+    parser.add_argument("--vcf", type=str, nargs="+", help="vcf(s)")
+    parser.add_argument("--sample", type=str, help="sample in vcf file, assume first sample if not provided")
     parser.add_argument("--max_diff_splice", type=int, help="maximum number of base differences in splice motif. Default:1", default=1)
     
     args = parser.parse_args()
@@ -44,6 +46,11 @@ def create_pysam_tabix(path):
         return pysam.Tabixfile(path, parser=pysam.asGTF())
     return None
 
+def create_pysam_vcf(path):
+    if path is not None and os.path.exists(path):
+        return pysam.VariantFile(path)
+    return None
+
 def main():
     args = parse_args()
     bam = create_pysam_bam(args.bam)
@@ -54,6 +61,9 @@ def main():
     genome_bam = None
     if args.genome_bam:
         genome_bam = create_pysam_bam(args.genome_bam)
+    vcfs = []
+    if args.vcf:
+        vcfs = [create_pysam_vcf(v) for v in args.vcf]
     
     em = ExonMapper(annot_tabix,
                     transcripts_dict,
@@ -85,8 +95,8 @@ def main():
         if events_merged:
             filter_events(events_merged, args.min_support)
 
-    if genome_bam:
-        corroborate_genome(events_merged, genome_bam)
+    if genome_bam or vcfs:
+        corroborate_genome(events_merged, genome_bam=genome_bam, vcfs=vcfs, sample=args.sample)
     
     cmd = ' '.join(sys.argv)
     time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
