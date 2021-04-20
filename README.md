@@ -1,6 +1,6 @@
 ## *P*ost-*A*ssembly *V*ariant *Finder* (PAVFinder)
 
-PAVFinder is a Python package that detects structural variants from *de novo* assemblies (e.g. [ABySS](http://www.bcgsc.ca/platform/bioinfo/software/abyss), [Trans-ABySS](http://www.bcgsc.ca/platform/bioinfo/software/trans-abyss)).  As such, it is able to analyse both genome and transcriptome assemblies:
+PAVFinder is a Python package that detects structural variants from *de novo* assemblies (e.g. [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom), [ABySS](http://www.bcgsc.ca/platform/bioinfo/software/abyss), [Trans-ABySS](http://www.bcgsc.ca/platform/bioinfo/software/trans-abyss)).  As such, it is able to analyse both genome and transcriptome assemblies:
 
 ### genomic structural variants `pavfinder genome`
 - translocations
