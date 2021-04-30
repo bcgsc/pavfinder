@@ -1714,11 +1714,6 @@ class SVFinder:
                     else:
                         set_orients(reverse=True)
 
-            # does not allow downstream breakpoint to be at utr when upstream
-            # isn't
-            within_utrs = (adj.transcripts[0].within_utr(adj.genome_breaks[0]),
-                           adj.transcripts[1].within_utr(adj.genome_breaks[1]))
-
         adj.sense_fusion = sense
 
     def is_fusion_read_through(self, adj):
