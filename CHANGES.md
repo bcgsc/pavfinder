@@ -120,3 +120,8 @@ v1.7.1
 	- bugfix: `is_valid()` call in `sv_finder.py`
 	- bugfix: rare case where `adj.size` is not `int`
 	- added `--nproc` to running `pavfinder`
+
+v1.8.0
+- can also examine splice-site mutations from vcf file(s) in addition to genome bam
+- fix bug so that skip_exon event will now also be examined for splice-site mutations when genome bam or vcf given
+- fix bug in `within_utr()` reported by issue 15
