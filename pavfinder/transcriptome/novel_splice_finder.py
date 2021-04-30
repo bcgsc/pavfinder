@@ -87,7 +87,8 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
             adj.exons = (transcript.coord_to_exon(event['pos'][0]),
                          transcript.coord_to_exon(event['pos'][1]))
 
-            if event['blocks']:
+            if adj.exons and not None in adj.exons:
+            #if event['blocks']:
                 # set up splice_motif field for genome association
                 check_splice_motif_skipped_exon(adj, transcript, ref_fasta)
 
@@ -732,23 +733,24 @@ def check_splice_motif_skipped_exon(adj, transcript, ref_fasta):
     """
     # identify flanking splice-site coordinates of skipped exon(s)
     flanking_exons = sorted(adj.exons)
-    skipped_exons = sorted(
-        set(xrange(min(flanking_exons), max(flanking_exons))).difference(flanking_exons))
+    #skipped_exons = sorted(
+    #    set(xrange(min(flanking_exons), max(flanking_exons))).difference(flanking_exons))
+    skipped_exons = sorted(set(range(min(flanking_exons), max(flanking_exons))).difference(flanking_exons))
 
     exon_coords = set()
     for exon in skipped_exons:
         bounds = transcript.exon(exon)
         exon_coords.add(bounds[0])
         exon_coords.add(bounds[1])
-    sorted_exon_coords = sorted(exon_coords)
-    splice_site_coords = range(
-        sorted_exon_coords[0] - 2,
-        sorted_exon_coords[0]) + range(
-        sorted_exon_coords[1] + 1,
-        sorted_exon_coords[1] + 3)
 
-    # extract coordinates and corresponding bases for
-    # find_genome_interruptions()
+    if not exon_coords or None in exon_coords:
+        adj.splice_motif = [None, []]
+        return
+
+    sorted_exon_coords = sorted(exon_coords)
+    splice_site_coords = list(range(sorted_exon_coords[0] - 2, sorted_exon_coords[0])) + list(range(sorted_exon_coords[1] + 1, sorted_exon_coords[1] + 3))
+
+    # extract coordinates and corresponding bases for find_genome_interruptions()
     adj.splice_motif = [None, []]
     for coord in splice_site_coords:
         adj.splice_motif[1].append([coord, ref_fasta.fetch(transcript.chrom, coord - 1, coord).upper()])
@@ -814,6 +816,7 @@ def corroborate_genome(adjs, genome_bam=False, vcfs=[], sample=None):
         genome_bam: genome bam
     """
     canonical = 'GTAG'
+    canonicals = ('GTAG', 'AGGT')
     for adj in adjs:
         if adj.splice_motif is None:
             continue
@@ -826,7 +829,7 @@ def corroborate_genome(adjs, genome_bam=False, vcfs=[], sample=None):
                     find_vcf_support(adj, vcfs, sample=sample)
 
         if adj.event in ('skipped_exon', 'novel_acceptor', 'novel_donor'):
-            if adj.splice_motif[0] == canonical and adj.splice_motif[1] and len(adj.splice_motif[1]) == 4:
+            if adj.splice_motif[0] in canonicals and adj.splice_motif[1] and len(adj.splice_motif[1]) == 4:
                 if genome_bam:
                     find_genome_interruptions(adj, genome_bam)
                 elif vcfs:
