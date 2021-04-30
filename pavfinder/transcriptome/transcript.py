@@ -346,7 +346,7 @@ class Transcript:
 
     def within_utr(self, pos):
         utrs = self.utr()
-        if utrs is not None:
+        if utrs is not None and pos is not None:
             utr5, utr3 = utrs
             if pos >= utr5[0] and pos <= utr5[1]:
                 return 5
