@@ -870,13 +870,20 @@ def find_genome_support(adj, bam):
 def extract_support_vcf_rec(rec, sample=None):
     ''' assumptions: first allele is ref, second allele is alt, only one alt allele, DP only single number '''
     if sample is None:
-        DPs = [s['DP'] for s in rec.samples.values()]
-        ADs = [s['AD'] for s in rec.samples.values()]
-        return '{}/{}'.format(ADs[0][1], DPs[0])
+        try:
+            DPs = [s['DP'] for s in rec.samples.values()]
+            ADs = [s['AD'] for s in rec.samples.values()]
+
+            return '{}/{}'.format(ADs[0][1], DPs[0])
+        except:
+            return None
     else:
         for s in rec.samples:
             if s == sample:
-                return '{}/{}'.format(rec.samples[s]['AD'][1], rec.samples[s]['DP'])
+                try:
+                    return '{}/{}'.format(rec.samples[s]['AD'][1], rec.samples[s]['DP'])
+                except:
+                    return None
 
 def find_vcf_support(adj, vcfs, sample=None):
     genome_support = []
