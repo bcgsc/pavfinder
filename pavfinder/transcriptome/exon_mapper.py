@@ -337,16 +337,24 @@ class ExonMapper:
                     continue
 
                 if i == 0:
+                    if matches[i][0][1][1] == '=':
+                        score += 2
+                    '''
                     if matches[i][0][1][0] == '=':
                         score += 5
                     elif matches[i][0][1][0] == '>':
                         score += 2
+                    '''
 
                 elif i == len(matches) - 1:
+                    if matches[i][-1][1][0] == '=':
+                        score += 2
+                    '''
                     if matches[i][-1][1][1] == '=':
                         score += 5
                     elif matches[i][-1][1][1] == '<':
                         score += 2
+                    '''
 
                 if matches[i][0][1][1] == '=':
                     score += 4
@@ -400,7 +408,7 @@ class ExonMapper:
             metrics[tid] = metric
 
             if self.debug:
-                sys.stdout.write("mapping {} {} {}\n".format(align.query, tid, metric))
+                sys.stdout.write("mapping {} {} {} {}\n".format(align.query, tid, metric, matches))
 
         if mappings:
             tids_sorted = sorted(metrics.keys(), key=lambda tid: (-1 * metrics[tid]['score'], metrics[tid]['from_edge'], metrics[tid]['txt_size']))
