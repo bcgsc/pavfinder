@@ -125,3 +125,9 @@ v1.8.0
 - can also examine splice-site mutations from vcf file(s) in addition to genome bam
 - fix bug so that skip_exon event will now also be examined for splice-site mutations when genome bam or vcf given
 - fix bug in `within_utr()` reported by issue 15
+
+v1.8.1
+- use try..except in processing VCF to prevent crash
+- renamed `find_genome_splicing_support.py` to `link_ssv.py`
+- does not give extra weight to matching outermost exon/block boundaries when calculating score in alignment-transcript mapping
+- bugfix: sorting chromosome names
