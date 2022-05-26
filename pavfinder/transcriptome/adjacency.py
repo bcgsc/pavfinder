@@ -609,29 +609,28 @@ class Adjacency:
 
     @classmethod
     def cmp_genome_coords(cls, coord1, coord2):
-        def extract_chrom(chrom):
-            if chrom.isdigit():
-                return None, int(chrom)
-            else:
-                m = re.search(r'^(\D+)(\d+)$', chrom)
-                if m:
-                    return m.group(1), int(m.group(2))
-            return None, chrom
-
         if coord1[0] != coord2[0]:
-            prefix1, chrom1 = extract_chrom(coord1[0])
-            prefix2, chrom2 = extract_chrom(coord2[0])
+            chrom1 = re.sub('^chr', '', coord1[0], flags=re.I)
+            chrom2 = re.sub('^chr', '', coord2[0], flags=re.I)
 
-            if prefix1 == prefix2:
-                if chrom1 < chrom2:
+            if chrom1.isdigit() and chrom2.isdigit():
+                if int(chrom1) < int(chrom2):
                     return -1
                 else:
                     return 1
+
+            elif chrom1.isdigit() and not chrom2.isdigit():
+                return -1
+
+            elif not chrom1.isdigit() and chrom2.isdigit():
+                return 1
+
+            elif chrom1 < chrom2:
+                return -1
+
             else:
-                if coord1[0] < coord2[0]:
-                    return -1
-                else:
-                    return 1
+                return 1
+ 
         else:
             if int(coord1[1]) < int(coord2[1]):
                 return -1
