@@ -6,6 +6,7 @@ Make sure the following software are in your PATH
 - [bwa](http://bio-bwa.sourceforge.net/)
 - [samtools](http://samtools.sourceforge.net/)
 - [gmap](http://research-pub.gene.com/gmap/) (optional for fusion/transcriptome SV analysis)
+- [blastn](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
 
 ### Python package
 Install the following Python packages (e.g. using `pip insall`)

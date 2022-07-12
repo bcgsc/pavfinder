@@ -131,3 +131,4 @@ v1.8.1
 - renamed `find_genome_splicing_support.py` to `link_ssv.py`
 - does not give extra weight to matching outermost exon/block boundaries when calculating score in alignment-transcript mapping
 - bugfix: sorting chromosome names
+- added `blastn` as a dependency to INSTALL instructions (for detecting duplication events)
