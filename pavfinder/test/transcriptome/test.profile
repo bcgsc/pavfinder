@@ -6,3 +6,4 @@ export GMAPDB=/path/to/gmapdb
 export GTF=/path/to/refGene.sorted.gtf.gz
 export TRANSCRIPTS_FASTA=/path/to/refGene.fa
 export GENOME_FASTA=/path/to/hg19.fa
+export RNABLOOM_PARAMS='-ntcard -fpr 0.005 -chimera -extend -tiplength 5'

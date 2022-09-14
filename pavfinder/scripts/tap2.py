@@ -319,7 +319,7 @@ def assemble_single_gene(fastqs, gene_fasta, readlen):
     
     fastqs_sorted = sorted(fastqs)
     
-    cmd = 'rnabloom -length {} -l {} -r {} -o {} -n {} -prefix {} --revcomp-right'.format(readlen,
+    cmd = 'rnabloom -length {} -l {} -r {} -o {} -n {} -prefix {} --revcomp-right -tiplength 5 -extend -chimera'.format(readlen,
                                                                                           fastqs_sorted[0],
                                                                                           fastqs_sorted[1],
                                                                                           outdir,

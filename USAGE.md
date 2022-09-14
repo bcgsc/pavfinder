@@ -67,6 +67,6 @@
   export GTF=/path/to/gencode.v26.annotation.transcripts.sorted.gtf.gz
   export TRANSCRIPTS_FASTA=/path/to/gencode.v26.annotation.transcripts.sorted.gtf.fa
   export GENOME_FASTA=/path/to/hg38.fa
-  export RNABLOOM_PARAMS='-ntcard -fpr 0.005 -chimera -extend'
+  export RNABLOOM_PARAMS='-ntcard -fpr 0.005 -chimera -extend -tiplength 5'
   export PAVFINDER_PARAMS='--only_fusions --include_non_exon_bound_fusion --min_support 2'
   ```
