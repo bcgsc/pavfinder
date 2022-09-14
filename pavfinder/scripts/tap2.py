@@ -147,7 +147,6 @@ parser.add_argument('--only_splicing', action='store_true')
 parser.add_argument('--genome_bam', type=str, help='genome bam(for detecting splice-site variants)')
 parser.add_argument('--params', type=str, help='parameters file')
 assembly = parser.add_argument_group('assembly')
-assembly.add_argument('--k', type=int, nargs='+', help='k sizes for assembly')
 assembly.add_argument('--readlen', type=int, help='read length')
 alignments = parser.add_argument_group('alignments')
 alignments.add_argument('--genome_index', type=str, nargs=2, help='gmap index')
@@ -326,6 +325,7 @@ def assemble_single_gene(fastqs, gene_fasta, readlen):
                                                                                           prefix,
                                                                                           prefix + '.',
                                                                                           )
+
     if 'assembly' in params:
         aps = params['assembly']
         cmd += '{} '.format(' '.join(['-{} {}'.format(name, aps[name]) for name in aps.keys() if type(aps[name]) is not bool]))
