@@ -26,13 +26,20 @@ PAVFinder is a Python package that detects structural variants from *de novo* as
 
 PAVFinder infers variants from non-contiguous (split or gapped) contig sequence alignments to the reference genome. Assemblies can be aligned to the reference genome (`c2g` alignment) using [bwa mem](http://bio-bwa.sourceforge.net/)(genome) or [gmap](http://research-pub.gene.com/gmap/)(transcriptome).  Read support for events can be gathered by aligning reads to the assembly using [bwa mem](http://bio-bwa.sourceforge.net/) (`r2c` alignment).
 
-A pipeline that bundles the 3 analysis steps called `TAP` (*T*ransabyss-*A*lignment-*P*AVFinder) is provided to facilitate whole transcriptome analysis. TAP is also designed to be run in a targeted mode on selected genes. This requires a [Bloom Filter](http://www.bcgsc.ca/platform/bioinfo/software/biobloomtools) of targeted gene sequences to be created beforehand. Whereas the full assembly of a single RNAseq library with over 100 million read pairs requires more than 24 hours to complete, a targeted assembly and analysis of a gene list (e.g. [COSMIC](http://cancer.sanger.ac.uk/census/)) of several hundred can be completed within half an hour.
+We provide a *T*argeted-*A*ssembly-*P*ipeline, `TAP`, to facilitate transcriptome analysis on selected genes. This requires a [multi-index Bloom Filter](http://www.bcgsc.ca/platform/bioinfo/software/biobloomtools) of targeted gene sequences to be created beforehand. Whereas whole transcriptome analysis with over 100 million read pairs can take more than 24 hours, a targeted analysis of several hundred genes (e.g. [COSMIC](http://cancer.sanger.ac.uk/census/)) can be completed within half an hour. `TAP` uses [Trans-ABySS](https://github.com/bcgsc/transabyss) for transcriptome assembly. `TAP2` is the successor of `TAP` and it uses [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) for transcriptome assembly.
 
-A new pipeline named `fusion-bloom` coupling PAVFinder with our latest RNA-seq assembler [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) has been added to the repository. We demonstrated that it has higher senstivitiy and specificity than most state-of-the-art fusion callers.    
+We also provide a pipeline for gene fusion detection in RNA-seq data, `Fusion-Bloom`, which couples PAVFinder with [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom). We demonstrated that it has higher senstivitiy and specificity than most state-of-the-art fusion callers.    
 
-`TAP2`, the next version of `TAP` using RNA-Bloom instead of Trans-ABySS for better transcriptome assembly, has been released.
+### Installation
+See [INSTALL.md](INSTALL.md)
 
-### Publication
+### Usage
+See [USAGE.md](USAGE.md)
+
+### Test Data
+See [pavfinder/test](pavfinder/test) for a small dataset to test our transcriptome (`TAP`, `TAP2`, and `Fusion-Bloom`) and genome workflows.
+
+### Publications
 Readman Chiu, Ka Ming Nip, Justin Chu and Inanc Birol. **TAP: a targeted clinical genomics pipeline for detecting transcript variants using RNA-seq data**. *BMC Med Genomics* (2018) 11:79 [https://doi.org/10.1186/s12920-018-0402-6](https://doi.org/10.1186/s12920-018-0402-6)
 
 Readman Chiu, Ka Ming Nip, Inanc Birol. **Fusion-Bloom: fusion detection in assembled transcriptomes**. *Bioinformatics* (2019) btz902 [https://doi.org/10.1093/bioinformatics/btz902](https://doi.org/10.1093/bioinformatics/btz902)
