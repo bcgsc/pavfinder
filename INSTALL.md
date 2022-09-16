@@ -37,8 +37,9 @@ mamba activate pavfinder
 mamba install --file conda_requirements.txt -c conda-forge -c bioconda
 ```
 
-Before running `tap.py`, `tap2.py`, `fusion-bloom`, or other scripts, set up your `PATH` and `PYTHONPATH`, e.g.
+Before running `tap.py`, `tap2.py`, `fusion-bloom`, or other scripts, set your `PATH` and `PYTHONPATH` after activating your `conda` environment, e.g.
 ```
+conda activate pavfinder
 export PATH=/path/to/pavfinder/scripts:${PATH}
 export PYTHONPATH=/path/to/pavfinder
 ```
