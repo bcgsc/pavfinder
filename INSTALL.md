@@ -37,6 +37,12 @@ mamba activate pavfinder
 mamba install --file conda_requirements.txt -c conda-forge -c bioconda
 ```
 
+Before running `tap.py`, `tap2.py`, `fusion-bloom`, or other scripts, set up your `PATH` and `PYTHONPATH`, e.g.
+```
+export PATH=/path/to/pavfinder/scripts:${PATH}
+export PYTHONPATH=/path/to/pavfinder
+```
+
 ## Install PAVFinder in `virtualenv`
 
 This is an alternative to using a `conda` environment. All required software listed above must be in your `PATH`.
