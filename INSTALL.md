@@ -29,12 +29,19 @@ It is recommended to use `mamba` instead of `conda`.
 ```
 conda create -n pavfinder
 conda activate pavfinder
-conda install -f conda_requirements.txt -c conda-forge -c bioconda
+conda install --file conda_requirements.txt -c conda-forge -c bioconda
 ```
 ```
 mamba create -n pavfinder
 mamba activate pavfinder
-mamba install -f conda_requirements.txt -c conda-forge -c bioconda
+mamba install --file conda_requirements.txt -c conda-forge -c bioconda
+```
+
+Before running `tap.py`, `tap2.py`, `fusion-bloom`, or other scripts, set your `PATH` and `PYTHONPATH` after activating your `conda` environment, e.g.
+```
+conda activate pavfinder
+export PATH=/path/to/pavfinder/scripts:${PATH}
+export PYTHONPATH=/path/to/pavfinder
 ```
 
 ## Install PAVFinder in `virtualenv`
