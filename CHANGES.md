@@ -134,5 +134,5 @@ v1.8.1
 - added `blastn` as a dependency to INSTALL instructions (for detecting duplication events)
 
 v1.8.2
-- updated requirements file for creating conda environment for pavfinder, tap, tap2, and fusion-bloom
-- updated expected output files for tap, tap2, and fusion-bloom
+- updated requirements file for creating conda environment for `pavfinder`, `tap`, `tap2`, and `fusion-bloom`
+- updated expected output files for `tap`, `tap2`, and `fusion-bloom`
