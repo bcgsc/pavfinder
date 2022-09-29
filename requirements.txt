@@ -3,4 +3,3 @@ pybedtools>=0.6.9
 intspan>=0.701
 biopython
 ruffus
-python-igraph

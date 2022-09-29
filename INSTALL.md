@@ -17,8 +17,6 @@ Install the following Python packages (e.g. using `pip insall`)
 - [pysam](https://github.com/pysam-developers/pysam)
 - [pybedtools](https://daler.github.io/pybedtools/)
 - [intspan](https://pypi.python.org/pypi/intspan/)
-- [numpy](https://numpy.org/)
-- [pandas](https://pandas.pydata.org/)
 - [biopython](http://biopython.org/) (for transcriptome analysis)
 - [ruffus](http://www.ruffus.org.uk/) (for TAP)
 
