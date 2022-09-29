@@ -61,7 +61,7 @@ pavfinder splice c2g.bam test.fa refGene.sorted.gtf.gz /path/to/hg19.fa /path/to
     * specify full paths to `genome_fasta` and `genome_index`(GMAP hg19 index)
     * specify full paths to `transcripts_fasta`(`refGene.fa` provided) and `gtf`(`refGene.sorted.gtf.gz` provided)
   * `test_genes.bf`: Bloom filter corresponding to the genes described above containing the various events
-* output `transcriptome/expected_output/tap.tar.gz`
+* output `transcriptome/expected_output/tap.tar.gz` or `transcriptome/expected_output/tap2.tar.gz`
 
 The Bloom filter provided for testing with `tap` and `tap2` was generated with the following spaced seeds:
 ```
@@ -79,7 +79,7 @@ tap2 test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test
   * `test.profile`
 	* specify full paths to `GMAPDB` and `GENOME_FASTA`(GMAP hg19 index and hg19 fasta file)
 	* specify full paths to `TRANSCRIPTS_FASTA`(`refGene.fa` provided) and `GTF`(`refGene.sorted.gtf.gz` provided)
-* output `transcriptome/expected_output/fusion-bloom.out.tar.gz`
+* output `transcriptome/expected_output/fusion-bloom.tar.gz`
 
 ```
 fusion-bloom profile=test.profile left=test_1.fastq.gz right=test_2.fastq.gz readlen=100 name=test
