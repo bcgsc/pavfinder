@@ -69,7 +69,8 @@ biobloommimaker -F -b 0.8 -t 64 -p test_genes -S "001100111101110000001100101001
 ```
 
 ```
-tap.py test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
+tap test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --k 32 62 92 --readlen 100 --params test.cfg --remove_fq
+tap2 test /path/to/output_directory --bf test_genes.bf --fq test_1.fastq.gz test_2.fastq.gz --readlen 100 --params test.cfg --remove_fq
 ```
 
 ## fusion-bloom
