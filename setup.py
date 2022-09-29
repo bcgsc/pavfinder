@@ -12,10 +12,10 @@ setup(
     url='https://github.com/bcgsc/pavfinder.git',
     author='Readman Chiu',
     author_email='rchiu@bcgsc.ca',
-    license='BCCA',
+    license='GPL',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.8',
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
