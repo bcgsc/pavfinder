@@ -18,7 +18,7 @@ Install the following Python packages (e.g. using `pip insall`)
 - [pybedtools](https://daler.github.io/pybedtools/)
 - [intspan](https://pypi.python.org/pypi/intspan/)
 - [biopython](http://biopython.org/) (for transcriptome analysis)
-- [ruffus](http://www.ruffus.org.uk/) (for TAP)
+- [ruffus](http://www.ruffus.org.uk/) (for TAP and TAP2)
 
 ## Set up a `conda` environment
 
