@@ -132,3 +132,7 @@ v1.8.1
 - does not give extra weight to matching outermost exon/block boundaries when calculating score in alignment-transcript mapping
 - bugfix: sorting chromosome names
 - added `blastn` as a dependency to INSTALL instructions (for detecting duplication events)
+
+v1.8.2
+- updated requirements file for creating conda environment for pavfinder, tap, tap2, and fusion-bloom
+- updated expected output files for tap, tap2, and fusion-bloom
