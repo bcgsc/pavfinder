@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from pavfinder.transcriptome.adjacency import Adjacency
 import re
 from pavfinder.transcriptome.novel_splice_finder import corroborate_genome, check_splice_motif_novel_site, check_splice_motif_skipped_exon
