@@ -32,8 +32,8 @@ def find_unmapped_mates(bam, outdir):
 
     prev_aln = None
     for aln in bam.fetch(until_eof=True):
-	if not aln.is_unmapped and len(aln.cigartuples) > 1 and 5 in [t[0] for t in aln.cigartuples]:
-	    continue
+        if not aln.is_unmapped and len(aln.cigartuples) > 1 and 5 in [t[0] for t in aln.cigartuples]:
+            continue
 
         if prev_aln is not None:
             if aln.is_unmapped and not aln.mate_is_unmapped and prev_aln.query_name == aln.query_name:
@@ -59,7 +59,7 @@ def align_unmapped_mates(fastas, ref, nthreads, outdir):
     process = subprocess.Popen('/bin/bash -c "{}"'.format(cmd), shell = True)
     process.communicate()
     if process.returncode != 0:
-	return Exception("Failed to run '{}'\n".format(cmd))
+        return Exception("Failed to run '{}'\n".format(cmd))
     
     return out_bam
 
@@ -118,7 +118,7 @@ def shuffle_to_exon_bound(txt1, txt2, txt_break1, txt_break2, txt_orient1, txt_o
     exon2 = txt2.txt_coord_to_exon(txt_break2)
 
     if exon1 is None or exon2 is None:
-	return txt_break1, txt_break2, exon_bound
+        return txt_break1, txt_break2, exon_bound
 
     exon_span1 = txt1.exon(exon1, transcript_coord=True)
     exon_span2 = txt2.exon(exon2, transcript_coord=True)
@@ -178,9 +178,9 @@ def check_frame(adj, genome_fasta):
                               chimeric_seq,
                               genome_fasta)
         if type(in_frame) is tuple:
-	    adj.in_frame = True
-	else:
-	    adj.in_frame = in_frame
+            adj.in_frame = True
+        else:
+            adj.in_frame = in_frame
 
 def create_adj(event):
     seq_id = ','.join(event['spanning'] + event['flanking'])
@@ -329,7 +329,7 @@ def find_discordant_pairs(bam, transcripts_dict, genome_fasta, min_pairs=2):
 
 def cleanup(outdir):
     for ff in ('unmapped_1.fa', 'unmapped_2.fa', 'unmapped.bam'):
-	os.remove('{}/{}'.format(outdir, ff))
+        os.remove('{}/{}'.format(outdir, ff))
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Extracts discordant read pairs when fusion breakpoints are not captured')
@@ -360,7 +360,7 @@ def main():
     Adjacency.report_events(adjs, '{}/discordant_pairs.bedpe'.format(args.outdir))
     
     if not args.no_cleanup:
-	cleanup(args.outdir)
+        cleanup(args.outdir)
 
 main()
 
