@@ -1,4 +1,0 @@
-#!/bin/bash
-
-script_dir=`dirname $0`
-python $script_dir/filter_fasta.py $@
