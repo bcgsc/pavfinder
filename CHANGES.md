@@ -139,3 +139,6 @@ v1.8.2
 
 v1.8.3
 - minor fixes for compatibility with Bioconda
+
+v1.8.4
+- separate bash and make files for fusion-bloom for Bioconda recipe
