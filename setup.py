@@ -91,5 +91,6 @@ setup(
                'pavfinder/scripts/fusion-bloom.makefile',
                'pavfinder/scripts/tap2',
                'pavfinder/scripts/filter_fasta.py',
+               'pavfinder/scripts/link_ssv.py',
                ],
 )

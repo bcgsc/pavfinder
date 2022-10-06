@@ -141,4 +141,7 @@ v1.8.3
 - minor fixes for compatibility with Bioconda
 
 v1.8.4
-- separate bash and make files for fusion-bloom for Bioconda recipe
+- separate bash and make files for `fusion-bloom` for `Bioconda` recipe
+
+v1.8.5
+- added `link_ssv.py` to `setup.py`
