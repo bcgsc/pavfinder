@@ -1,3 +1,8 @@
+[![Release](https://img.shields.io/github/v/release/bcgsc/pavfinder?include_prereleases)](https://github.com/bcgsc/pavfinder/releases)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/pavfinder/badges/latest_release_date.svg)](https://anaconda.org/bioconda/pavfinder)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/pavfinder/badges/installer/conda.svg)](https://conda.anaconda.org/bioconda)
+[![Conda](https://img.shields.io/conda/dn/bioconda/pavfinder?label=Conda)](https://anaconda.org/bioconda/pavfinder)
+
 ## *P*ost-*A*ssembly *V*ariant *Finder* (PAVFinder)
 
 PAVFinder is a Python package that detects structural variants from *de novo* assemblies (e.g. [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom), [ABySS](http://www.bcgsc.ca/platform/bioinfo/software/abyss), [Trans-ABySS](http://www.bcgsc.ca/platform/bioinfo/software/trans-abyss)).  As such, it is able to analyse both genome and transcriptome assemblies:
