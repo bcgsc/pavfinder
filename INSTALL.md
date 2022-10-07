@@ -20,26 +20,16 @@ Install the following Python packages (e.g. using `pip insall`)
 - [biopython](http://biopython.org/) (for transcriptome analysis)
 - [ruffus](http://www.ruffus.org.uk/) (for TAP and TAP2)
 
-## Set up a `conda` environment
-
-It is recommended to use `mamba` instead of `conda`.
+## Install PAVFinder in a `conda` environment
 
 ```
 conda create -n pavfinder
 conda activate pavfinder
-conda install --file conda_requirements.txt -c conda-forge -c bioconda
+conda install -c bioconda pavfinder
 ```
+It is recommended to use `mamba` instead of `conda`, i.e.
 ```
-mamba create -n pavfinder
-mamba activate pavfinder
-mamba install --file conda_requirements.txt -c conda-forge -c bioconda
-```
-
-Before running `tap`, `tap2`, `fusion-bloom`, or other scripts, set your `PATH` and `PYTHONPATH` after activating your `conda` environment, e.g.
-```
-conda activate pavfinder
-export PATH=/path/to/pavfinder/scripts:${PATH}
-export PYTHONPATH=/path/to/pavfinder
+mamba install -c bioconda pavfinder
 ```
 
 ## Install PAVFinder in `virtualenv`
