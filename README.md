@@ -1,6 +1,6 @@
 [![Release](https://img.shields.io/github/v/release/bcgsc/pavfinder?include_prereleases)](https://github.com/bcgsc/pavfinder/releases)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/pavfinder/badges/latest_release_date.svg)](https://anaconda.org/bioconda/pavfinder)
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/pavfinder/badges/installer/conda.svg)](https://conda.anaconda.org/bioconda)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/pavfinder/badges/installer/conda.svg)](https://conda.anaconda.org/bioconda/pavfinder)
 [![Conda](https://img.shields.io/conda/dn/bioconda/pavfinder?label=Conda)](https://anaconda.org/bioconda/pavfinder)
 
 ## *P*ost-*A*ssembly *V*ariant *Finder* (PAVFinder)
