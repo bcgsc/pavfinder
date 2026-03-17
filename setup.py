@@ -9,7 +9,7 @@ setup(
     version=__version__,
     description='Post Assembly Variant Finder',
     long_description='Identifies genomic structural variants or transcriptomic splice variants given the alignments of assembly contigs',
-    url='https://github.com/bcgsc/pavfinder.git',
+    url='https://github.com/BirolLab/pavfinder.git',
     author='Readman Chiu',
     author_email='rchiu@bcgsc.ca',
     license='GPL',
