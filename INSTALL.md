@@ -7,9 +7,9 @@ Make sure the following software are in your `PATH`
 - [samtools](http://samtools.sourceforge.net/)
 - [blastn](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
 - [gmap](http://research-pub.gene.com/gmap/) (for Fusion-Bloom, TAP, TAP2)
-- [biobloomtools](https://github.com/bcgsc/biobloom) (for TAP and TAP2)
-- [RNA-Bloom](https://github.com/bcgsc/RNA-Bloom) (for Fusion-Bloom and TAP2)
-- [Trans-ABySS](https://github.com/bcgsc/transabyss) (for TAP)
+- [biobloomtools](https://github.com/BirolLab/biobloom) (for TAP and TAP2)
+- [RNA-Bloom](https://github.com/BirolLab/RNA-Bloom) (for Fusion-Bloom and TAP2)
+- [Trans-ABySS](https://github.com/BirolLab/transabyss) (for TAP)
 
 ### Python package
 Install the following Python packages (e.g. using `pip insall`)
@@ -40,5 +40,5 @@ This is an alternative to using a `conda` environment. All required software lis
 $ pip install virtualenv
 $ virtualenv <DIR>
 $ source <DIR>/bin/activate
-$ pip install git+https://github.com/bcgsc/pavfinder.git#egg=pavfinder
+$ pip install git+https://github.com/BirolLab/pavfinder.git#egg=pavfinder
 ```
